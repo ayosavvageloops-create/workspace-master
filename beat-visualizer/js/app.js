@@ -353,7 +353,7 @@
         look, ctx: c, buffer: state.buffer, fps: state.fps, filename: name, normalize: state.normalize, signal: exporting.signal,
         onProgress: (k, label) => { bar.style.width = `${k * 100}%`; $('exportStatus').textContent = `${label} ${Math.round(k * 100)}%`; },
       });
-      $('exportStatus').textContent = res.cancelled ? 'Cancelled.' : `Saved ${name} · ${(res.size / 1e6).toFixed(1)} MB in ${res.seconds.toFixed(1)} s${res.codec ? ' · ' + res.codec : ''}${res.codec && !res.codec.startsWith('H.264') ? ' (this browser has no H.264 encoder; use Chrome or Edge on Mac/Windows for the most compatible file)' : ''}`;
+      $('exportStatus').textContent = res.cancelled ? 'Cancelled.' : `Saved ${res.path || name} · ${(res.size / 1e6).toFixed(1)} MB in ${res.seconds.toFixed(1)} s${res.codec ? ' · ' + res.codec : ''}${res.codec && !res.codec.startsWith('H.264') ? ' (this browser has no H.264 encoder; use Chrome or Edge on Mac/Windows for the most compatible file)' : ''}`;
     } catch (err) {
       console.error(err);
       $('exportStatus').textContent = `Export failed: ${err.message}`;

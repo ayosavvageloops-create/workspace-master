@@ -31,3 +31,13 @@ Every look has an accent colour plus its own options. All looks work in 9:16, 16
 - `tools/snap.cjs` — renders looks on the demo beat in headless Chromium for review:
   `node tools/snap.cjs <look|all> --out snaps [--format 16:9] [--nomidi]`.
 - `vendor/fonts` — self-hosted Google Fonts (SIL OFL) so the app works offline.
+
+## Desktop app (Electron)
+`desktop/` wraps the web app in an Electron window with a native "Save as" dialog for exports.
+```
+cd desktop && npm install
+npm start            # run it
+npm run dist:mac     # macOS Apple Silicon zip
+npm run dist:win     # Windows installer (needs wine when built on Linux)
+```
+On macOS the app is not notarised: the first time, right-click it and choose **Open**.

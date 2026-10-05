@@ -1,0 +1,56 @@
+{
+  "name": "beat-visualizer",
+  "productName": "Beat Visualizer",
+  "version": "1.0.0",
+  "description": "Turns a beat and its MIDI into a short video with 40 looks.",
+  "main": "main.js",
+  "author": "Beat Visualizer",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "prepare-app": "node prepare.js",
+    "start": "node prepare.js && electron .",
+    "dist:mac": "node prepare.js && electron-builder --mac zip --arm64",
+    "dist:win": "node prepare.js && electron-builder --win nsis --x64",
+    "dist": "node prepare.js && electron-builder --mac zip --arm64 --win nsis --x64"
+  },
+  "build": {
+    "appId": "app.beatvisualizer.desktop",
+    "productName": "Beat Visualizer",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.video",
+      "icon": "build/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Beat Visualizer",
+      "artifactName": "Beat-Visualizer-Setup-${version}.${ext}"
+    },
+    "artifactName": "Beat-Visualizer-${version}-${os}-${arch}.${ext}",
+    "publish": null
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  }
+}

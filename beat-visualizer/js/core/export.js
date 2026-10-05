@@ -86,6 +86,7 @@
   }
 
   async function saveTarget(filename) {
+    if (window.desktop) return null; // desktop app: native save dialog after rendering
     if (window.claude) return null; // inside an artifact frame the file picker is refused
     if (window.showSaveFilePicker) {
       try {
@@ -97,6 +98,11 @@
     return null;
   }
   async function save(handle, blob, filename) {
+    if (window.desktop) {
+      const saved = await window.desktop.saveFile(filename, blob);
+      if (!saved) throw Object.assign(new Error('Not saved.'), { cancelled: true });
+      return saved;
+    }
     if (handle && handle !== 'cancel') {
       const ws = await handle.createWritable(); await ws.write(blob); await ws.close();
       return;
@@ -122,8 +128,10 @@
     if (window.VideoEncoder && window.AudioEncoder && window.Mp4Muxer) blob = await offline(opts);
     else blob = await realtime(opts);
     if (!blob) return { cancelled: true };
-    await save(handle, blob, blob.type.includes('webm') ? filename.replace(/\.mp4$/, '.webm') : filename);
-    return { seconds: (performance.now() - t0) / 1000, size: blob.size, codec: blob.codec };
+    let savedPath;
+    try { savedPath = await save(handle, blob, blob.type.includes('webm') ? filename.replace(/\.mp4$/, '.webm') : filename); }
+    catch (e) { if (e.cancelled) return { cancelled: true }; throw e; }
+    return { seconds: (performance.now() - t0) / 1000, size: blob.size, codec: blob.codec, path: savedPath };
   }
 
   async function offline({ look, ctx, buffer, fps, normalize, onProgress, signal }) {
