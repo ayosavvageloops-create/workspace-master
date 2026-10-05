@@ -133,7 +133,7 @@
       const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
       let lastEnd = 0;
       for (const p of parts) if (p.notes.length) lastEnd = Math.max(lastEnd, p.notes[p.notes.length - 1].e);
-      const nBars = Math.max(1, lastEnd ? Math.ceil((lastEnd - origin) / S.bar - 0.05) : Math.round(S.A.dur / S.bar));
+      const nBars = Math.max(1, S.hasMidi && lastEnd ? Math.ceil((lastEnd - origin) / S.bar - 0.05) : Math.floor((S.A.dur - origin) / S.bar + 0.25));
       U.text(g, [`${nBars} bars`, S.meta.key, Math.round(S.bpm)].filter(Boolean).join(' · '), M.box.x + M.box.w, hy, { size: unit * 0.036, font: U.FONT.MONO, color: '#8d8a9c', align: 'right' });
 
       const mb = M.box;

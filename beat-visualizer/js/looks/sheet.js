@@ -153,7 +153,7 @@
       const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
       let lastEnd = 0;
       for (const p of S.parts) if (p.notes.length) lastEnd = Math.max(lastEnd, p.notes[p.notes.length - 1].e);
-      const nBars = Math.max(1, lastEnd ? Math.ceil((lastEnd - origin) / S.bar - 0.05) : Math.round((S.A.dur - origin) / S.bar));
+      const nBars = Math.max(1, S.hasMidi && lastEnd ? Math.ceil((lastEnd - origin) / S.bar - 0.05) : Math.floor((S.A.dur - origin) / S.bar + 0.25));
       const barIdx = Math.max(0, Math.floor((S.t - origin) / S.bar));
       const page = Math.floor(barIdx / L.n), pages = Math.max(1, Math.ceil(nBars / L.n));
       const barX = (t, b0) => L.xN0 + ((t - b0) / S.bar) * (L.xN1 - L.xN0);
