@@ -159,9 +159,11 @@ Looks.register({
       const ix = bands.x + unit * 0.012, iy = bands.y + unit * 0.03, iw = bands.w - unit * 0.024, ih = bands.h - unit * 0.042;
       const cg = Math.max(1, unit * 0.003), cw = (iw - cg * (cols - 1)) / cols, ch = (ih - cg * (rows - 1)) / rows;
       const lvl = (v) => Math.min(rows, Math.floor(Math.pow(v, 2.3) * (rows + 0.5)));
-      const now = Float32Array.from(A.bands12(S.t));
+      // meter ballistics: each reading averages ~70 ms so cells do not flicker frame to frame
+      const avg = (tt) => { const o = new Float32Array(cols); for (let j = 0; j < 4; j++) { const b = A.bands12(tt - j * 0.018); for (let i = 0; i < cols; i++) o[i] += b[i] / 4; } return o; };
+      const now = avg(S.t);
       const peak = new Int8Array(cols);
-      for (let k = 1; k <= 12; k++) { const b = A.bands12(S.t - k * 0.06); for (let i = 0; i < cols; i++) peak[i] = Math.max(peak[i], lvl(b[i])); }
+      for (let k = 1; k <= 10; k++) { const b = avg(S.t - k * 0.075); for (let i = 0; i < cols; i++) peak[i] = Math.max(peak[i], lvl(b[i])); }
       const hot = Math.max(1, Math.round(rows / 3));
       for (let i = 0; i < cols; i++) {
         const lit = lvl(now[i]);

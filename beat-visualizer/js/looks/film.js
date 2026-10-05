@@ -84,15 +84,26 @@
       g.drawImage(C.bg, 0, 0, w, h);
       g.drawImage(C.lines, 0, 0, w, h);
       const fr = Math.floor(S.t * 24);                  // film frame index (24 fps feel)
-      const weave = opt.dust ? (U.hash(fr, 7) - 0.5) * u * 0.004 + U.vnoise(S.t * 1.7, 3) * u * 0.003 : 0;
+      // gate weave: a slow, smooth drift (no per-frame random jumps)
+      const weave = opt.dust ? U.vnoise(S.t * 0.9, 3) * u * 0.0025 : 0;
 
       g.save();
       g.translate(0, weave);
       const mono = U.FONT.MONO, top = S.pad + u * 0.012;
-      U.text(g, `${S.meta.title || 'untitled'} · ${S.sub}`, S.pad, top, { size: u * 0.026, font: mono, color: '#2c2c2a' });
-      U.text(g, S.timeLabel(), w - S.pad, top, { size: u * 0.026, font: mono, color: '#2c2c2a', align: 'right' });
+      // time on the right; "title · bpm · key" fitted into the rest (only the title is shortened)
+      const hs = u * 0.026;
+      const tw = U.text(g, S.timeLabel(), w - S.pad, top, { size: hs, font: mono, color: '#2c2c2a', align: 'right' });
+      const sub = ` · ${S.sub}`, title = S.meta.title || 'untitled', room = w - S.pad * 2 - tw - u * 0.04;
+      let size = hs;
+      const full = U.textWidth(g, title + sub, { size, font: mono });
+      if (full > room) size = Math.max(hs * 0.72, hs * room / full);
+      const subW = U.textWidth(g, sub, { size, font: mono });
+      const ttw = U.text(g, title, S.pad, top, { size, font: mono, color: '#2c2c2a', max: room - subW });
+      U.text(g, sub, S.pad + ttw, top, { size, font: mono, color: '#5a5a56' });
 
-      const x0 = S.pad, x1 = w - S.pad, y0 = S.portrait ? h * 0.085 : h * 0.14, y1 = S.portrait ? h * 0.8 : h * 0.9;
+      const markTop = (S.portrait ? h - u * 0.16 : h - S.pad * 0.9) - u * 0.035;   // core handle strip
+      const x0 = S.pad, x1 = w - S.pad, y0 = Math.max(S.portrait ? h * 0.085 : h * 0.14, S.pad + u * 0.06);
+      const y1 = Math.min(S.portrait ? h * 0.8 : h * 0.9, markTop - u * 0.02);
       const { list, idx } = C.rows, nR = list.length;
       const rowY = (i) => (nR === 1 ? (y0 + y1) / 2 : y1 - u * 0.03 - (i / (nR - 1)) * (y1 - y0 - u * 0.06));
       const win = S.bar * opt.bars, phK = 0.28, phx = x0 + (x1 - x0) * phK;
@@ -129,7 +140,8 @@
       }
       if (opt.dust) {
         // flicker: tiny per-film-frame exposure change
-        const f = (U.hash(fr, 1) - 0.5) * 0.07;
+        // flicker: a gentle, smooth exposure breathing rather than a per-frame random jump
+        const f = U.vnoise(S.t * 5, 11) * 0.03 + U.vnoise(S.t * 13, 12) * 0.012;
         g.fillStyle = f > 0 ? `rgba(255,255,250,${f})` : `rgba(30,30,26,${-f * 0.8})`;
         g.fillRect(0, 0, w, h);
         // dust specks, hairs and the odd scratch

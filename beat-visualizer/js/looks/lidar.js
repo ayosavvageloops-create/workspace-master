@@ -72,7 +72,17 @@ Looks.register({
       hist.push(acc);
     }
     const bandAt = (arr, u) => { const x = U.clamp(u) * 11, i = Math.floor(x), f = x - i; return arr[i] * (1 - f) + arr[Math.min(11, i + 1)] * f; };
-    const sweep = opt.sweep ? U.fract(S.t / (S.spb * 2)) : -1;
+    // scanner sweep: each kick sends a bright front from the near edge into the room
+    // (falls back to the beat grid when the track has no detected bass onsets)
+    let sweep = -1, sweepK = 0;
+    if (opt.sweep) {
+      const on = A.onsets.bass;
+      let lo = 0, hi = on.length - 1, idx = -1;
+      while (lo <= hi) { const m = (lo + hi) >> 1; if (on[m].t <= S.t) { idx = m; lo = m + 1; } else hi = m - 1; }
+      const t0 = idx >= 0 ? on[idx].t : A.beatOffset + Math.floor((S.t - A.beatOffset) / S.spb) * S.spb;
+      const age = S.t - t0, life = Math.min(0.55, S.spb * 1.2);
+      if (age < life) { sweep = age / life; sweepK = (idx >= 0 ? 0.5 + 0.5 * on[idx].s : 0.6) * (1 - age / life); }
+    }
     const NB = 8, dim = Array.from({ length: NB }, () => []), lit = Array.from({ length: NB }, () => []), cy = Array.from({ length: NB }, () => []);
     for (const c of C.cells) {
       let best = 0, bestK = 0;
@@ -83,7 +93,7 @@ Looks.register({
         if (e > best) { best = e; bestK = k; }
       }
       let base = c.base * (0.6 + 0.4 * c.d);
-      if (sweep >= 0) { const ds = (c.s - sweep) / 0.05; base += 0.35 * Math.exp(-ds * ds); }
+      if (sweep >= 0) { const ds = (c.s - sweep) / 0.06; base += 0.55 * sweepK * Math.exp(-ds * ds); }
       let bucket, b;
       if (best > 0.2 && bestK <= 1) { bucket = lit; b = Math.min(NB - 1, Math.floor(best * NB)); }
       else if (best > 0.2) { bucket = cy; b = Math.min(NB - 1, Math.floor(best * NB)); }

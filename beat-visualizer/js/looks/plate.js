@@ -16,7 +16,7 @@
   function layout(S) {
     const { w, h, unit, portrait } = S;
     const x0 = S.pad, x1 = w - S.pad;
-    const ky = portrait ? h * 0.1 : h * 0.19;          // ruler top
+    const ky = Math.max(portrait ? h * 0.1 : h * 0.19, S.pad + unit * 0.105);   // ruler top, below header + legend
     const rul = unit * 0.026;
     const markTop = (portrait ? h - unit * 0.16 : h - S.pad * 0.9) - unit * 0.035;   // core handle strip
     const y0 = ky + rul, y1 = Math.min(portrait ? h * 0.8 : h - S.pad, markTop - unit * 0.015);
