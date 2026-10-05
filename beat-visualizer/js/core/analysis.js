@@ -84,6 +84,21 @@
   }
   const toLufs = (ms) => (ms > 1e-12 ? -0.691 + 10 * Math.log10(ms) : -120);
 
+  // Integrated loudness (BS.1770 gating) of raw channel data; used by export.
+  function integratedLoudness(L, R, sr) {
+    const [shelf, hp] = kFilters(sr);
+    const chans = (R && R !== L ? [L, R] : [L, L]).map((c) => { const k = Float32Array.from(c); biquadInPlace(k, shelf); biquadInPlace(k, hp); return k; });
+    const hopN = Math.round(sr / 10), nH = Math.floor(L.length / hopN), hopSum = new Float64Array(nH);
+    for (const k of chans) for (let i = 0; i < nH * hopN; i++) hopSum[(i / hopN) | 0] += k[i] * k[i];
+    const blocks = [];
+    for (let j = 3; j < nH; j++) blocks.push((hopSum[j] + hopSum[j - 1] + hopSum[j - 2] + hopSum[j - 3]) / (4 * hopN));
+    const abs = blocks.filter((m) => toLufs(m) > -70);
+    if (!abs.length) return -70;
+    const rel = toLufs(abs.reduce((a, b) => a + b, 0) / abs.length) - 10;
+    const gated = abs.filter((m) => toLufs(m) > rel);
+    return gated.length ? toLufs(gated.reduce((a, b) => a + b, 0) / gated.length) : -70;
+  }
+
   function percentile(arr, q) {
     if (!arr.length) return 0;
     const s = Float32Array.from(arr).sort();
@@ -329,5 +344,5 @@
     return A;
   }
 
-  window.Analysis = { analyze, FPS, BAND_NAMES };
+  window.Analysis = { analyze, integratedLoudness, FPS, BAND_NAMES };
 })();

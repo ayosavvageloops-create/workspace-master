@@ -25,25 +25,57 @@
     return null;
   }
 
-  // Clip [start, start+len) of the decoded buffer, resampled to 48 kHz stereo, with loudness gain and short fades.
+  // Clip [start, start+len) of the decoded buffer, resampled to 48 kHz stereo. With `normalize`
+  // the clip is brought to -14 LUFS through a look-ahead limiter with a -1 dBFS ceiling.
   async function clipAudio(buffer, start, len, A, normalize) {
     const frames = Math.ceil(len * SR);
     const oc = new OfflineAudioContext(2, frames, SR);
     const src = oc.createBufferSource(); src.buffer = buffer;
-    const g = oc.createGain();
-    let gainDb = 0;
-    if (normalize && A) {
-      gainDb = -14 - A.lufs.integrated;
-      gainDb = Math.min(gainDb, -1 - A.lufs.truePeak);
-    }
-    const lin = Math.pow(10, gainDb / 20);
-    g.gain.setValueAtTime(0, 0);
-    g.gain.linearRampToValueAtTime(lin, 0.01);
-    g.gain.setValueAtTime(lin, Math.max(0.02, len - 0.06));
-    g.gain.linearRampToValueAtTime(0, len);
-    src.connect(g).connect(oc.destination);
+    src.connect(oc.destination);
     src.start(0, start, len);
-    return oc.startRendering();
+    const out = await oc.startRendering();
+    const L = out.getChannelData(0), R = out.getChannelData(1);
+    if (normalize) {
+      let gainDb = -14 - Analysis.integratedLoudness(L, R, SR);
+      for (let pass = 0; pass < 3 && Math.abs(gainDb) > 0.05; pass++) {
+        limit(L, R, Math.pow(10, gainDb / 20), Math.pow(10, -1.2 / 20));
+        gainDb = -14 - Analysis.integratedLoudness(L, R, SR);
+      }
+    }
+    // 10 ms fade in, 60 ms fade out against clicks at the cut points
+    const fi = Math.round(0.01 * SR), fo = Math.round(0.06 * SR);
+    for (let i = 0; i < fi && i < L.length; i++) { const k = i / fi; L[i] *= k; R[i] *= k; }
+    for (let i = 0; i < fo && i < L.length; i++) { const k = i / fo, j = L.length - 1 - i; L[j] *= k; R[j] *= k; }
+    return out;
+  }
+
+  // Applies `gain`, then a 5 ms look-ahead brick-wall limiter at `ceil` (linear) in place.
+  function limit(L, R, gain, ceil) {
+    const n = L.length, la = Math.round(0.005 * SR), rel = 1 - Math.exp(-1 / (0.08 * SR));
+    const target = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      L[i] *= gain; R[i] *= gain;
+      const pk = Math.max(Math.abs(L[i]), Math.abs(R[i]));
+      target[i] = pk > ceil ? ceil / pk : 1;
+    }
+    // forward-looking minimum over la samples (monotonic deque)
+    const m = new Float32Array(n), dq = new Int32Array(n);
+    let head = 0, tail = 0;
+    for (let i = n - 1; i >= 0; i--) {
+      while (tail > head && target[dq[tail - 1]] >= target[i]) tail--;
+      dq[tail++] = i;
+      while (dq[head] > i + la) head++;
+      m[i] = target[dq[head]];
+    }
+    // smooth the attack: moving average of m over the last la samples (m before 0 counts as 1).
+    // At a peak p every m[j], j in (p-la, p], is <= target[p], so the average never overshoots.
+    let sum = la, env = 1;
+    for (let i = 0; i < n; i++) {
+      sum += m[i] - (i >= la ? m[i - la] : 1);
+      const sm = sum / la;
+      env = sm < env ? sm : env + (sm - env) * rel;
+      L[i] *= env; R[i] *= env;
+    }
   }
 
   async function saveTarget(filename) {
@@ -77,7 +109,7 @@
     else blob = await realtime(opts);
     if (!blob) return { cancelled: true };
     await save(handle, blob, blob.type.includes('webm') ? filename.replace(/\.mp4$/, '.webm') : filename);
-    return { seconds: (performance.now() - t0) / 1000, size: blob.size };
+    return { seconds: (performance.now() - t0) / 1000, size: blob.size, codec: blob.codec };
   }
 
   async function offline({ look, ctx, buffer, fps, normalize, onProgress, signal }) {
@@ -131,7 +163,9 @@
     if (failed) throw failed;
     muxer.finalize();
     onProgress && onProgress(1, 'done');
-    return new Blob([muxer.target.buffer], { type: 'video/mp4' });
+    const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+    blob.codec = `${vc.mux === 'avc' ? 'H.264' : vc.mux.toUpperCase()} + ${ac ? (ac.mux === 'aac' ? 'AAC' : 'Opus') : 'no audio'}`;
+    return blob;
   }
 
   // Real-time fallback: plays the clip and records canvas + audio.

@@ -127,16 +127,22 @@
     lastFrameMs = lastFrameMs * 0.9 + (performance.now() - t0) * 0.1;
   }
 
-  // thumbnails: rendered round-robin so the grid stays live without stalling playback
+  // thumbnails: rendered round-robin within a per-frame time budget; while paused each tile
+  // is redrawn only when something it depends on changed.
   let thumbIdx = 0;
-  function drawThumbs(n) {
+  function drawThumbs(budgetMs) {
     if (!state.A) return;
     const tiles = [...document.querySelectorAll('.tile:not([hidden])')];
     if (!tiles.length) return;
-    const c = ctx(), t = nowT();
-    for (let k = 0; k < n; k++) {
+    const c = ctx(), t = nowT(), start = performance.now();
+    const stamp = `${state.version}|${state.format}|${t.toFixed(3)}|${state.meta.handle}`;
+    for (let k = 0; k < tiles.length && performance.now() - start < budgetMs; k++) {
       const tile = tiles[thumbIdx++ % tiles.length];
-      const look = Looks.get(tile.dataset.id), cv = tile.querySelector('canvas'), cg = cv.getContext('2d', { alpha: false });
+      const look = Looks.get(tile.dataset.id);
+      const key = stamp + JSON.stringify(state.opt[look.id] || {});
+      if (!state.playing && tile._key === key) continue;
+      tile._key = key;
+      const cv = tile.querySelector('canvas'), cg = cv.getContext('2d', { alpha: false });
       const s = cv.width / c.w;
       if (cv.height !== Math.round(c.h * s)) cv.height = Math.round(c.h * s);
       cg.setTransform(s, 0, 0, s, 0, 0);
@@ -144,14 +150,15 @@
     }
   }
 
-  let lastUi = 0;
+  let lastUi = 0, lastPreviewKey = '';
   function loop(now) {
     if (state.playing) {
       const t = nowT();
       if (t >= state.clipStart + state.clipLen) { state.t = state.clipStart; play(); }
     }
-    drawPreview();
-    drawThumbs(state.playing ? 1 : 3);
+    const pk = `${state.version}|${state.format}|${state.quality}|${state.look}|${nowT()}|${state.meta.handle}|${JSON.stringify(state.opt[state.look] || {})}`;
+    if (state.playing || pk !== lastPreviewKey) { drawPreview(); lastPreviewKey = pk; }
+    drawThumbs(state.playing ? 6 : 12);
     if (now - lastUi > 50) { ui.time(); lastUi = now; }
     requestAnimationFrame(loop);
   }
@@ -340,7 +347,7 @@
         look, ctx: c, buffer: state.buffer, fps: state.fps, filename: name, normalize: state.normalize, signal: exporting.signal,
         onProgress: (k, label) => { bar.style.width = `${k * 100}%`; $('exportStatus').textContent = `${label} ${Math.round(k * 100)}%`; },
       });
-      $('exportStatus').textContent = res.cancelled ? 'Cancelled.' : `Saved ${name} · ${(res.size / 1e6).toFixed(1)} MB in ${res.seconds.toFixed(1)} s`;
+      $('exportStatus').textContent = res.cancelled ? 'Cancelled.' : `Saved ${name} · ${(res.size / 1e6).toFixed(1)} MB in ${res.seconds.toFixed(1)} s${res.codec ? ' · ' + res.codec : ''}${res.codec && !res.codec.startsWith('H.264') ? ' (this browser has no H.264 encoder; use Chrome or Edge on Mac/Windows for the most compatible file)' : ''}`;
     } catch (err) {
       console.error(err);
       $('exportStatus').textContent = `Export failed: ${err.message}`;

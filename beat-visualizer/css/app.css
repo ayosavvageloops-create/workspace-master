@@ -5,7 +5,7 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 13px/1.45 Inter, system-ui, sans-serif;
-  display: grid; grid-template-columns: minmax(0, 1fr) 380px; overflow: hidden; }
+  display: grid; grid-template-columns: minmax(0, 1fr) 380px; overflow: hidden; position: fixed; inset: 0; }
 button, input, select { font: inherit; color: inherit; }
 .muted { color: var(--soft); }
 .small { font-size: 12px; }
@@ -82,7 +82,7 @@ button, input, select { font: inherit; color: inherit; }
 body.dragging #drop-overlay { display: flex; }
 
 @media (max-width: 900px) {
-  body { grid-template-columns: 1fr; overflow: auto; }
+  body { grid-template-columns: 1fr; overflow: auto; position: static; }
   .stage { height: 70vh; }
   .grid { grid-template-columns: repeat(4, 1fr); }
 }
