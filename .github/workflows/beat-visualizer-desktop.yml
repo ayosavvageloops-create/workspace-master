@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+# one build at a time; a newer push replaces a build still running
+concurrency:
+  group: beat-visualizer-desktop
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
