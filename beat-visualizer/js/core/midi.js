@@ -194,12 +194,10 @@
     };
     const beatChroma = [];
     for (let b = 0; b < nBeats; b++) beatChroma.push(chromaAt(off + (b + 0.5) * spb));
-    const seg = [];
-    for (let b = 0; b + 1 < nBeats; b += 2) {
-      const ch = new Float32Array(12);
-      for (let k = 0; k < 12; k++) ch[k] = beatChroma[b][k] + beatChroma[b + 1][k];
-      let norm = Math.hypot(...ch);
-      if (norm < 1e-9) { seg.push(null); continue; }
+    // best chord template for a chroma vector
+    const match = (ch) => {
+      const norm = Math.hypot(...ch);
+      if (norm < 1e-9) return null;
       let best = null;
       for (let root = 0; root < 12; root++) {
         for (const [name, iv] of CHORD_SHAPES) {
@@ -210,7 +208,17 @@
           if (!best || score > best.score) best = { score, root, iv, name };
         }
       }
-      seg.push(best && best.score > 0.55 ? best : null);
+      return best && best.score > 0.55 ? best : null;
+    };
+    const sum = (b0, n) => { const ch = new Float32Array(12); for (let b = b0; b < b0 + n && b < nBeats; b++) for (let k = 0; k < 12; k++) ch[k] += beatChroma[b][k]; return ch; };
+    // one chord per bar unless the two halves clearly disagree; seg holds half-bar slots
+    const seg = [];
+    for (let b = 0; b + 1 < nBeats; b += 4) {
+      const whole = match(sum(b, 4)), h1 = match(sum(b, 2)), h2 = b + 3 < nBeats ? match(sum(b + 2, 2)) : null;
+      const split = h1 && h2 && (h1.root !== h2.root || h1.name !== h2.name) && h1.score > 0.72 && h2.score > 0.72 &&
+        (!whole || (h1.score + h2.score) / 2 > whole.score + 0.08);
+      if (split) seg.push(h1, h2);
+      else seg.push(whole, b + 3 < nBeats ? whole : null);
     }
     // merge equal neighbours, then voice each chord close above C3
     for (let i = 0; i < seg.length; i++) {
