@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Type Beat Leads",
+  "version": "0.1.0",
+  "description": "Лидогенерация для продюсеров: YouTube type beat-каналы → их Instagram → артисты из комментариев и отметок (Tagged).",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "unlimitedStorage", "tabs", "scripting", "sidePanel"],
+  "host_permissions": ["https://www.youtube.com/*", "https://www.instagram.com/*"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/ui/sidepanel.html"
+  },
+  "action": {
+    "default_title": "Type Beat Leads",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

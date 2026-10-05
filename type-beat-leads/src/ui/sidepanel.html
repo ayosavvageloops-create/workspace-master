@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Type Beat Leads</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="panel">
+  <header class="top">
+    <div class="brand">Type Beat Leads</div>
+    <span id="statusBadge" class="badge">—</span>
+  </header>
+
+  <form id="settings" autocomplete="off">
+    <section class="card">
+      <h2>1 · YouTube</h2>
+      <label>Поиск type beat
+        <input name="query" type="text" placeholder="Rylo Rodriguez type beat" required />
+      </label>
+      <div class="row">
+        <label>Страниц выдачи <input name="searchPages" type="number" min="1" max="10" /></label>
+        <label>Мин. подписчиков <input name="minSubscribers" type="number" min="0" /></label>
+        <label>Продюсеров <input name="producerCount" type="number" min="1" max="10" /></label>
+      </div>
+      <label>…или сразу Instagram продюсеров (через запятую)
+        <input name="manualProducers" type="text" placeholder="@stunnahbeatz, @tsunamisoslime" />
+      </label>
+      <p class="hint">Если поле заполнено — шаг YouTube пропускается.</p>
+    </section>
+
+    <section class="card">
+      <h2>2 · Instagram</h2>
+      <label class="check"><input name="scanComments" type="checkbox" /> Комментарии под постами (Check DM / how much / where can I buy)</label>
+      <label class="check"><input name="scanTagged" type="checkbox" /> Вкладка Tagged (кто отмечает продюсера)</label>
+      <label class="check"><input name="includePlacements" type="checkbox" /> Артисты, отмеченные в постах продюсера (плейсменты)</label>
+      <label class="check"><input name="visualNavigation" type="checkbox" /> Открывать каждую страницу во вкладке (медленнее, естественнее)</label>
+      <details>
+        <summary>Лимиты и задержки</summary>
+        <div class="row">
+          <label>Постов загрузить <input name="postsToFetch" type="number" min="1" max="120" /></label>
+          <label>Постов с комментами <input name="postsToScan" type="number" min="1" max="60" /></label>
+        </div>
+        <div class="row">
+          <label>Комментов на пост <input name="commentsPerPost" type="number" min="10" max="2000" /></label>
+          <label>Tagged-постов <input name="taggedPosts" type="number" min="0" max="300" /></label>
+        </div>
+        <div class="row">
+          <label>Проверок профилей <input name="maxProfileChecks" type="number" min="0" max="500" /></label>
+          <label>Порог намерения <input name="minIntent" type="number" min="1" max="15" /></label>
+          <label>Порог «артист» <input name="artistThreshold" type="number" min="-5" max="15" /></label>
+        </div>
+        <div class="row">
+          <label>Пауза от, мс <input name="delayMin" type="number" min="500" /></label>
+          <label>Пауза до, мс <input name="delayMax" type="number" min="500" /></label>
+          <label>Перепроверка, дней <input name="recheckDays" type="number" min="0" max="365" /></label>
+        </div>
+      </details>
+      <p class="hint">Нужно быть залогиненным в Instagram в этом браузере.</p>
+    </section>
+
+    <div class="actions">
+      <button id="startBtn" type="submit" class="primary">Запустить</button>
+      <button id="stopBtn" type="button" class="danger" hidden>Остановить</button>
+    </div>
+  </form>
+
+  <section class="card" id="progressCard" hidden>
+    <div id="message" class="message"></div>
+    <div id="progressLabel" class="hint"></div>
+    <div class="bar"><div id="progressFill"></div></div>
+    <div id="producers"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Лиды</h2>
+      <div class="counts" id="counts"></div>
+    </div>
+    <div class="actions small">
+      <button id="openTable" type="button">Открыть таблицу</button>
+      <button id="exportCsv" type="button">CSV</button>
+      <button id="clearLeads" type="button" class="ghost">Очистить</button>
+    </div>
+    <div id="leadList" class="lead-list"></div>
+  </section>
+
+  <details class="card" id="logCard" open>
+    <summary>Журнал</summary>
+    <div id="log" class="log"></div>
+  </details>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

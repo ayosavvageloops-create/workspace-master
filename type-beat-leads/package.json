@@ -1,0 +1,14 @@
+{
+  "name": "type-beat-leads",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome-расширение: лидогенерация артистов через type beat-продюсеров (YouTube → Instagram).",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "node tests/e2e-mock.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}
