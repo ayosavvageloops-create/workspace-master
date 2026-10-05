@@ -1,17 +1,24 @@
 # Beat Visualizer
 
-Browser tool that turns an audio track into a beat-reactive video (audio → video).
-No build step or server: open `index.html` in Chrome.
+Turns a beat (wav/mp3) — and optionally the MIDI of its parts — into a short vertical
+or horizontal video. Runs entirely in the browser: open `index.html` in Chrome or Edge.
 
-## Features
-- Load an audio track, cover art and an optional background image (the cover is used, blurred, if no background is set).
-- Visual styles: Bars, Mirror Bars, Circle Spectrum, Liquid Circle, Waveform, Spectrum Curve, Particles, Pulse Rings.
-- Formats: 16:9, 9:16 (Reels/TikTok), 1:1, 4:5.
-- Title/artist overlay, fonts, two-colour gradient, background colour, blur and dimming.
-- Beat reaction: intensity, bar count, beat-detection sensitivity, glow, zoom pulse, shake, flash, progress bar.
-- Export: records the canvas plus the audio in real time (30/60 fps), for the full track or a chosen segment. Chrome saves MP4; other browsers save WebM.
+## Workflow
+1. **Beat** — drop a wav/mp3 anywhere on the page (or press *Demo*). Title, BPM and key are
+   read from the filename (`loversrock 136 emin.wav`). Drop `.mid` files beside it: each track
+   becomes a *part* (bass / chords / lead…) with its own colour. Without MIDI, parts are guessed
+   from the audio.
+2. **Look** — pick one of the looks; every tile is a live render of your beat. Each look has its
+   own options (accent colour, layout, density…).
+3. **Export** — renders off-screen as fast as the machine allows (WebCodecs H.264 + AAC → MP4),
+   1080×1920 or 1920×1080 at 60 fps, audio normalised to −14 LUFS / −1 dBTP. Asks where to save.
 
 ## Structure
-- `audio.js`: Web Audio playback, spectrum and bands, beat detection.
-- `modes.js`: registry of visual styles. To add a style, append `{ id, name, coverLayout?, draw(g, s) }`.
-- `app.js`: renderer layers (background, mode, cover, text, progress), UI bindings and export.
+- `js/core/analysis.js` — offline audio analysis: spectrum, bands, onsets, tempo/beat grid, EBU R128 loudness.
+- `js/core/midi.js` — MIDI parser and the parts model (`Parts.inRange`, `Parts.active`, `Parts.chordAt`).
+- `js/core/looks.js` — look registry and the per-frame scene contract (documented at the top of the file).
+- `js/core/export.js` — offline MP4 export (vendored `mp4-muxer`, MIT) with a real-time fallback.
+- `js/looks/*.js` — one look per file, listed in `js/looks/index.js`.
+- `tools/snap.cjs` — renders looks on the demo beat in headless Chromium for review:
+  `node tools/snap.cjs <look|all> --out snaps [--format 16:9] [--nomidi]`.
+- `vendor/fonts` — self-hosted Google Fonts (SIL OFL) so the app works offline.
