@@ -30,7 +30,10 @@
       { key: 'ghosts', label: 'Show upcoming slots', type: 'toggle' },
     ],
     prepare(S) {
-      return { ev: S.parts.map((p) => ({ p, ev: events(p) })).filter((x) => x.ev.length) };
+      const ev = S.parts.map((p) => ({ p, ev: events(p) })).filter((x) => x.ev.length);
+      // empty state: an uncarved totem of ghost seeds
+      const ghost = { p: { role: 'bass', name: 'bass', lo: 0, hi: 1 }, ev: Array.from({ length: 24 }, (_, i) => ({ s: Infinity, e: Infinity, p: (i % 3) / 2 })) };
+      return { ev, ghost };
     },
     draw(g, S) {
       const { w, h, unit, pad, opt, t } = S;
@@ -42,7 +45,7 @@
 
       // sections from the top: lead, chords, bass (reverse role order), only once a part has entered
       const live = all.filter((x) => x.ev[0].s <= t).reverse();
-      const shown = live.length ? live : all.slice(0, 1);
+      const shown = live.length ? live : all.length ? all.slice(0, 1) : [S.cache.ghost];
       const win = +opt.window || 32;
       const counts = shown.map((x) => Math.min(win, x.ev.length));
       const totalSlots = counts.reduce((a, b) => a + b, 0) || 1;

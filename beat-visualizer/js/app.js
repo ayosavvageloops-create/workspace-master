@@ -381,7 +381,9 @@
       const cg = cv.getContext('2d', { alpha: false }); cg.setTransform(scale, 0, 0, scale, 0, 0);
       const t0 = performance.now();
       Looks.render(cg, look, Looks.scene(look, c, c.clipStart + ct, Math.round(ct * c.fps)));
-      return { url: cv.toDataURL('image/png'), ms: performance.now() - t0 };
+      cg.getImageData(0, 0, 1, 1); // flush pending canvas work so the timing is honest
+      const ms = performance.now() - t0;
+      return { url: cv.toDataURL('image/png'), ms };
     },
   };
 })();

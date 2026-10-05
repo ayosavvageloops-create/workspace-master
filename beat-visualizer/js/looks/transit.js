@@ -6,7 +6,7 @@
   const COLORS = ['#7b4fd6', '#3f9a3a', '#8aa422', '#d1a22a', '#ec9a22', '#16a6b8',
     '#1f6fb8', '#d6402e', '#c02f7a', '#7a5a3c', '#9a9a9a', '#6cc04a'];
   // arm directions per line: a designed spread so every compass point is served
-  const ARMS = [[4, 7], [3, 7], [4, 0], [4, 1], [0, 5], [6, 2], [7, 1], [5, 2], [5, 1], [7, 3], [6, 3], [3, 6]];
+  const ARMS = [[4, 7], [3, 7], [4, 0], [4, 1], [0, 5], [6, 2], [7, 1], [6, 2], [5, 1], [7, 3], [5, 2], [2, 6]];
 
   function buildMap(seed) {
     const r = U.rng(seed), M = 0.03;
@@ -31,7 +31,7 @@
         // main run, then maybe one 45° bend
         const L1 = room(p, dir) * (0.22 + r() * 0.35);
         p = [p[0] + DIRS[dir][0] * L1, p[1] + DIRS[dir][1] * L1]; pts.push(p.slice());
-        if (r() < 0.6) dir = (dir + (r() < 0.5 ? 1 : 7)) % 8;
+        if (r() < 0.45) dir = (dir + (r() < 0.5 ? 1 : 7)) % 8;
         const L2 = room(p, dir) * (0.62 + r() * 0.38);
         p = [p[0] + DIRS[dir][0] * L2, p[1] + DIRS[dir][1] * L2]; pts.push(p.slice());
         return pts;
@@ -45,13 +45,14 @@
       const st = [0, len];
       const mid = cum[arms[0].length - 1];
       st.push(mid);
+      const rs = U.rng(seed * 31 + i * 977 + 5); // separate stream so station spacing never reshapes the network
       for (const [a, b, sgn] of [[mid, 0, -1], [mid, len, 1]]) {
-        let s = a + sgn * (0.06 + r() * 0.03);
-        while (sgn > 0 ? s < b - 0.045 : s > b + 0.045) { st.push(s); s += sgn * (0.065 + r() * 0.07); }
+        let s = a + sgn * (0.07 + rs() * 0.04);
+        while (sgn > 0 ? s < b - 0.06 : s > b + 0.06) { st.push(s); s += sgn * (0.15 + rs() * 0.1); }
       }
       st.sort((a, b) => a - b);
-      const trains = Array.from({ length: 4 }, (_, j) => ({ ph: r(), sp: (0.035 + r() * 0.03) * (j % 2 ? -1 : 1), th: 0.18 + 0.12 * j + r() * 0.1 }));
-      lines.push({ color: COLORS[i], pts, cum, len, st, big: st.map(() => r()), trains });
+      const trains = Array.from({ length: 4 }, (_, j) => ({ ph: rs(), sp: (0.035 + rs() * 0.03) * (j % 2 ? -1 : 1), th: 0.18 + 0.12 * j + rs() * 0.1 }));
+      lines.push({ color: COLORS[i], pts, cum, len, st, trains });
     }
     return lines;
   }

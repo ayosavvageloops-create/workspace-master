@@ -63,8 +63,8 @@
         let u = (((a + rot) % U.TAU) + U.TAU) % U.TAU / Math.PI; if (u > 1) u = 2 - u;
         const f = u * (N - 1), i = Math.floor(f), k = f - i;
         const v = sp[i] * (1 - k) + sp[Math.min(N - 1, i + 1)] * k;
-        const scallop = Math.pow(Math.abs(Math.sin(a * 8 + rot * 2)), 0.6);
-        return R * (1 + 0.006 * pulse) + amp * (0.012 * scallop + 0.05 * v * v * (0.6 + 0.4 * scallop));
+        const scallop = Math.abs(Math.sin(a * 9 + rot * 2 + 0.6 * Math.sin(a * 3)));
+        return R * (1 + 0.008 * pulse) + amp * (0.028 * scallop + 0.07 * v * v * (0.4 + 0.6 * scallop));
       };
       g.beginPath();
       const steps = 220;

@@ -7,10 +7,10 @@ Looks.register({
   group: 'audio',
   theme: 'dark',
   desc: 'a glowing fractal tree in blue haze',
-  defaults: { accent: '#cfe6ff', bg: '#05080b', depth: 9, sway: 1, haze: true },
+  defaults: { accent: '#cfe6ff', bg: '#05080b', depth: 7, sway: 1, haze: true },
   controls: [
     { key: 'bg', label: 'Background', type: 'color' },
-    { key: 'depth', label: 'Branching depth', type: 'range', min: 6, max: 10, step: 1 },
+    { key: 'depth', label: 'Branching depth', type: 'range', min: 5, max: 9, step: 1 },
     { key: 'sway', label: 'Sway', type: 'range', min: 0, max: 3, step: 0.05 },
     { key: 'haze', label: 'Light cone', type: 'toggle' },
   ],
@@ -24,33 +24,33 @@ Looks.register({
       const i = nodes.length;
       nodes.push({ p: parent, a: rel, len, d, ph: r() * U.TAU, bend: (r() - 0.5) * 0.25 });
       if (d >= maxD) return;
-      const kids = d < 2 ? (r() < 0.5 ? 3 : 2) : r() < 0.12 ? 3 : 2;
+      const kids = d >= 2 && r() < 0.15 ? 1 : 2;
       for (let k = 0; k < kids; k++) {
-        const spread = d === 0 ? 0.16 : 0.3 + r() * 0.32;
-        const off = kids === 1 ? 0 : -spread + (2 * spread * k) / (kids - 1);
-        const lf = d === 0 ? 0.92 : 0.7 + r() * 0.14;
+        const spread = d === 0 ? 0.22 : 0.32 + r() * 0.3;
+        const off = kids === 1 ? (r() - 0.5) * 0.5 : -spread + (2 * spread * k) / (kids - 1);
+        const lf = d === 0 ? 0.62 : 0.74 + r() * 0.14;
         grow(i, off + (r() - 0.5) * 0.18, len * lf, d + 1);
       }
     };
     // three stems from the root, close together, like the reference trunk
     nodes.push({ p: -1, a: -Math.PI / 2, len: 0, d: -1, ph: 0, bend: 0 });
-    for (let k = 0; k < 3; k++) grow(0, (k - 1) * 0.07, 0.2, 0);
+    for (let k = 0; k < 3; k++) grow(0, (k - 1) * 0.1 + (r() - 0.5) * 0.04, 0.3 - Math.abs(k - 1) * 0.04, 0);
 
     const geom = filament_geom(S);
     // haze cone + backdrop, full-res layer (cheap to blit)
     const bg = U.layer(w, h, (g) => {
       g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
       if (opt.haze) {
-        const cw = geom.size * 1.05, top = geom.by - geom.size * 1.45;
+        const cw = geom.size * 1.25, top = geom.by - geom.size * 2.25;
         g.save();
-        g.filter = `blur(${Math.round(unit * 0.05)}px)`;
+        g.filter = `blur(${Math.round(unit * 0.09)}px)`;
         const gr = g.createLinearGradient(0, top, 0, geom.by);
-        gr.addColorStop(0, 'rgba(40,60,78,0)'); gr.addColorStop(0.3, 'rgba(40,62,80,0.35)'); gr.addColorStop(1, 'rgba(55,82,100,0.55)');
+        gr.addColorStop(0, 'rgba(30,48,62,0)'); gr.addColorStop(0.35, 'rgba(32,52,66,0.32)'); gr.addColorStop(1, 'rgba(38,60,74,0.4)');
         g.fillStyle = gr;
         U.rrect(g, geom.bx - cw / 2, top, cw, geom.by - top + unit * 0.05, cw / 2);
         g.fill();
         g.restore();
-        U.glowBlob(g, geom.bx, geom.by - geom.size * 0.35, geom.size * 0.6, '#3c6478', 0.25);
+        U.glowBlob(g, geom.bx, geom.by - geom.size * 0.5, geom.size * 0.8, '#2e4c5e', 0.2);
       }
       // a few specks of dust
       for (let i = 0; i < 40; i++) {
@@ -80,7 +80,7 @@ Looks.register({
     }
 
     // base glow pulses with the bass
-    U.glowBlob(g, geom.bx, geom.by - geom.size * 0.05, geom.size * (0.18 + 0.12 * kick), '#bfe0ff', 0.12 + 0.25 * Math.max(bass, sub));
+    U.glowBlob(g, geom.bx, geom.by - geom.size * 0.04, geom.size * (0.1 + 0.08 * kick), '#cfe6ff', 0.1 + 0.25 * Math.max(bass, sub));
 
     g.lineCap = 'round';
     g.lineJoin = 'round';
@@ -95,12 +95,12 @@ Looks.register({
           const my = (Y[n.p] + Y[i]) / 2 + Math.sin(AN[i] + Math.PI / 2) * n.bend * n.len * geom.size * 0.5;
           g.moveTo(X[n.p], Y[n.p]); g.quadraticCurveTo(mx, my, X[i], Y[i]);
         }
-        const wd = Math.max(1, unit * 0.0075 * Math.pow(0.68, d));
+        const wd = Math.max(1, unit * 0.0065 * Math.pow(0.66, d));
         // trunk brightness from the bass, fine branches from the upper mids
         const e = d <= 2 ? 0.55 + 0.45 * Math.max(bass, kick) : 0.55 + 0.35 * (d / C.maxD) * hm + 0.2 * lvl;
         if (pass === 0) {
-          g.strokeStyle = `rgba(120,170,220,${0.12 * e})`;
-          g.lineWidth = wd * 4 + unit * 0.004;
+          g.strokeStyle = `rgba(140,185,230,${0.16 * e})`;
+          g.lineWidth = wd * 4 + unit * 0.005;
         } else {
           g.strokeStyle = `rgba(232,242,255,${Math.min(1, 0.55 + 0.45 * e)})`;
           g.lineWidth = wd;
@@ -110,13 +110,13 @@ Looks.register({
     }
 
     // sparkles on the finest tips: which ones light follows the highs, re-rolled 12x per second
-    const step = Math.floor(t * 12), p = 0.04 + 0.4 * Math.max(high, A.pulse(t, 'high', 0.15));
+    const step = Math.floor(t * 12), p = 0.02 + 0.16 * Math.max(high * high, A.pulse(t, 'high', 0.15));
     for (let i = 1; i < nodes.length; i++) {
       const n = nodes[i];
       if (n.d < C.maxD - 1) continue;
       const hsh = U.hash(i, step);
       if (hsh > p) continue;
-      const rr = unit * (0.0025 + 0.004 * (1 - hsh / p));
+      const rr = unit * (0.002 + 0.0028 * (1 - hsh / p));
       U.glowBlob(g, X[i], Y[i], rr * 3.5, U.hash(i, 9) < 0.35 ? '#ffe9b0' : opt.accent, 0.5);
       g.fillStyle = U.hash(i, 9) < 0.35 ? '#fff2cc' : '#f2f8ff';
       g.fillRect(X[i] - rr / 2, Y[i] - rr / 2, rr, rr);

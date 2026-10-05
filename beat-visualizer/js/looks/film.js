@@ -35,8 +35,8 @@
     const g = c.getContext('2d'), r = U.rng(seed);
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
       const v = r();
-      if (v > 0.32 && v < 0.68) continue;
-      g.fillStyle = v < 0.5 ? `rgba(20,20,18,${(0.32 - v) * 1.6})` : `rgba(255,255,250,${(v - 0.68) * 1.8})`;
+      if (v > 0.05 && v < 0.95) continue;
+      g.fillStyle = v < 0.5 ? `rgba(20,20,18,${0.12 + (0.1 - v) * 2.5})` : `rgba(255,255,250,${0.2 + (v - 0.9) * 3})`;
       g.fillRect(x * px, y * px, px, px);
     }
     return c;
@@ -48,7 +48,7 @@
     group: 'midi',
     theme: 'light',
     desc: 'soft grey note dots on flickering old film stock',
-    defaults: { accent: '#3a3a38', bg: '#e9e8e2', bars: 2, rows: 'pitch', grain: 0.08, dust: true },
+    defaults: { accent: '#3a3a38', bg: '#e9e8e2', bars: 2, rows: 'pitch', grain: 0, dust: true },
     controls: [
       { key: 'bg', label: 'Film base', type: 'color' },
       { key: 'bars', label: 'Bars on screen', type: 'select', options: [1, 2, 4] },
@@ -76,7 +76,7 @@
         for (let y = 0; y < h; y += 2) { g.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '40,40,36'},${0.02 + r() * 0.035})`; g.fillRect(0, y, w, 1); }
       });
       const R = u * 0.017;
-      return { bg, lines, grain: grainTile(S.seed, Math.max(1, Math.round(u / 700))), rows: rowsOf(S.parts, opt.rows), dot: dotSprite(R), R };
+      return { bg, lines, grain: grainTile(S.seed, Math.max(2, Math.round(u / 500))), rows: rowsOf(S.parts, opt.rows), dot: dotSprite(R), R };
     },
     draw(g, S) {
       const { w, h, unit: u, opt, parts, A } = S;
