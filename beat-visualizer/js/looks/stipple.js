@@ -61,25 +61,30 @@ Looks.register({
     const { w, h, A, opt, unit, cache: C } = S;
     const { N, D, J, Q, Z, B, lobes } = C;
     g.drawImage(C.bg, 0, 0);
-    const t = S.t, lvl = A.level(t);
+    const t = S.t;
+    // everything that drives the form is averaged over a short window, so it breathes, not twitches
+    const avg = (f, span, n = 6) => { let v = 0; for (let k = 0; k < n; k++) v += f(t - (k * span) / (n - 1)); return v / n; };
+    const lvl = avg((x) => A.level(x), 0.3);
 
     // form: centre, size (taller than wide, like a head or a stone)
     const cx = w * (S.portrait ? 0.54 : 0.5), cy = h * (S.portrait ? 0.47 : 0.5);
     const R = S.portrait ? w * 0.25 : h * 0.2;
-    const yaw = opt.spin * (t * 0.12 + 0.25 * Math.sin(t * 0.3)), pitch = 0.15 * Math.sin(t * 0.21);
+    const yaw = opt.spin * (t * 0.12 + 0.12 * Math.sin(t * 0.3)), pitch = 0.1 * Math.sin(t * 0.21);
     const cyw = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
     // lobe amplitudes from the bands (smoothed a little by averaging two instants)
     const L = lobes.map((o) => {
-      const e = 0.5 * (A.band(t, o.band) + A.band(t - 0.1, o.band));
+      const e = avg((x) => A.band(x, o.band), 0.3);
       return { v: o.v, f: o.f, ph: o.ph + t * o.sp, a: opt.morph * o.a * (0.5 + 1.1 * e) };
     });
-    const swell = 1 + 0.07 * lvl + 0.05 * A.pulse(t, 'bass', 0.25);
+    const swell = 1 + 0.07 * lvl + 0.045 * avg((x) => A.pulse(x, 'bass', 0.3), 0.1, 4);
     // light from the right, drifting; the dense (shadowed) side is on the left
-    const la = 0.35 + 0.35 * Math.sin(t * 0.13) + 0.2 * A.band(t, 'mid');
+    const la = 0.35 + 0.35 * Math.sin(t * 0.13) + 0.2 * avg((x) => A.band(x, 'mid'), 0.6);
     const lx = Math.cos(la) * 0.85, ly = -0.25, lz = Math.sin(la) * 0.5 + 0.2;
     const ll = Math.hypot(lx, ly, lz);
 
-    g.beginPath();
+    // three paths by how far a dot is inside the density threshold: dots near the
+    // threshold are faint, so they fade in and out instead of popping
+    const P3 = [new Path2D(), new Path2D(), new Path2D()];
     const ds = Math.max(1.5, unit * 0.0026);
     for (let i = 0; i < N; i++) {
       let x = D[i * 3], y = D[i * 3 + 1], z = D[i * 3 + 2];
@@ -98,14 +103,16 @@ Looks.register({
       const rim = 1 - Math.abs(z2); // silhouettes collect dots
       // the far side shows through faintly, like a cloud of stipple
       const dens = (0.16 + 0.8 * Math.pow(1 - lam, 2.2) + 0.07 * rim * rim) * (z2 < 0 ? 0.35 : 1);
-      if (Q[i] > dens) continue;
+      const mg = dens - Q[i];
+      if (mg < 0) continue;
       const px = cx + x1 * rr * R * 1.02, py = cy + y2 * rr * R * 1.32;
       const s = ds * Z[i];
-      g.rect(px, py, s, s);
+      P3[mg < 0.04 ? 0 : mg < 0.09 ? 1 : 2].rect(px, py, s, s);
     }
     g.fillStyle = opt.accent;
-    g.globalAlpha = 0.85;
-    g.fill();
+    g.globalAlpha = 0.28; g.fill(P3[0]);
+    g.globalAlpha = 0.58; g.fill(P3[1]);
+    g.globalAlpha = 0.88; g.fill(P3[2]);
     g.globalAlpha = 1;
   },
 });

@@ -64,10 +64,14 @@
 
       // oblique camera that drifts slowly
       const th = 1.1 + 0.16 * Math.sin(t * 0.21 * opt.spin) * (opt.spin > 0 ? 1 : 0);
-      const D = portrait ? w * 0.36 : h * 0.24;
+      // vertical stack: header, box, spectrogram strip, footer, all above the handle watermark
+      const wide = w / h > 1.3;
+      const handleTop = (portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.036;
+      const fyT = handleTop - unit * 0.004, sh = unit * (portrait ? 0.065 : 0.055), sy = fyT - unit * 0.032 - sh;
+      const T = portrait ? h * 0.12 : h * 0.13, B = sy - unit * 0.06;
+      const D = Math.min(portrait ? w * 0.36 : h * 0.24, (B - T) * 0.3);
       const DX = D * Math.cos(th), DY = D * Math.sin(th);
-      const L = portrait ? w * 0.1 : w * 0.26, Rt = portrait ? w * 0.93 : w * 0.74;
-      const T = portrait ? h * 0.12 : h * 0.13, B = portrait ? h * 0.87 : h * 0.8;
+      const L = portrait ? w * 0.1 : wide ? w * 0.26 : w * 0.12, Rt = portrait ? w * 0.93 : wide ? w * 0.74 : w * 0.88;
       const DXm = D * Math.cos(0.94), DYm = D * Math.sin(1.26);
       const FW = Rt - L - DXm, FH = B - T - DYm;
       const P = (x, y, z) => [L + x * FW + z * DX, B - y * FH - z * DY];
@@ -143,16 +147,17 @@
       U.text(g, U.noteName(lo), a1[0] - unit * 0.012, a1[1] + unit * 0.005, { ...lab, align: 'right', spacing: 0 });
       U.text(g, 'PITCH', am[0] + unit * 0.012, am[1], lab);
       U.text(g, 'TIME', tb[0], tb[1] + unit * 0.03, { ...lab, align: 'center' });
-      U.text(g, 'BRIGHTNESS', bz[0] + unit * 0.02, bz[1] + unit * 0.01, lab);
+      U.text(g, 'BRIGHTNESS', bz[0] + unit * 0.02, bz[1] + unit * 0.01, { ...lab, max: w - pad * 0.5 - bz[0] - unit * 0.02 });
       if (!parts.length) U.text(g, 'NO NOTES', (L + Rt) / 2, (T + B) / 2, { ...lab, size: unit * 0.016, align: 'center', spacing: 5 });
 
       // header
       const hx = pad * 0.9, hy = portrait ? h * 0.075 : pad + unit * 0.02;
-      U.text(g, [`${Math.max(0, S.ct).toFixed(1)} s`, `RANGE ${U.noteName(lo)}–${U.noteName(hi)}`, `${count} NOTES`, `BRIGHT ${Math.round(bAt(t) * 30)}`].join('  ·  '),
-        hx, hy, { size: unit * 0.0145, font: U.FONT.MONO, color: 'rgba(190,205,200,0.5)', spacing: 2 });
+      let brightNow = 0; for (let k = 0; k < 8; k++) brightNow += bAt(t - k * 0.08) / 8; // smoothed readout
+      U.text(g, [`${Math.max(0, S.ct).toFixed(1)} s`, `RANGE ${U.noteName(lo)}–${U.noteName(hi)}`, `${count} NOTES`, `BRIGHT ${Math.round(brightNow * 30)}`].join('  ·  '),
+        hx, hy, { size: unit * 0.0145, font: U.FONT.MONO, color: 'rgba(190,205,200,0.5)', spacing: 2, max: w - pad * 1.8 });
 
       // spectrogram strip + footer
-      const sx0 = pad * 0.9, sx1 = w - pad * 0.9, sy = portrait ? h * 0.892 : h * 0.86, sh = portrait ? h * 0.04 : h * 0.055;
+      const sx0 = pad * 0.9, sx1 = w - pad * 0.9;
       g.imageSmoothingEnabled = false;
       g.drawImage(strip, sx0, sy, sx1 - sx0, sh);
       g.imageSmoothingEnabled = true;
@@ -160,7 +165,7 @@
       g.fillStyle = opt.accent; g.fillRect(px - 1.5, sy - unit * 0.004, 3, sh + unit * 0.008);
       const lufs = A && A.lufs ? `${A.lufs.integrated.toFixed(1)} LUFS` : '';
       U.text(g, [String(S.meta.title || 'untitled').toUpperCase(), S.sub, lufs].filter(Boolean).join(' · '),
-        sx0, sy + sh + unit * 0.035, { size: unit * 0.0135, font: U.FONT.MONO, color: 'rgba(190,205,200,0.5)', spacing: 1.5 });
+        sx0, fyT, { size: unit * 0.0135, font: U.FONT.MONO, color: 'rgba(190,205,200,0.5)', spacing: 1.5, max: sx1 - sx0 });
     },
   });
 })();

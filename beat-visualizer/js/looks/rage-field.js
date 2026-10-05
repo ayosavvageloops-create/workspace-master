@@ -34,7 +34,7 @@
       if (lo > hi) { lo = 36; hi = 84; }
       lo -= 2; hi += 3;
       const { w, h, pad, portrait } = S;
-      const box = { x0: pad, x1: w - pad, y0: portrait ? h * 0.098 : h * 0.15, y1: portrait ? h * 0.8 : h * 0.92 };
+      const box = { x0: pad, x1: w - pad, y0: portrait ? h * 0.098 : h * 0.15, y1: portrait ? Math.min(h * 0.8, h - S.unit * 0.21) : h - pad * 0.9 - S.unit * 0.05 };
       const rowH = (box.y1 - box.y0) / (hi - lo + 1);
       // glow sprites per role colour (cheaper than shadowBlur)
       const glows = {};

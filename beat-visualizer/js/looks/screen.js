@@ -69,7 +69,7 @@
 
       // roll geometry
       const x0 = S.pad * 0.4, x1 = w - S.pad * 0.4;
-      const y0 = S.portrait ? h * 0.075 : h * 0.13, y1 = S.portrait ? h * 0.8 : h * 0.9;
+      const y0 = S.portrait ? h * 0.075 : h * 0.13, y1 = S.portrait ? Math.min(h * 0.8, h - unit * 0.21) : h - S.pad * 0.9 - unit * 0.06;
       const win = S.bar * (+opt.bars || 4), ph = 0.3;
       const phx = x0 + (x1 - x0) * ph;
       const tx = (t) => phx + ((t - S.t) / win) * (x1 - x0);
@@ -89,7 +89,7 @@
           if (xb - xa < 1) continue;
           const y = rowY(nt.p);
           const past = nt.s <= S.t;
-          blocks.push({ x: xa, y: y - bh / 2, w: Math.max(unit * 0.006, xb - xa), past, playing: past && nt.e > S.t });
+          blocks.push({ x: xa, y: y - bh / 2, w: Math.max(unit * 0.006, xb - xa), past, playing: past && nt.e > S.t, id: Math.round(nt.s * 1000) * 131 + nt.p, nx: tx(nt.s), nw: Math.max(1, tx(nt.e) - tx(nt.s)) });
         }
       }
       // pink pass (offset up-right), then navy multiplied over it
@@ -103,16 +103,19 @@
       // a little ink speckle so the blocks read as printed
       g.fillStyle = U.rgba(opt.bg, 0.35);
       for (const b of blocks) {
-        const k = Math.floor(b.x * 7 + b.y * 3);
+        const k = b.id;
         for (let i = 0; i < 3; i++) {
-          const sx = b.x + U.hash(k, i) * b.w, sy = b.y + U.hash(k, i, 1) * bh;
+          const fx = U.hash(k, i), fy = U.hash(k, i, 1);
+          const sx = b.nx + fx * b.nw;                     // fixed spot on the note, scrolls with it
+          if (sx < b.x || sx > b.x + b.w) continue;
+          const sy = b.y + fy * bh;
           g.fillRect(sx, sy, unit * 0.003, unit * 0.003);
         }
       }
 
       // playhead: black line with a pink double
       const lw = Math.max(2, unit * 0.0028);
-      const py0 = S.portrait ? h * 0.075 : h * 0.12, py1 = S.portrait ? h * 0.8 : h * 0.92;
+      const py0 = S.portrait ? h * 0.075 : h * 0.12, py1 = y1 + unit * 0.01;
       g.fillStyle = U.rgba(pink, 0.85); g.fillRect(phx + off * 0.9, py0 - off, lw * 1.4, py1 - py0);
       g.save(); g.globalCompositeOperation = 'multiply';
       g.fillStyle = '#1b1b1f'; g.fillRect(phx - lw / 2, py0, lw, py1 - py0);

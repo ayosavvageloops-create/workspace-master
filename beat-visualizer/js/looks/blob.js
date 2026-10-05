@@ -66,10 +66,12 @@ Looks.register({
       // band level averaged over ~200 ms: sizes breathe with the music without twitching
       let e = 0;
       for (let k = 0; k < 6; k++) e += A.band(t - k * 0.04, b.band) / 6;
+      const br = U2 * b.r * (0.72 + 0.5 * e), m = br * 1.45 + S.pad;
       balls.push({
-        x: cx0 + U2 * (b.x * 1.25 + b.ax * U.vnoise(b.ph, t * 0.16)),
-        y: cy0 + U2 * (b.y + b.ay * U.vnoise(b.ph + 31, t * 0.14)),
-        r: U2 * b.r * (0.72 + 0.5 * e),
+        // drift on slow noise, kept inside the frame (reticles included)
+        x: U.clamp(cx0 + U2 * (b.x * 1.15 + b.ax * U.vnoise(b.ph, t * 0.16)), m, w - m),
+        y: U.clamp(cy0 + U2 * (b.y + b.ay * U.vnoise(b.ph + 31, t * 0.14)), m, h - m),
+        r: br,
         // wobble harmonics (2nd, 3rd, 4th), animated and pushed by level
         a2: opt.wobble * (0.06 + 0.1 * e) * U.vnoise(b.ph + 7, t * 0.5),
         a3: opt.wobble * (0.05 + 0.06 * e) * U.vnoise(b.ph + 9, t * 0.6),

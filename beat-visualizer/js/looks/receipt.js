@@ -41,23 +41,27 @@
       { key: 'tilt', label: 'Tilt', type: 'range', min: -3, max: 3, step: 0.1 },
     ],
     prepare(S) {
-      const { w, h, unit, portrait } = S;
-      const pw = portrait ? w * 0.875 : Math.min(w * 0.8, h * 0.78);
-      const ph = h * (portrait ? 0.955 : 0.94);
+      const { w, h, unit, portrait, pad } = S;
+      // the paper ends above the handle watermark, which then sits on the backdrop
+      const handleTop = (portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.036;
+      const py0 = unit * 0.025, py1 = handleTop - unit * 0.012;
+      const ph = py1 - py0;
+      const pw = Math.min(w * (portrait ? 0.875 : 0.8), ph * 0.7);
+      const pcy = (py0 + py1) / 2;
       const it = items(S);
       // barcode widths from the title
       const r = U.rng(U.strSeed(S.meta.title || 'x'));
       const code = [];
       for (let i = 0; i < 64; i++) code.push(1 + Math.floor(r() * 3.2), 1 + Math.floor(r() * 2.2));
-      return { pw, ph, it, code, teeth: Math.max(10, Math.round(pw / (unit * 0.018))) };
+      return { pw, ph, pcy, it, code, teeth: Math.max(10, Math.round(pw / (unit * 0.018))) };
     },
     draw(g, S) {
       const { w, h, unit, opt, t } = S;
-      const { pw, ph, it, code, teeth } = S.cache;
+      const { pw, ph, pcy, it, code, teeth } = S.cache;
       g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
 
       g.save();
-      g.translate(w / 2, h / 2);
+      g.translate(w / 2, pcy);
       g.rotate((opt.tilt * Math.PI) / 180);
       const x0 = -pw / 2, y0 = -ph / 2, tw = pw / teeth, th = tw * 0.55;
       // paper with zig-zag tear at top and bottom
@@ -81,14 +85,14 @@
       let y = y0 + ph * 0.06;
       dbl(y);
       y += pw * 0.07;
-      U.text(g, S.meta.title || 'untitled', L, y, { size: pw * 0.05, font: F, weight: 500, color: ink });
+      U.text(g, S.meta.title || 'untitled', L, y, { size: pw * 0.05, font: F, weight: 500, color: ink, max: Rr - L });
       y += pw * 0.04;
       const bars = Math.max(1, Math.round((S.clipLen) / S.bar));
-      U.text(g, `${Math.round(S.bpm)} BPM  ·  ${S.meta.key || '—'}  ·  ${bars} BARS`, L, y, { size: fs * 0.85, font: F, color: ink, spacing: pw * 0.009 });
+      U.text(g, `${Math.round(S.bpm)} BPM  ·  ${S.meta.key || '—'}  ·  ${bars} BARS`, L, y, { size: fs * 0.85, font: F, color: ink, spacing: pw * 0.009, max: Rr - L });
       y += pw * 0.045;
       const all = opt.part === 'all' || it.names.length !== 1;
       const w1 = U.text(g, all ? 'ALL LINES' : '1 LINE', L, y, { size: fs * 0.85, font: F, color: ink });
-      U.text(g, it.names.join(' ') || '—', L + w1 + pw * 0.03, y, { size: fs * 0.85, font: F, color: ink });
+      U.text(g, it.names.join(' ') || '—', L + w1 + pw * 0.03, y, { size: fs * 0.85, font: F, color: ink, max: Rr - L - w1 - pw * 0.03 });
       y += pw * 0.035;
       line(y, [unit * 0.004, unit * 0.003]);
       y += pw * 0.042;
@@ -109,10 +113,19 @@
       const list = it.list, off = gridOff(S);
       let cur = -1;
       for (let i = 0; i < list.length && list[i].s <= t; i++) cur = i;
-      const first = U.clamp(cur - Math.floor(nVis / 3), 0, Math.max(0, list.length - nVis));
+      // smooth scroll: ease from the previous onset's row to the current one
+      let pos = cur;
+      if (cur >= 0) {
+        let prev = cur; while (prev >= 0 && list[prev].s >= list[cur].s - 1e-6) prev--;
+        const gap = cur + 1 < list.length ? list[cur + 1].s - list[cur].s : 1;
+        pos = U.lerp(prev, cur, U.smooth(0, Math.max(0.02, Math.min(0.14, gap * 0.8)), t - list[cur].s));
+      }
+      const first = U.clamp(pos - Math.floor(nVis / 3), 0, Math.max(0, list.length - nVis));
       const sixteenth = S.spb / 4;
-      for (let k = 0; k < nVis && first + k < list.length; k++) {
-        const i = first + k, n = list[i], ry = top + k * rowH;
+      g.save();
+      g.beginPath(); g.rect(x0, top - rowH * 0.85, pw, nVis * rowH); g.clip();
+      for (let i = Math.max(0, Math.floor(first)); i < list.length && i <= first + nVis; i++) {
+        const n = list[i], ry = top + (i - first) * rowH;
         const past = i <= cur, isCur = i === cur;
         if (isCur) {
           g.fillStyle = opt.accent;
@@ -123,10 +136,11 @@
         const len = Math.max(1, Math.round((n.e - n.s) / sixteenth));
         const rel = (n.s - off) / S.spb, bar = Math.floor(rel / 4) + 1, beat = Math.floor(rel - (bar - 1) * 4) + 1;
         U.text(g, String(n.qty), cQ + pw * 0.012, ry, o);
-        U.text(g, n.name, cN, ry, o);
+        U.text(g, n.name, cN, ry, { ...o, max: cL - cN - pw * 0.1 });
         U.text(g, `${len}/16`, cL, ry, { ...o, align: 'center' });
         U.text(g, `${bar}.${beat}`, cA, ry, { ...o, align: 'right' });
       }
+      g.restore();
       if (!list.length) {
         U.text(g, '— NO ITEMS —', x0 + pw / 2, top + rowH * 4, { size: fs, font: F, color: mid, align: 'center', spacing: 3 });
       }
@@ -145,7 +159,7 @@
       let bx = -cw / 2;
       g.fillStyle = ink;
       for (let i = 0; i < code.length; i++) { if (i % 2 === 0) g.fillRect(bx, yCode, code[i] * unitW, codeH); bx += code[i] * unitW; }
-      U.text(g, `${Math.round(S.bpm)}   ${(S.meta.title || '').toUpperCase()}`, 0, yCodeTxt, { size: fs * 0.72, font: F, color: mid, align: 'center', spacing: pw * 0.012 });
+      U.text(g, `${Math.round(S.bpm)}   ${(S.meta.title || '').toUpperCase()}`, 0, yCodeTxt, { size: fs * 0.72, font: F, color: mid, align: 'center', spacing: pw * 0.012, max: pw * 0.84 });
       g.restore();
     },
   });

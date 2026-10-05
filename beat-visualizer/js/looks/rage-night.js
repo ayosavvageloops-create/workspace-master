@@ -11,23 +11,33 @@
   }
 
   function layout(S) {
-    const { w, h, unit, pad, portrait } = S;
+    // Windows are laid out in a virtual space and drawn with a uniform scale k, so they
+    // always fit above the handle watermark strip (stacked in tall/square formats).
+    const { w, h, unit, pad } = S;
     const th = unit * 0.052;                                     // title bar
     const hL = th + unit * 0.39, hM = th + unit * 0.42;          // window heights
-    let L, M;
-    if (portrait) {
-      const gap = unit * 0.04, total = hL + gap + hM, top = h * 0.5 - total / 2 + unit * 0.02;
-      L = { x: pad, y: top, w: w - pad * 2, h: hL };
-      M = { x: pad, y: top + hL + gap, w: w - pad * 2, h: hM };
+    const stack = S.portrait || w / h < 1.3;
+    const handleTop = S.portrait ? h - unit * 0.16 - unit * 0.035 : h - pad * 0.9 - unit * 0.035;
+    const topMin = unit * 0.06, bottomMax = handleTop - unit * 0.02;
+    let L, M, k;
+    if (stack) {
+      const gap = unit * 0.04, total = hL + gap + hM;
+      k = Math.min(1, (bottomMax - topMin) / total);
+      const top = Math.max(topMin, Math.min(h * 0.5 - total * k / 2 + unit * 0.02, bottomMax - total * k)) / k;
+      const x = pad / k, ww = w / k - pad * 2 / k;
+      L = { x, y: top, w: ww, h: hL };
+      M = { x, y: top + hL + gap, w: ww, h: hM };
     } else {
-      const gap = pad, ww = (w - pad * 2 - gap) / 2, top = h * 0.5 - hM / 2;
-      L = { x: pad, y: top, w: ww, h: hL };
-      M = { x: pad + ww + gap, y: top, w: ww, h: hM };
+      k = Math.min(1, (bottomMax - topMin) / hM);
+      const gap = pad / k, x = pad / k, ww = (w / k - x * 2 - gap) / 2;
+      const top = Math.max(topMin, Math.min(h * 0.5 - hM * k / 2, bottomMax - hM * k)) / k;
+      L = { x, y: top, w: ww, h: hL };
+      M = { x: x + ww + gap, y: top, w: ww, h: hM };
     }
     const inset = unit * 0.035;
     L.box = { x: L.x + inset, y: L.y + th + unit * 0.12, w: L.w - inset * 2, h: unit * 0.19 };
     M.box = { x: M.x + inset, y: M.y + th + unit * 0.1, w: M.w - inset * 2, h: unit * 0.285 };
-    return { th, inset, L, M };
+    return { th, inset, L, M, k };
   }
 
   function windowChrome(g, S, win, title, th) {
@@ -75,6 +85,7 @@
         }
         for (const win of [Lo.L, Lo.M]) {
           g.save();
+          g.scale(Lo.k, Lo.k);
           g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = S.unit * 0.05; g.shadowOffsetY = S.unit * 0.015;
           U.rrect(g, win.x, win.y, win.w, win.h, S.unit * 0.018); g.fillStyle = '#1c1b22'; g.fill();
           g.restore();
@@ -102,10 +113,12 @@
       const { w, h, unit, opt, parts, cache } = S;
       const { Lo, amp } = cache, { th, L, M } = Lo;
       g.drawImage(cache.bg, 0, 0, w, h);
+      g.save();
+      g.scale(Lo.k, Lo.k);
 
       // ---------------- listen window ----------------
       windowChrome(g, S, L, 'listen', th);
-      U.text(g, String(S.meta.title || 'untitled'), L.box.x, L.y + th + unit * 0.09, { size: unit * 0.062, font: U.FONT.MONO, weight: 700, color: opt.accent });
+      U.text(g, String(S.meta.title || 'untitled'), L.box.x, L.y + th + unit * 0.09, { size: unit * 0.062, font: U.FONT.MONO, weight: 700, color: opt.accent, max: L.box.w });
       const b = L.box;
       U.rrect(g, b.x, b.y, b.w, b.h, unit * 0.012); g.fillStyle = '#131218'; g.fill();
       const wx0 = b.x + unit * 0.022, wx1 = b.x + b.w - unit * 0.022;
@@ -122,19 +135,24 @@
       g.fillStyle = '#f2f0ff'; g.fillRect(px - unit * 0.0012, wy - wa * 1.35, unit * 0.0024, wa * 2.7);
       const small = { size: unit * 0.019, font: U.FONT.MONO, color: '#a9a6b8' };
       const sr = S.A && S.A.sr ? `${Math.round(S.A.sr / 1000)} khz` : '';
-      U.text(g, [`${S.meta.title} ${Math.round(S.bpm)} ${keyWord(S.meta.key)}`.trim(), sr].filter(Boolean).join(' · '), wx0, b.y + b.h - unit * 0.025, small);
-      U.text(g, U.fmtTime(Math.max(0, S.ct)), wx1, b.y + b.h - unit * 0.025, { ...small, align: 'right' });
-      U.text(g, `${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`, b.x, b.y + b.h + unit * 0.045, { ...small, color: '#8d8a9c' });
+      const tw = U.text(g, U.fmtTime(Math.max(0, S.ct)), wx1, b.y + b.h - unit * 0.025, { ...small, align: 'right' });
+      // caption: the title part shrinks/truncates, "bpm key · khz" stays whole
+      const capRest = ' ' + [`${Math.round(S.bpm)} ${keyWord(S.meta.key)}`.trim(), sr].filter(Boolean).join(' · ');
+      const capAvail = wx1 - wx0 - tw - unit * 0.03, capRestW = U.textWidth(g, capRest, small);
+      const ctw = U.text(g, String(S.meta.title || ''), wx0, b.y + b.h - unit * 0.025, { ...small, max: Math.max(unit * 0.06, capAvail - capRestW) });
+      U.text(g, capRest, wx0 + ctw, b.y + b.h - unit * 0.025, { ...small, max: Math.max(1, capAvail - ctw) });
+      U.text(g, `${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`, b.x, b.y + b.h + unit * 0.045, { ...small, color: '#8d8a9c', max: b.w });
 
       // ---------------- MIDI window ----------------
       windowChrome(g, S, M, 'MIDI', th);
       const hy = M.y + th + unit * 0.06;
-      U.text(g, `${parts.length} layer${parts.length === 1 ? '' : 's'}`, M.box.x, hy, { size: unit * 0.04, font: U.FONT.MONO, weight: 700, color: opt.accent });
+
       const origin = (S.A && S.A.beatOffset) || 0;
       let lastEnd = 0;
       for (const p of parts) if (p.notes.length) lastEnd = Math.max(lastEnd, p.notes[p.notes.length - 1].e);
       const nBars = Math.max(1, S.hasMidi && lastEnd ? Math.ceil((lastEnd - origin) / S.bar - 0.05) : Math.floor((S.A.dur - origin) / S.bar + 0.25));
-      U.text(g, [`${nBars} bars`, S.meta.key, Math.round(S.bpm)].filter(Boolean).join(' · '), M.box.x + M.box.w, hy, { size: unit * 0.036, font: U.FONT.MONO, color: '#8d8a9c', align: 'right' });
+      const rw = U.text(g, [`${nBars} bars`, S.meta.key, Math.round(S.bpm)].filter(Boolean).join(' · '), M.box.x + M.box.w, hy, { size: unit * 0.036, font: U.FONT.MONO, color: '#8d8a9c', align: 'right', max: M.box.w * 0.62 });
+      U.text(g, `${parts.length} layer${parts.length === 1 ? '' : 's'}`, M.box.x, hy, { size: unit * 0.04, font: U.FONT.MONO, weight: 700, color: opt.accent, max: M.box.w - rw - unit * 0.03 });
 
       const mb = M.box;
       U.rrect(g, mb.x, mb.y, mb.w, mb.h, unit * 0.012); g.fillStyle = '#131218'; g.fill();
@@ -143,6 +161,7 @@
       let lx = mb.x + unit * 0.022;
       const ly = mb.y + unit * 0.038, sq = unit * 0.009;
       for (const p of legend) {
+        if (lx > mb.x + mb.w - unit * 0.12) break;
         const on = p.enabled && p.notes.some((nn) => nn.s <= S.t);
         g.fillStyle = on ? colOf(p) : U.rgba(colOf(p), 0.3);
         g.fillRect(lx, ly - sq * 1.05, sq, sq);
@@ -196,6 +215,7 @@
       if (!parts.length) {
         U.text(g, 'no midi layers yet', (rx0 + rx1) / 2, (ry0 + ry1) / 2, { size: unit * 0.02, font: U.FONT.MONO, color: 'rgba(170,166,184,0.5)', align: 'center' });
       }
+      g.restore();
     },
   });
 })();

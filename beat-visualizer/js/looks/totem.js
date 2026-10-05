@@ -39,7 +39,8 @@
       const { w, h, unit, pad, opt, t } = S;
       g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
       const cx = w / 2;
-      const yTop = h * (S.portrait ? 0.075 : 0.13), yBot = h * (S.portrait ? 0.875 : 0.86);
+      const handleTop = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.036;
+      const yTop = h * (S.portrait ? 0.075 : 0.13), yBot = Math.min(h * (S.portrait ? 0.875 : 0.86), handleTop - unit * 0.035);
       const fanY = yTop - unit * 0.01;
       const all = S.cache.ev;
 
@@ -48,7 +49,9 @@
       const shown = live.length ? live : all.length ? all.slice(0, 1) : [S.cache.ghost];
       const win = +opt.window || 32;
       const counts = shown.map((x) => Math.min(win, x.ev.length));
-      const totalSlots = counts.reduce((a, b) => a + b, 0) || 1;
+      // a part that just entered grows its section over one bar instead of popping in
+      const weights = shown.map((x, i) => counts[i] * (live.length ? U.easeInOut(U.clamp((t - x.ev[0].s) / S.bar + 0.02)) : 1));
+      const totalSlots = weights.reduce((a, b) => a + b, 0) || 1;
       const y0 = yTop + unit * 0.012, span = yBot - y0 - unit * 0.012;
       const gw = unit * 0.055 * opt.size;
 
@@ -59,19 +62,29 @@
       let yy = y0;
       shown.forEach((x, si) => {
         const st = styleOf(x.p), ev = x.ev, n = counts[si];
-        const secH = span * (n / totalSlots), step = secH / n;
-        // current event index and the sliding window around it
+        const secH = span * (weights[si] / totalSlots), step = secH / n;
+        if (secH < 1) return;
+        // current event index and the sliding window around it (eased, so slots glide rather than jump)
         let cur = -1;
         for (let i = 0; i < ev.length && ev[i].s <= t; i++) cur = i;
-        const first = U.clamp(cur - Math.floor(n * 0.35), 0, Math.max(0, ev.length - n));
+        let pos = cur;
+        if (cur >= 0) {
+          let prev = cur; while (prev >= 0 && ev[prev].s >= ev[cur].s - 1e-6) prev--;
+          const gap = cur + 1 < ev.length ? ev[cur + 1].s - ev[cur].s : 1;
+          pos = U.lerp(prev, cur, U.smooth(0, Math.max(0.02, Math.min(0.15, gap * 0.8)), t - ev[cur].s));
+        }
+        const first = U.clamp(pos - n * 0.35, 0, Math.max(0, ev.length - n));
         const lo = x.p.lo, hi = Math.max(x.p.hi, lo + 1);
         // draw bottom-up so upper glyphs overlap lower ones like scales
-        for (let k = n - 1; k >= 0; k--) {
-          const i = first + k, e = ev[i];
-          if (!e) continue;
+        const i0 = Math.max(0, Math.floor(first)), i1 = Math.min(ev.length - 1, Math.ceil(first + n - 1));
+        for (let i = i1; i >= i0; i--) {
+          const e = ev[i], u = i - first;
+          const fade = U.clamp(u + 1) * U.clamp(n - u);
+          if (fade <= 0.01) continue;
           const played = i <= cur, sounding = played && e.e > t;
           if (!played && !opt.ghosts) continue;
-          const y = yy + (k + 0.5) * step;
+          g.globalAlpha = fade;
+          const y = yy + (u + 0.5) * step;
           const sz = 0.82 + 0.36 * (e.p - lo) / (hi - lo);
           const hh = U.clamp(step * 1.25, gw * 0.5, gw * 0.85) * sz, ww = gw * sz * (sounding ? 1.08 : 1);
           const fill = played ? st.col : GHOST_F, stroke = played ? DARK : GHOST_S;
@@ -97,6 +110,7 @@
             }
           }
         }
+        g.globalAlpha = 1;
         yy += secH;
       });
 
@@ -126,7 +140,7 @@
       for (const x of all) bits.push(`${String(x.p.name || x.p.role).toUpperCase()} ${x.ev.length}`);
       if (!all.length) bits.push('NO PARTS');
       bits.push(S.sub);
-      U.text(g, bits.join(' · '), pad * 0.9, h - pad * 0.9 - unit * 0.035, { size: unit * 0.0145, font: U.FONT.MONO, color: '#8f8672', spacing: 2 });
+      U.text(g, bits.join(' · '), pad * 0.9, h - pad * 0.9 - unit * 0.035, { size: unit * 0.0145, font: U.FONT.MONO, color: '#8f8672', spacing: 2, max: w - pad * 1.8 });
     },
   });
 })();

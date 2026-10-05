@@ -44,7 +44,8 @@
       const X = (tt) => x0 + ((tt - ws) / win) * (x1 - x0);
 
       // regions, bottom-up: bass, chords, lead…
-      const B = portrait ? h * 0.86 : h * 0.83, T = portrait ? h * 0.15 : h * 0.2;
+      const handleTop = (portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.036;
+      const B = Math.min(portrait ? h * 0.86 : h * 0.83, handleTop - unit * 0.075), T = portrait ? h * 0.15 : h * 0.2;
       const k = Math.max(1, parts.length), gap = h * 0.05;
       const rh = Math.min(h * 0.22, (B - T - gap * (k - 1)) / k);
       const regions = parts.map((p, i) => ({ p, y1: B - i * (rh + gap), y0: B - i * (rh + gap) - rh }));
@@ -56,7 +57,7 @@
       g.beginPath(); g.moveTo(x0, hy + h * 0.025); g.quadraticCurveTo(w / 2, hy - h * 0.05, x1, hy + h * 0.025); g.stroke();
 
       // meridian (playhead)
-      const px = X(t), yTop = T - h * 0.05, yBot = B + h * 0.025;
+      const px = X(t), yTop = T - h * 0.05, yBot = B + unit * 0.022;
       g.strokeStyle = 'rgba(180,195,220,0.4)';
       g.setLineDash([unit * 0.004, unit * 0.006]);
       g.beginPath(); g.moveTo(px, yTop); g.lineTo(px, yBot); g.stroke();
@@ -98,7 +99,7 @@
       if (!parts.length) U.text(g, 'AN EMPTY SKY', w / 2, h * 0.5, { size: unit * 0.016, font: U.FONT.MONO, color: 'rgba(170,180,205,0.5)', align: 'center', spacing: 6 });
 
       // bar axis ("hours")
-      const ay = B + h * 0.045;
+      const ay = B + unit * 0.05;
       const b0 = Math.ceil((ws - off) / S.bar - 1e-6), curBar = Math.floor((t - off) / S.bar);
       for (let b = b0; off + b * S.bar <= ws + win + 1e-6; b++) {
         const x = X(off + b * S.bar);
@@ -107,9 +108,9 @@
 
       // header + footer
       const top = pad * 0.9 + unit * 0.05;
-      U.text(g, S.meta.title || 'untitled', pad * 0.9, top, { size: unit * 0.06, font: U.FONT.PLEX, color: '#f2f4fb' });
+      U.text(g, S.meta.title || 'untitled', pad * 0.9, top, { size: unit * 0.06, font: U.FONT.PLEX, color: '#f2f4fb', max: w - pad * 1.8 });
       U.text(g, `${WORDS[bars] || bars} CONSTELLATIONS${S.meta.key ? ' · ' + S.meta.key : ''}`, pad * 0.9, top + unit * 0.036,
-        { size: unit * 0.0135, font: U.FONT.MONO, color: 'rgba(170,180,205,0.5)', spacing: unit * 0.006 });
+        { size: unit * 0.0135, font: U.FONT.MONO, color: 'rgba(170,180,205,0.5)', spacing: unit * 0.006, max: w - pad * 1.8 });
       const fy = h - pad * 0.9 - unit * 0.02;
       U.text(g, `${Math.round(S.bpm)} BPM`, pad * 0.9, fy, { size: unit * 0.0145, font: U.FONT.MONO, color: 'rgba(170,180,205,0.6)', spacing: unit * 0.008 });
       U.text(g, S.timeLabel(2), w - pad * 0.9, fy, { size: unit * 0.0145, font: U.FONT.MONO, color: 'rgba(170,180,205,0.6)', align: 'right' });

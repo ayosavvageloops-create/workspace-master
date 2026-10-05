@@ -137,13 +137,17 @@ Looks.register({
       const corr = sl && sr ? slr / Math.sqrt(sl * sr) : 0;
       const k = (side * 0.5) / C.top;
       g.save(); g.beginPath(); g.rect(cx - side / 2, cy - side / 2, side, side); g.clip();
-      g.beginPath();
-      for (let i = 0; i < n; i++) {
-        const x = cx + (st.r[i] - st.l[i]) * k * 2.2 + (st.l[i] + st.r[i]) * k * 0.12, y = cy - (st.l[i] + st.r[i]) * k * 0.5;
-        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      // three overlapping windows (now and the two frames before) so the blob breathes instead of flickering
+      for (let p = 2; p >= 0; p--) {
+        const sw = p ? A.stereo(S.t - p / 60, n, 0.03) : st;
+        g.beginPath();
+        for (let i = 0; i < n; i++) {
+          const x = cx + (sw.r[i] - sw.l[i]) * k * 2.2 + (sw.l[i] + sw.r[i]) * k * 0.12, y = cy - (sw.l[i] + sw.r[i]) * k * 0.5;
+          i ? g.lineTo(x, y) : g.moveTo(x, y);
+        }
+        g.fillStyle = U.rgba(acc, p ? 0.22 : 0.8); g.fill();
+        if (!p) { g.strokeStyle = acc; g.lineWidth = 1.5; g.lineJoin = 'round'; g.stroke(); }
       }
-      g.fillStyle = U.rgba(acc, 0.85); g.fill();
-      g.strokeStyle = acc; g.lineWidth = 1.5; g.lineJoin = 'round'; g.stroke();
       g.restore();
       U.text(g, `${corr >= 0 ? '+' : ''}${corr.toFixed(2)}`, cx, cy + side / 2 + unit * 0.026, { ...lab, align: 'center' });
     }

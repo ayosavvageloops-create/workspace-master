@@ -175,7 +175,8 @@ Looks.register({
 function scan_geom(S) {
   const { w, h } = S;
   const f = S.portrait ? w * 1.5 : h * 1.15;
-  return { f, cx: w / 2, cy: S.portrait ? h * 0.46 : h * 0.4, shadowY: S.portrait ? h * 0.8 : h * 0.9, shadowR: S.portrait ? w * 0.42 : h * 0.5 };
+  const cy = S.portrait ? h * 0.46 : h * 0.4;
+  return { f, cx: w / 2, cy, shadowY: cy + f * 0.41, shadowR: f * 0.3 };
 }
 
 // strong low-end onsets at least half a beat apart

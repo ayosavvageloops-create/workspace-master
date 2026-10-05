@@ -135,6 +135,8 @@ Looks.register({
 
 function filament_geom(S) {
   const { w, h } = S;
-  const size = S.portrait ? Math.min(w * 0.6, h * 0.34) : h * 0.5; // tree height scale
-  return { bx: w / 2, by: S.portrait ? h * 0.94 : h * 0.95, size };
+  const size = S.portrait ? Math.min(w * 0.6, h * 0.32) : h * 0.45; // tree height scale
+  // keep the root above the core's handle watermark strip
+  const by = S.portrait ? Math.min(h * 0.94, h - S.unit * 0.2) : h - S.pad * 0.9 - S.unit * 0.065;
+  return { bx: w / 2, by, size };
 }

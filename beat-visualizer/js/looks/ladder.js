@@ -33,21 +33,21 @@ Looks.register({
     const x0 = pad * 1.1, x1 = w - pad * 1.1;
 
     // header
-    U.text(g, S.meta.title, x0, pad + unit * 0.05, { size: unit * 0.05, font: U.FONT.PLEX, color: ink });
-    U.text(g, S.sub.toUpperCase(), x0, pad + unit * 0.075, { ...tiny, size: unit * 0.0135 });
+    U.text(g, S.meta.title, x0, pad + unit * 0.05, { size: unit * 0.05, font: U.FONT.PLEX, color: ink, max: x1 - x0 });
+    U.text(g, S.sub.toUpperCase(), x0, pad + unit * 0.075, { ...tiny, size: unit * 0.0135, max: x1 - x0 });
 
-    // layout
+    // layout: everything sits between the header and the handle-safe strip
+    const top = pad + unit * 0.11, bot = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.045, Hb = bot - top, W = x1 - x0;
     let big, meters, chart;
-    if (S.portrait) {
-      big = { x: x0, y: h * 0.235, size: unit * 0.18 };
-      meters = { x: x0, x1, y: h * 0.372, rowH: h * 0.077 };
-      chart = { x: x0, x1, y: h * 0.69, y1: h * 0.925, labY: h * 0.657 };
+    if (Hb / W >= 0.95) {
+      big = { x: x0, y: top + Hb * 0.19, size: Math.min(unit * 0.18, Hb * 0.125, W * 0.3) };
+      meters = { x: x0, x1, y: top + Hb * 0.355, rowH: Hb * 0.095 };
+      chart = { x: x0, x1, y: top + Hb * 0.76, y1: bot, labY: top + Hb * 0.715 };
     } else {
-      const mid = w * 0.47;
-      big = { x: x0, y: h * 0.42, size: unit * 0.2 };
-      meters = { x: mid, x1, y: h * 0.17, rowH: h * 0.095 };
-      chart = { x: x0, x1, y: h * 0.67, y1: h * 0.9, labY: h * 0.62 };
-      meters.x1 = x1;
+      const mid = x0 + W * 0.47;
+      big = { x: x0, y: top + Hb * 0.34, size: Math.min(unit * 0.2, (mid - x0 - unit * 0.03) / 3.2, Hb * 0.3) };
+      meters = { x: mid, x1, y: top + Hb * 0.07, rowH: Hb * 0.12 };
+      chart = { x: x0, x1, y: top + Hb * 0.64, y1: bot, labY: top + Hb * 0.59 };
     }
     U.text(g, L.integrated.toFixed(1), big.x - big.size * 0.04, big.y, { size: big.size, font: U.FONT.PLEX, color: ink });
     U.text(g, 'LUFS INTEGRATED', big.x + unit * 0.006, big.y + big.size * 0.24, { ...tiny, size: unit * 0.014 });
@@ -66,7 +66,7 @@ Looks.register({
       const y = meters.y + i * meters.rowH;
       const by = y + meters.rowH * 0.45;
       U.text(g, name, meters.x, y, tiny);
-      U.text(g, v <= -69.9 ? '-inf' : v.toFixed(1), meters.x1, y - meters.rowH * 0.04, { size: unit * 0.033, font: U.FONT.PLEX, color: ink, align: 'right' });
+      U.text(g, v <= -69.9 ? '-inf' : v.toFixed(1), meters.x1, y - meters.rowH * 0.04, { size: Math.min(unit * 0.033, meters.rowH * 0.3), font: U.FONT.PLEX, color: ink, align: 'right' });
       g.fillStyle = 'rgba(27,27,27,0.22)'; g.fillRect(meters.x, by, mw, 1);
       g.fillStyle = i === 3 ? red : '#343432';
       g.fillRect(meters.x, by - bh / 2 + 0.5, f(v) * mw, bh);
@@ -77,8 +77,8 @@ Looks.register({
 
     // history chart
     const win = opt.window, cw = chart.x1 - chart.x, ph = chart.x + cw * 0.72;
-    U.text(g, `MOMENTARY · ${win.toFixed(1)} s`, chart.x, chart.labY, tiny);
-    U.text(g, `${C.lo.toFixed(1)} .. ${C.hi.toFixed(1)} LUFS`, chart.x1, chart.labY, { ...tiny, align: 'right' });
+    U.text(g, `MOMENTARY · ${win.toFixed(1)} s`, chart.x, chart.labY, { ...tiny, max: cw * 0.48 });
+    U.text(g, `${C.lo.toFixed(1)} .. ${C.hi.toFixed(1)} LUFS`, chart.x1, chart.labY, { ...tiny, align: 'right', max: cw * 0.48 });
     const cy0 = chart.y, cy1 = chart.y1, chH = cy1 - cy0;
     const vy = (v) => cy1 - U.clamp(U.invLerp(C.lo - 2, C.hi + 1, v)) * chH;
     // wrap history inside the clip so the chart is full and loops seamlessly
@@ -112,8 +112,12 @@ Looks.register({
     g.fillStyle = red; g.fillRect(ph - 1, cy0 - chH * 0.12, 2, chH * 1.12);
 
     // footer
-    const fy = S.portrait ? h - pad * 1.2 : h - pad * 0.6;
-    U.text(g, 'EBU R128 · 400 ms / 75 % · 4x OVERSAMPLED PEAK', x0, fy, { ...tiny, size: unit * 0.0115 });
-    U.text(g, S.timeLabel(2), x1, fy, { ...tiny, size: unit * 0.0115, align: 'right' });
+    // below the handle in portrait; beside it (never under it) in the other formats
+    const fy = S.portrait ? h - pad * 1.2 : h - pad * 0.6, ft = { ...tiny, size: unit * 0.0115 };
+    const tw = U.textWidth(g, S.timeLabel(2), ft);
+    let room = W - tw - unit * 0.03;
+    if (!S.portrait && S.meta.handle) room = Math.min(room, w / 2 - U.textWidth(g, S.meta.handle, { size: unit * 0.026, font: U.FONT.MONO, spacing: 1 }) / 2 - unit * 0.03 - x0);
+    if (room > unit * 0.08) U.text(g, 'EBU R128 · 400 ms / 75 % · 4x OVERSAMPLED PEAK', x0, fy, { ...ft, max: room });
+    U.text(g, S.timeLabel(2), x1, fy, { ...ft, align: 'right' });
   },
 });

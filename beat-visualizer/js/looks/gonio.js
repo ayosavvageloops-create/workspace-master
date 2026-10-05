@@ -17,7 +17,18 @@ Looks.register({
     const { A } = S;
     let pk = 0;
     for (const ch of [A.L, A.R]) for (let i = 0; i < ch.length; i += 3) { const v = Math.abs(ch[i]); if (v > pk) pk = v; }
-    return { pk: pk || 1 };
+    pk = pk || 1;
+    // smooth gain envelope at 20 Hz: block peaks → max over ±0.6 s → box blur over ±0.5 s
+    const RATE = 20, n = Math.ceil(A.dur * RATE) + 1, hop = A.sr / RATE, blk = new Float32Array(n);
+    for (let f = 0; f < n; f++) {
+      let p = 0; const e = Math.min(A.L.length, (f + 1) * hop);
+      for (let i = Math.floor(f * hop); i < e; i += 5) p = Math.max(p, Math.abs(A.L[i]), Math.abs(A.R[i]));
+      blk[f] = Math.max(p, pk / 3);
+    }
+    const mx = new Float32Array(n), env = new Float32Array(n);
+    for (let f = 0; f < n; f++) { let m = 0; for (let j = Math.max(0, f - 12); j <= Math.min(n - 1, f + 12); j++) m = Math.max(m, blk[j]); mx[f] = m; }
+    for (let f = 0; f < n; f++) { let sum = 0, c = 0; for (let j = Math.max(0, f - 10); j <= Math.min(n - 1, f + 10); j++) { sum += mx[j]; c++; } env[f] = sum / c; }
+    return { pk, env, RATE };
   },
   draw(g, S) {
     const { w, h, A, opt, unit } = S;
@@ -26,11 +37,19 @@ Looks.register({
     const lab = (s, x, y, o = {}) => U.text(g, s, x, y, { size: unit * 0.016, font: U.FONT.PLEX, color: 'rgba(255,255,255,0.55)', ...o });
 
     // layout: scope on top, meters below (portrait) or beside (landscape)
+    // (kept clear of the handle strip at the bottom)
+    const pad = S.pad, top = pad, bot = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.045, avH = bot - top;
+    const MB = unit * 0.29; // height of the meter block
     let cx, cy, r, mx0, mx1, my;
-    if (S.portrait) {
-      r = w * 0.34; cx = w / 2; cy = h * 0.36; mx0 = w * 0.12; mx1 = w * 0.88; my = cy + r + h * 0.075;
+    if (h / w >= 1.1) {
+      r = Math.min(w * 0.34, (avH - unit * 0.135 - MB) / 2);
+      const total = unit * 0.135 + 2 * r + MB, y0 = top + (avH - total) / 2;
+      cx = w / 2; cy = y0 + unit * 0.045 + r; my = cy + r + unit * 0.09;
+      mx0 = w / 2 - Math.max(r, w * 0.38) * 1.0; mx1 = w - mx0;
     } else {
-      r = h * 0.33; cx = w * 0.3; cy = h * 0.5; mx0 = w * 0.55; mx1 = w * 0.9; my = h * 0.36;
+      r = Math.min(avH * 0.42, w * 0.22);
+      const gap = unit * 0.12, mw = Math.min(w - pad * 2 - 2 * r - gap, unit * 0.75), xs = (w - (2 * r + gap + mw)) / 2;
+      cx = xs + r; cy = top + avH / 2; mx0 = xs + 2 * r + gap; mx1 = mx0 + mw; my = cy - MB / 2 + unit * 0.02;
     }
     const mw = mx1 - mx0;
 
@@ -53,10 +72,10 @@ Looks.register({
     lab('R', cx + r * 0.82, cy - r * 0.82, { align: 'center' });
 
     // ---- trace ----
-    // gentle auto-gain: fit the last half second, never boost quiet passages past 3x
-    let lp = 0;
-    for (let i = Math.max(0, Math.floor((S.t - 0.5) * A.sr)), e = Math.min(A.M.length, Math.floor(S.t * A.sr)); i < e; i += 7) lp = Math.max(lp, Math.abs(A.L[i]), Math.abs(A.R[i]));
-    const k = (r * 0.62 * opt.gain) / Math.max(lp, S.cache.pk / 3), sz = opt.width;
+    // gentle auto-gain from a pre-smoothed peak envelope (never boosts quiet passages past 3x)
+    const C = S.cache, ef = U.clamp(S.t * C.RATE, 0, C.env.length - 1), e0 = Math.floor(ef), e1 = Math.min(C.env.length - 1, e0 + 1);
+    const lp = C.env[e0] + (C.env[e1] - C.env[e0]) * (ef - e0);
+    const k = (r * 0.62 * opt.gain) / lp, sz = opt.width;
     const trace = (tt, n, color, alpha, lw) => {
       const st = A.stereo(tt, n, 0.035);
       g.beginPath();
@@ -75,7 +94,7 @@ Looks.register({
     g.restore();
 
     // ---- correlation ----
-    const st = A.stereo(S.t, 600, 0.12);
+    const st = A.stereo(S.t, 600, 0.3);
     let sl = 0, sr = 0, slr = 0;
     for (let i = 0; i < 600; i++) { sl += st.l[i] * st.l[i]; sr += st.r[i] * st.r[i]; slr += st.l[i] * st.r[i]; }
     const corr = sl > 1e-9 && sr > 1e-9 ? slr / Math.sqrt(sl * sr) : 1;

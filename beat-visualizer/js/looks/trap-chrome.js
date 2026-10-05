@@ -134,7 +134,9 @@
       // title: a scrolling marquee when it is wider than the lcd (pauses at the start of each pass)
       const title = (S.meta.title || 'untitled').toUpperCase();
       const tOpt = { size: lh * 0.27, font: U.FONT.PIXEL, color: ink, spacing: 2 };
-      const tw0 = U.textWidth(g, title, tOpt), avail = lw - pad * 2;
+      const avail = lw - pad * 2;
+      let tw0 = U.textWidth(g, title, tOpt);
+      if (tw0 > avail) { tOpt.size *= Math.max(0.78, avail / tw0); tw0 = U.textWidth(g, title, tOpt); }
       if (tw0 <= avail) U.text(g, title, lx + pad, ly + lh * 0.37, tOpt);
       else {
         const gap = lh * 0.6, loop = tw0 + gap, speed = lh * 0.55, hold = 1.6;

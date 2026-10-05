@@ -66,7 +66,7 @@
 
       // roll: pitch -> x, time -> y (future below the playhead, moving up)
       const x0 = pad, x1 = w - pad;
-      const y0 = S.portrait ? h * 0.085 : h * 0.14, y1 = S.portrait ? h * 0.8 : h * 0.93;
+      const y0 = S.portrait ? h * 0.085 : h * 0.14, y1 = S.portrait ? Math.min(h * 0.8, h - unit * 0.21) : h - pad * 0.9 - unit * 0.05;
       const win = S.bar * (+opt.bars || 2);
       const phy = y0 + (y1 - y0) * opt.playhead;
       const ty = (t) => phy + ((t - S.t) / win) * (y1 - y0);

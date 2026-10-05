@@ -116,7 +116,7 @@ Looks.register({
     const blocky = U.layer(w, h, (g) => { g.imageSmoothingEnabled = false; g.drawImage(mb, 0, 0, mb.width * bs, mb.height * bs); }, 1);
 
     // glitch events: strong transients at least half a beat apart
-    const cand = A.onsets.hit.concat(A.onsets.bass).filter((o) => o.s > 0.3).sort((p, q) => p.t - q.t);
+    const cand = S.A.onsets.hit.concat(S.A.onsets.bass).filter((o) => o.s > 0.3).sort((p, q) => p.t - q.t);
     const events = [], gap = Math.max(0.18, S.spb * 0.5);
     for (const o of cand) {
       const last = events[events.length - 1];
