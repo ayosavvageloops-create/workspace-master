@@ -13,6 +13,15 @@ or horizontal video. Runs entirely in the browser: open `index.html` in Chrome o
 3. **Export** — renders off-screen as fast as the machine allows (WebCodecs H.264 + AAC → MP4),
    1080×1920 or 1920×1080 at 60 fps, audio normalised to −14 LUFS / −1 dBTP. Asks where to save.
 
+## Looks (40)
+- **Audio only:** scope, campaign, rack, orrery, mosh, blob, transit, lidar, glyph, filament,
+  monitor, scan, smear, stipple, ladder, gonio.
+- **With MIDI** (or with parts guessed from the audio): proof, oracle, weather, arcade, receipt,
+  totem, trajectory, stars, chart, eclipse, sheet, screen, strip, mono studio, rage field,
+  rage night, trap phosphor, trap chrome, ama sun, afro paper, plate, film, keys, domino.
+
+Every look has an accent colour plus its own options. All looks work in 9:16, 16:9, 4:5 and 1:1.
+
 ## Structure
 - `js/core/analysis.js` — offline audio analysis: spectrum, bands, onsets, tempo/beat grid, EBU R128 loudness.
 - `js/core/midi.js` — MIDI parser and the parts model (`Parts.inRange`, `Parts.active`, `Parts.chordAt`).

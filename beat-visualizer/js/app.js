@@ -110,8 +110,14 @@
     const [w, h] = SIZES[state.format], q = state.quality;
     const cw = Math.round(w * q), ch = Math.round(h * q);
     if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
-    canvas.style.aspectRatio = `${w} / ${h}`;
-    ui.safe();
+    // fit the preview into its area (CSS percentages are unreliable inside the flex column)
+    const wrap = $('canvasWrap'), ww = wrap.clientWidth, wh = wrap.clientHeight;
+    const k = Math.min(ww / w, wh / h), dw = Math.floor(w * k), dh = Math.floor(h * k);
+    if (canvas.style.width !== dw + 'px' || canvas.style.height !== dh + 'px') {
+      canvas.style.width = dw + 'px'; canvas.style.height = dh + 'px';
+      canvas.style.left = Math.floor((ww - dw) / 2) + 'px'; canvas.style.top = Math.floor((wh - dh) / 2) + 'px';
+      ui.safe();
+    }
   }
   function drawPreview() {
     sizeCanvas();
@@ -304,7 +310,7 @@
     if (e.code === 'Space') { e.preventDefault(); state.playing ? pause() : play(); }
     if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) { e.preventDefault(); $('search').focus(); }
   });
-  addEventListener('resize', () => ui.safe());
+  addEventListener('resize', () => { lastPreviewKey = ''; sizeCanvas(); ui.safe(); });
 
   // settings search: jumps to the matching control
   $('search').addEventListener('input', (e) => {

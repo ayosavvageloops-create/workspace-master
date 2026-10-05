@@ -16,15 +16,15 @@ Looks.register({
   ],
   prepare(S) {
     const { w, h, opt, unit } = S;
-    const hy = S.portrait ? h * 0.315 : h * 0.18, bottom = S.portrait ? h * 0.93 : h * 1.0;
+    const hy = S.portrait ? h * 0.3 : h * 0.18, bottom = S.portrait ? h * 0.84 : h * 0.98;
     const R = Math.round(opt.rows), cells = [];
-    const halfNear = S.portrait ? w * 0.95 : w * 0.62;
+    const halfNear = S.portrait ? w * 0.62 : w * 0.5;
     const rows = [];
     for (let k = 0; k < R; k++) {
       const s = k / (R - 1);                                 // 0 near … 1 far
-      const y = bottom - (bottom - hy) * Math.pow(s, 0.9);
+      const y = bottom - (bottom - hy) * Math.pow(s, 0.75);
       const d = U.lerp(1, 0.3, Math.pow(s, 0.9));            // perspective scale
-      const ext = Math.sqrt(Math.max(0, 1 - Math.pow(s * 0.98, 2.2))); // dome footprint
+      const ext = Math.sqrt(Math.max(0, 1 - Math.pow((s - 0.25) / 0.78, 2))); // dome: widest a little above the near edge
       rows.push({ s, y, d, half: halfNear * (0.4 + 0.6 * d) * ext });
     }
     // cells: segments of dots in world X (-1..1), staggered per row
@@ -45,7 +45,7 @@ Looks.register({
       const gr = g.createLinearGradient(0, 0, 0, h);
       gr.addColorStop(0, opt.bg); gr.addColorStop(0.45, U.mix(opt.bg, '#0c2236', 0.6)); gr.addColorStop(1, '#000000');
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      g.save(); g.translate(w / 2, hy + (bottom - hy) * 0.35); g.scale(1, 0.6);
+      g.save(); g.translate(w / 2, hy + (bottom - hy) * 0.45); g.scale(1, 0.5);
       U.glowBlob(g, 0, 0, w * 0.75, '#12324a', 0.55);
       g.restore();
     });
@@ -94,7 +94,7 @@ Looks.register({
       }
       g.globalAlpha = alpha; g.fillStyle = color; g.fill();
     };
-    for (let b = 0; b < NB; b++) paint(dim[b], b > 5 ? '#6fb8d8' : '#3b86b8', 0.2 + 0.8 * (b / NB), 1);
+    for (let b = 0; b < NB; b++) paint(dim[b], b > 5 ? '#7cc4e2' : '#4596c8', Math.min(1, 0.3 + 0.95 * (b / NB)), 1);
     for (let b = 0; b < NB; b++) {
       paint(cy[b], opt.accent, 0.08 * (b / NB), 2.6);
       paint(cy[b], opt.accent, 0.35 + 0.6 * (b / NB), 1.05);
