@@ -19,12 +19,16 @@
     midiParts: [], midiBpm: 0, audioParts: null, source: 'audio', midiOffset: 0, fileBpm: 0,
     cacheStore: {},
     filter: 'all',
+    layout: (() => { const d = JSON.parse(JSON.stringify(Looks.DEFAULT_LAYOUT)); const L = store.get('layout', null); return L ? Looks.layoutOf({ layout: L }) : d; })(),
   };
+  let lastScene = null, dragItem = null, hoverItem = null;
+  const layoutKey = () => JSON.stringify(state.layout);
+  function saveLayout() { store.set('layout', state.layout); lastPreviewKey = ''; }
 
   // ---------- context ----------
   function ctx() {
     const [w, h] = SIZES[state.format];
-    return { A: state.A, parts: state.parts, meta: state.meta, w, h, clipStart: state.clipStart, clipLen: state.clipLen,
+    return { A: state.A, parts: state.parts, meta: state.meta, w, h, clipStart: state.clipStart, clipLen: state.clipLen, layout: state.layout,
              fps: state.fps, opt: state.opt, cacheStore: state.cacheStore, version: state.version };
   }
   function bump() { state.version++; state.cacheStore = {}; }
@@ -155,7 +159,6 @@
     if (canvas.style.width !== dw + 'px' || canvas.style.height !== dh + 'px') {
       canvas.style.width = dw + 'px'; canvas.style.height = dh + 'px';
       canvas.style.left = Math.floor((ww - dw) / 2) + 'px'; canvas.style.top = Math.floor((wh - dh) / 2) + 'px';
-      ui.safe();
     }
   }
   function drawPreview() {
@@ -167,7 +170,10 @@
     const t = nowT();
     const t0 = performance.now();
     g.setTransform(state.quality, 0, 0, state.quality, 0, 0);
-    Looks.render(g, look, Looks.scene(look, c, t, Math.round((t - state.clipStart) * state.fps)));
+    const S = Looks.scene(look, c, t, Math.round((t - state.clipStart) * state.fps));
+    Looks.render(g, look, S);
+    Looks.drawGuides(g, S, { highlight: dragItem || hoverItem || null });
+    lastScene = S;
     g.setTransform(1, 0, 0, 1, 0, 0);
     lastFrameMs = lastFrameMs * 0.9 + (performance.now() - t0) * 0.1;
   }
@@ -180,7 +186,7 @@
     const tiles = [...document.querySelectorAll('.tile:not([hidden])')];
     if (!tiles.length) return;
     const c = ctx(), t = nowT(), start = performance.now();
-    const stamp = `${state.version}|${state.format}|${t.toFixed(3)}|${state.meta.handle}`;
+    const stamp = `${state.version}|${state.format}|${t.toFixed(3)}|${state.meta.handle}|${layoutKey()}`;
     for (let k = 0; k < tiles.length && performance.now() - start < budgetMs; k++) {
       const tile = tiles[thumbIdx++ % tiles.length];
       const look = Looks.get(tile.dataset.id);
@@ -201,7 +207,7 @@
       const t = nowT();
       if (t >= state.clipStart + state.clipLen) { state.t = state.clipStart; play(); }
     }
-    const pk = `${state.version}|${state.format}|${state.quality}|${state.look}|${nowT()}|${state.meta.handle}|${JSON.stringify(state.opt[state.look] || {})}`;
+    const pk = `${state.version}|${state.format}|${state.quality}|${state.look}|${nowT()}|${state.meta.handle}|${layoutKey()}|${dragItem}|${hoverItem}|${JSON.stringify(state.opt[state.look] || {})}`;
     if (state.playing || pk !== lastPreviewKey) { drawPreview(); lastPreviewKey = pk; }
     if (!state.playing) drawThumbs(12);
     if (now - lastUi > 50) { ui.time(); lastUi = now; }
@@ -261,6 +267,32 @@
         box.appendChild(row);
       }
     },
+    text() {
+      const L = state.layout;
+      $('tMode').value = L.mode; $('tLookScale').value = L.lookScale;
+      $('tPlatform').value = L.safe.platform; $('tSafeShow').checked = L.safe.show; $('tSafeFit').checked = L.safe.fit;
+      $('tCols').value = String(L.grid.cols); $('tSnap').checked = L.grid.snap;
+      $('tFont').value = L.font; $('tWeight').value = String(L.weight); $('tDetailFont').value = L.detailFont;
+      $('tColor').value = L.color || '#ffffff'; $('tColorAuto').classList.toggle('primary', !L.color);
+      $('tUpper').checked = L.upper; $('tSpacing').value = L.spacing; $('tBackdrop').value = L.backdrop || 'none';
+      $('myText').classList.toggle('off', L.mode === 'look');
+      $('safeBtn').classList.toggle('on', L.safe.show); $('gridBtn').classList.toggle('on', L.grid.show);
+      const names = { title: 'Title', sub: 'Subtitle', handle: 'Handle' };
+      document.querySelectorAll('.titem').forEach((box) => {
+        const key = box.dataset.item, it = L.items[key];
+        box.innerHTML = `<h3><input type="checkbox" ${it.on ? 'checked' : ''}> ${names[key]}</h3>
+          ${key === 'sub' ? `<div class="field"><label>Text</label><input type="text" class="t-text" value="${(it.text || '').replace(/"/g, '&quot;')}" title="{bpm}, {key} and {title} are filled in"></div>` : ''}
+          <div class="field"><label>Size</label><input type="range" class="t-size" min="0.4" max="3" step="0.05" value="${it.size}"></div>
+          <div class="field"><label>Position</label><div class="anchors">${['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'].map((a) => `<button type="button" data-a="${a}" class="${a === it.anchor ? 'on' : ''}" title="${a}"></button>`).join('')}</div></div>
+          <div class="field"><label>Offset · grid</label><div class="nums">X <input type="number" class="t-dx" step="0.5" value="${it.dx}"> Y <input type="number" class="t-dy" step="0.5" value="${it.dy}"></div></div>`;
+        box.querySelector('h3 input').onchange = (e) => { it.on = e.target.checked; saveLayout(); };
+        const tt = box.querySelector('.t-text'); if (tt) tt.oninput = () => { it.text = tt.value; saveLayout(); };
+        box.querySelector('.t-size').oninput = (e) => { it.size = parseFloat(e.target.value); saveLayout(); };
+        box.querySelectorAll('.anchors button').forEach((b) => (b.onclick = () => { it.anchor = b.dataset.a; it.dx = 0; it.dy = key === 'sub' && b.dataset.a[0] === 't' ? 1.5 : key === 'sub' && b.dataset.a[0] === 'b' ? -0.5 : 0; saveLayout(); ui.text(); }));
+        box.querySelector('.t-dx').onchange = (e) => { it.dx = parseFloat(e.target.value) || 0; saveLayout(); };
+        box.querySelector('.t-dy').onchange = (e) => { it.dy = parseFloat(e.target.value) || 0; saveLayout(); };
+      });
+    },
     grid() {
       const grid = $('lookGrid');
       grid.innerHTML = '';
@@ -313,15 +345,6 @@
       reset.onclick = () => { state.opt[look.id] = {}; store.set('opt', state.opt); ui.opts(); };
       box.appendChild(reset);
     },
-    safe() {
-      const el = $('safeGuide'), r = canvas.getBoundingClientRect(), wr = $('canvasWrap').getBoundingClientRect();
-      const [w, h] = SIZES[state.format];
-      // Reels/TikTok UI covers ~14% top, ~20% bottom, ~12% right; YouTube ~6% all round
-      const m = state.format === '9:16' ? [0.14, 0.12, 0.2, 0.06] : [0.06, 0.06, 0.06, 0.06];
-      el.style.left = `${r.left - wr.left + r.width * m[3]}px`; el.style.top = `${r.top - wr.top + r.height * m[0]}px`;
-      el.style.width = `${r.width * (1 - m[1] - m[3])}px`; el.style.height = `${r.height * (1 - m[0] - m[2])}px`;
-      void w; void h;
-    },
   };
 
   function selectLook(id) {
@@ -331,7 +354,8 @@
 
   // ---------- wiring ----------
   $('playBtn').onclick = () => (state.playing ? pause() : play());
-  $('safeBtn').onclick = () => { $('safeGuide').classList.toggle('on'); $('safeBtn').classList.toggle('on'); ui.safe(); };
+  $('safeBtn').onclick = () => { state.layout.safe.show = !state.layout.safe.show; saveLayout(); ui.text(); };
+  $('gridBtn').onclick = () => { state.layout.grid.show = !state.layout.grid.show; saveLayout(); ui.text(); };
   $('format').onchange = (e) => { state.format = e.target.value; store.set('format', state.format); bump(); };
   $('quality').onchange = (e) => { state.quality = parseFloat(e.target.value); store.set('quality', state.quality); };
   $('demoBtn').onclick = $('demoBtn2').onclick = loadDemo;
@@ -343,6 +367,71 @@
   $('bpm').onchange = (e) => { const v = parseFloat(e.target.value); if (v > 30 && state.A) { state.fileBpm = v; applyParts(); } };
   $('clipLen').onchange = (e) => { state.clipLen = Math.max(1, Math.min(210, parseFloat(e.target.value) || 15)); bump(); seek(state.t); };
   $('clipStart').onchange = (e) => { state.clipStart = Math.max(0, parseFloat(e.target.value) || 0); state.t = state.clipStart; bump(); if (state.playing) play(); };
+  // ---------- text & layout ----------
+  for (const sel of ['tFont', 'tDetailFont']) {
+    for (const f of ['Inter Tight', 'Inter', 'JetBrains Mono', 'IBM Plex Mono', 'Instrument Serif', 'VT323', 'Caveat']) $(sel).add(new Option(f, f));
+  }
+  const L$ = () => state.layout;
+  $('tMode').onchange = (e) => {
+    L$().mode = e.target.value;
+    if (L$().mode !== 'look') L$().grid.show = true;
+    saveLayout(); ui.text();
+  };
+  $('tLookScale').oninput = (e) => { L$().lookScale = parseFloat(e.target.value); saveLayout(); };
+  $('tPlatform').onchange = (e) => { L$().safe.platform = e.target.value; saveLayout(); };
+  $('tSafeShow').onchange = (e) => { L$().safe.show = e.target.checked; saveLayout(); ui.text(); };
+  $('tSafeFit').onchange = (e) => { L$().safe.fit = e.target.checked; saveLayout(); };
+  $('tCols').onchange = (e) => { L$().grid.cols = parseInt(e.target.value, 10); saveLayout(); };
+  $('tSnap').onchange = (e) => { L$().grid.snap = e.target.checked; saveLayout(); };
+  $('tFont').onchange = (e) => { L$().font = e.target.value; saveLayout(); };
+  $('tWeight').onchange = (e) => { L$().weight = parseInt(e.target.value, 10); saveLayout(); };
+  $('tDetailFont').onchange = (e) => { L$().detailFont = e.target.value; saveLayout(); };
+  $('tColor').oninput = (e) => { L$().color = e.target.value; saveLayout(); $('tColorAuto').classList.remove('primary'); };
+  $('tColorAuto').onclick = () => { L$().color = ''; saveLayout(); ui.text(); };
+  $('tBackdrop').onchange = (e) => { L$().backdrop = e.target.value; saveLayout(); };
+  $('tUpper').onchange = (e) => { L$().upper = e.target.checked; saveLayout(); };
+  $('tSpacing').oninput = (e) => { L$().spacing = parseFloat(e.target.value); saveLayout(); };
+  $('tReset').onclick = () => { state.layout = JSON.parse(JSON.stringify(Looks.DEFAULT_LAYOUT)); saveLayout(); ui.text(); };
+
+  // drag text items on the preview; offsets snap to half grid units
+  const toLogical = (e) => {
+    const r = canvas.getBoundingClientRect(), [w, h] = SIZES[state.format];
+    return { x: (e.clientX - r.left) / r.width * w, y: (e.clientY - r.top) / r.height * h };
+  };
+  const hitItem = (p) => {
+    const B = lastScene && lastScene.textBoxes;
+    if (!B) return null;
+    for (const k of ['handle', 'sub', 'title']) { const b = B[k]; if (b && p.x >= b.x - 14 && p.x <= b.x + b.w + 14 && p.y >= b.y - 14 && p.y <= b.y + b.h + 14) return k; }
+    return null;
+  };
+  let dragFrom = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state.layout.mode === 'look') return;
+    const p = toLogical(e), k = hitItem(p);
+    if (!k) return;
+    const it = state.layout.items[k];
+    dragItem = k; dragFrom = { p, dx: it.dx, dy: it.dy };
+    canvas.setPointerCapture(e.pointerId); canvas.classList.add('dragging');
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    const p = toLogical(e);
+    if (!dragItem) {
+      const k = state.layout.mode === 'look' ? null : hitItem(p);
+      if (k !== hoverItem) { hoverItem = k; canvas.classList.toggle('can-drag', !!k); }
+      return;
+    }
+    const G = lastScene.grid, it = state.layout.items[dragItem];
+    let dx = dragFrom.dx + (p.x - dragFrom.p.x) / G.unit, dy = dragFrom.dy + (p.y - dragFrom.p.y) / G.unit;
+    if (state.layout.grid.snap) { dx = Math.round(dx * 2) / 2; dy = Math.round(dy * 2) / 2; }
+    it.dx = Math.round(dx * 100) / 100; it.dy = Math.round(dy * 100) / 100;
+    lastPreviewKey = '';
+  });
+  const endDrag = () => { if (dragItem) { dragItem = null; canvas.classList.remove('dragging'); saveLayout(); ui.text(); } };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', () => { if (!dragItem && hoverItem) { hoverItem = null; canvas.classList.remove('can-drag'); } });
+
   $('source').onchange = (e) => { state.source = e.target.value; applyParts(); ui.fields(); ui.parts(); };
   $('midiOffset').onchange = (e) => { state.midiOffset = (parseFloat(e.target.value) || 0) / 1000; applyParts(); };
   $('alignBtn').onclick = () => { if (state.A && state.midiParts.length) { state.midiOffset = Parts.align(state.midiParts, state.A); applyParts(); ui.fields(); } };
@@ -361,7 +450,7 @@
     if (e.code === 'Space') { e.preventDefault(); state.playing ? pause() : play(); }
     if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) { e.preventDefault(); $('search').focus(); }
   });
-  addEventListener('resize', () => { lastPreviewKey = ''; sizeCanvas(); ui.safe(); });
+  addEventListener('resize', () => { lastPreviewKey = ''; sizeCanvas(); });
 
   // settings search: jumps to the matching control
   $('search').addEventListener('input', (e) => {
@@ -416,7 +505,7 @@
   // ---------- boot ----------
   ui.grid();
   if (!Looks.get(state.look)) state.look = Looks.list[0] && Looks.list[0].id;
-  ui.selected(); ui.opts(); ui.fields(); ui.play();
+  ui.selected(); ui.opts(); ui.fields(); ui.play(); ui.text();
   requestAnimationFrame(loop);
 
 

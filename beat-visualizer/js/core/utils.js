@@ -69,13 +69,24 @@
   function hsl(h, s, l, a = 1) { return `hsla(${h},${s}%,${l}%,${a})`; }
 
   // ---------- text ----------
+  // Global text controls set by the core around a look's draw():
+  //   textScale — multiplies every size; suppress — lower-case needles whose texts are skipped.
+  const T = { scale: 1, suppress: null };
   function font(size, family = FONT.SANS, weight = 400, style = '') {
+    size *= T.scale;
     return `${style} ${weight} ${Math.round(size)}px "${family}", ${family === FONT.MONO || family === FONT.PLEX ? 'monospace' : 'sans-serif'}`.trim();
   }
   // Draws text with optional letter spacing; returns its width.
   // o.max: maximum width — the text first shrinks (down to 75%), then is cut with an ellipsis.
   function text(g, str, x, y, o = {}) {
     str = String(str ?? '');
+    if (T.suppress && str) {
+      const low = str.toLowerCase();
+      // contains a needle, or is a shortened ("…") start of one (looks fit long titles before drawing)
+      const cut = low.replace(/[….\s]+$/, '');
+      // …or a wrapped line of one (a fragment of at least 6 characters that the needle contains)
+      if (T.suppress.some((n) => low.includes(n) || (cut.length >= 4 && low !== cut && n.startsWith(cut)) || (cut.trim().length >= 6 && n.includes(cut.trim())))) return 0;
+    }
     if (o.max > 0 && str) {
       const fitted = fit(g, str, o.max, o);
       if (fitted.str !== str || fitted.size !== o.size) { o = { ...o, size: fitted.size, max: 0 }; str = fitted.str; }
@@ -85,7 +96,7 @@
     g.fillStyle = o.color || '#000';
     g.textBaseline = o.baseline || 'alphabetic';
     if (o.alpha != null) g.globalAlpha *= o.alpha;
-    const ls = o.spacing || 0;
+    const ls = (o.spacing || 0) * T.scale;
     let w;
     if (ls && 'letterSpacing' in g) {
       g.letterSpacing = `${ls}px`;
@@ -112,7 +123,7 @@
     g.save();
     g.font = font(o.size || 24, o.font || FONT.SANS, o.weight || 400, o.style || '');
     let w = g.measureText(str).width;
-    if (o.spacing) w += o.spacing * [...str].length;
+    if (o.spacing) w += o.spacing * T.scale * [...str].length;
     g.restore();
     return w;
   }
@@ -216,6 +227,7 @@
   }
 
   window.U = {
+    T,
     TAU, FONT, clamp, lerp, invLerp, smooth, fract, easeOut, easeInOut,
     rng, hash, strSeed, vnoise, fbm,
     hexToRgb, rgbToHex, rgba, mix, hsl,

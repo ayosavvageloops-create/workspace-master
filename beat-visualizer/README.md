@@ -22,6 +22,15 @@ or horizontal video. Runs entirely in the browser: open `index.html` in Chrome o
 
 Every look has an accent colour plus its own options. All looks work in 9:16, 16:9, 4:5 and 1:1.
 
+## Text & layout
+- **Text:** keep each look's own text, switch to **My text layout** (the look's title/BPM lines are hidden and
+  your title, subtitle and handle are drawn on top), or show both. *Look text size* scales the look's own text.
+- Drag the title, subtitle and handle on the preview: they snap to a 4–16 column grid and can never leave the
+  safe zone. Each has size, 3×3 position and grid offsets; fonts, weight, colour, uppercase, tracking and a
+  backdrop (shadow / pill) are shared.
+- **Safe zone:** Instagram Reels, TikTok, YouTube Shorts or YouTube/feed. The red overlay (preview only) shows
+  where the app's buttons cover the video; *Keep look inside zone* shrinks the whole look into it.
+
 ## Structure
 - `js/core/analysis.js` — offline audio analysis: spectrum, bands, onsets, tempo/beat grid, EBU R128 loudness.
 - `js/core/midi.js` — MIDI parser and the parts model (`Parts.inRange`, `Parts.active`, `Parts.chordAt`).

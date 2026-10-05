@@ -14,7 +14,6 @@
   <div class="stage-inner">
     <div class="canvas-wrap" id="canvasWrap">
       <canvas id="preview"></canvas>
-      <div class="safe" id="safeGuide"></div>
       <div class="empty" id="emptyState">
         <p>Drop a beat anywhere on the page</p>
         <p class="muted">wav or mp3 — add .mid files beside it for the MIDI looks</p>
@@ -24,7 +23,8 @@
     <div class="scrub" id="scrub"><div class="scrub-fill" id="scrubFill"></div></div>
     <div class="transport">
       <button type="button" class="chip" id="playBtn" title="Space">play</button>
-      <button type="button" class="chip" id="safeBtn">safe area</button>
+      <button type="button" class="chip" id="safeBtn" title="Show the red zones covered by the app's buttons">safe zone</button>
+      <button type="button" class="chip" id="gridBtn" title="Show the layout grid">grid</button>
       <select id="format" class="chip">
         <option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="1:1">1:1</option>
       </select>
@@ -77,7 +77,35 @@
   </section>
 
   <section class="sec">
-    <h2><span>3</span> Export</h2>
+    <h2><span>3</span> Text &amp; layout</h2>
+    <div class="field" data-k="text mode title layout my text"><label>Text</label>
+      <select id="tMode"><option value="look">The look's own text</option><option value="mine">My text layout</option><option value="both">Both</option></select></div>
+    <div class="field" data-k="look text size scale"><label>Look text size</label><input id="tLookScale" type="range" min="0.7" max="1.4" step="0.05"></div>
+    <div class="field" data-k="safe zone platform reels tiktok shorts"><label>Safe zone</label>
+      <select id="tPlatform"><option value="reels">Instagram Reels</option><option value="tiktok">TikTok</option><option value="shorts">YouTube Shorts</option><option value="youtube">YouTube / feed</option><option value="off">None</option></select></div>
+    <div class="field" data-k="safe zone red show"><label>Show red zone</label><input id="tSafeShow" type="checkbox"></div>
+    <div class="field" data-k="fit look inside safe zone edges"><label>Keep look inside zone</label><input id="tSafeFit" type="checkbox"></div>
+    <div id="myText">
+      <p class="hint">Drag the title, subtitle and handle on the preview — they snap to the grid and never leave the safe zone.</p>
+      <div class="field" data-k="grid columns"><label>Grid columns</label><select id="tCols"><option>4</option><option>6</option><option>8</option><option>12</option><option>16</option></select></div>
+      <div class="field" data-k="snap grid"><label>Snap to grid</label><input id="tSnap" type="checkbox"></div>
+      <div class="field" data-k="title font"><label>Title font</label><select id="tFont"></select></div>
+      <div class="field" data-k="title weight bold"><label>Title weight</label><select id="tWeight"><option value="400">Regular</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option></select></div>
+      <div class="field" data-k="detail font subtitle handle"><label>Detail font</label><select id="tDetailFont"></select></div>
+      <div class="field" data-k="text colour color"><label>Colour</label><div class="row-inline"><input id="tColor" type="color"><button type="button" class="btn" id="tColorAuto">Auto</button></div></div>
+      <div class="field" data-k="backdrop shadow pill legible"><label>Backdrop</label>
+        <select id="tBackdrop"><option value="none">None</option><option value="shadow">Soft shadow</option><option value="pill">Pill</option></select></div>
+      <div class="field" data-k="uppercase caps"><label>Uppercase</label><input id="tUpper" type="checkbox"></div>
+      <div class="field" data-k="letter spacing tracking"><label>Letter spacing</label><input id="tSpacing" type="range" min="-4" max="30" step="1"></div>
+      <div class="titem" data-item="title"></div>
+      <div class="titem" data-item="sub"></div>
+      <div class="titem" data-item="handle"></div>
+    </div>
+    <button type="button" class="btn" id="tReset">Reset text &amp; layout</button>
+  </section>
+
+  <section class="sec">
+    <h2><span>4</span> Export</h2>
     <div class="field" data-k="fps frame rate"><label>Frame rate</label>
       <select id="fps"><option value="60">60 fps</option><option value="30">30 fps</option></select></div>
     <button type="button" class="btn primary wide" id="exportBtn" disabled>Export MP4</button>
