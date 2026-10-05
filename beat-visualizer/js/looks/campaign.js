@@ -1,3 +1,14 @@
+(function () {
+// content column is laid out in local units 1000 wide; this maps it onto the canvas
+function layout(S) {
+  const { w, h, pad } = S, gap = 70;
+  if (S.portrait) {
+    const cw = Math.min(w * 0.72, (h * 0.86) / 1.6);
+    return { cw, gap, ox: (w - cw) / 2, oy: h * 0.455 - (cw * 1.58) / 2, cardDx: 0, cardDy: 0 };
+  }
+  const cw = Math.min((h * 0.84) / 0.92, (w - pad * 2 - gap * 0.5) / 2.07);
+  return { cw, gap, ox: (w - cw * (2 + gap / 1000)) / 2, oy: h / 2 - (cw * 0.92) / 2, cardDx: 1000 + gap, cardDy: 72 - 921 };
+}
 // campaign — the beat presented as a release: a print layout with a 12" sleeve, a spinning
 // record, three crops (spectrum / flat / halftone), the inner tracklist and the back credits.
 Looks.register({
@@ -28,29 +39,39 @@ Looks.register({
     let tracks = String(opt.tracks || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 12);
     let cur = tracks.findIndex((s) => s.toLowerCase() === title.toLowerCase());
     if (cur < 0) { cur = Math.min(6, tracks.length); tracks.splice(cur, 0, title); tracks = tracks.slice(0, 12); cur = Math.min(cur, tracks.length - 1); }
-    // record sprite (grooves + label + text), rotated per frame
-    const R = 512;
+    // record sprite (grooves + label + text), rotated per frame; sized to its on-screen pixels
+    const R = Math.max(64, Math.round(216 * layout(S).cw / 1000));
     const rec = U.layer(R * 2, R * 2, (g) => {
       g.translate(R, R);
       g.fillStyle = '#0f2422'; g.beginPath(); g.arc(0, 0, R, 0, U.TAU); g.fill();
-      for (let r = R * 0.97; r > R * 0.5; r -= 3.2) {
+      const gs = Math.max(1.6, R / 160);
+      for (let r = R * 0.97; r > R * 0.5; r -= gs) {
         const k = U.hash(Math.round(r), 3);
         g.strokeStyle = k > 0.8 ? 'rgba(80,140,128,0.55)' : k > 0.45 ? 'rgba(40,90,82,0.6)' : 'rgba(10,26,24,0.6)';
-        g.lineWidth = 1.6; g.beginPath(); g.arc(0, 0, r, 0, U.TAU); g.stroke();
+        g.lineWidth = gs * 0.5; g.beginPath(); g.arc(0, 0, r, 0, U.TAU); g.stroke();
       }
       // band gaps between tracks
-      for (const r of [0.86, 0.74, 0.62]) { g.strokeStyle = '#0a1716'; g.lineWidth = 6; g.beginPath(); g.arc(0, 0, R * r, 0, U.TAU); g.stroke(); }
-      g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 6; g.beginPath(); g.arc(0, 0, R - 3, 0, U.TAU); g.stroke();
+      for (const r of [0.86, 0.74, 0.62]) { g.strokeStyle = '#0a1716'; g.lineWidth = gs * 1.6; g.beginPath(); g.arc(0, 0, R * r, 0, U.TAU); g.stroke(); }
+      g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = gs; g.beginPath(); g.arc(0, 0, R - 3, 0, U.TAU); g.stroke();
       g.fillStyle = opt.label; g.beginPath(); g.arc(0, 0, R * 0.48, 0, U.TAU); g.fill();
       g.fillStyle = '#111'; g.beginPath(); g.arc(0, 0, R * 0.035, 0, U.TAU); g.fill();
       U.text(g, `${cat} · A`, 0, R * 0.2, { size: R * 0.15, font: U.FONT.SANS, weight: 500, color: '#1a0d0a', align: 'center' });
-      U.text(g, 'SIDE A · 33⅓', 0, -R * 0.24, { size: R * 0.055, font: U.FONT.SANS, weight: 600, color: 'rgba(26,13,10,0.6)', align: 'center', spacing: 3 });
+      U.text(g, 'SIDE A · 33⅓', 0, -R * 0.24, { size: R * 0.055, font: U.FONT.SANS, weight: 600, color: 'rgba(26,13,10,0.6)', align: 'center', spacing: R * 0.006 });
+    });
+    // static sheen over the grooves
+    const sheen = U.layer(R * 2, R * 2, (g) => {
+      if (!g.createConicGradient) return;
+      const cg = g.createConicGradient(-0.6, R, R);
+      cg.addColorStop(0, 'rgba(255,255,255,0)'); cg.addColorStop(0.08, 'rgba(160,220,205,0.14)'); cg.addColorStop(0.16, 'rgba(255,255,255,0)');
+      cg.addColorStop(0.5, 'rgba(255,255,255,0)'); cg.addColorStop(0.58, 'rgba(160,220,205,0.1)'); cg.addColorStop(0.66, 'rgba(255,255,255,0)');
+      cg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = cg; g.beginPath(); g.arc(R, R, R, 0, U.TAU); g.arc(R, R, R * 0.49, 0, U.TAU, true); g.fill();
     });
     // barcode widths from the catalogue string
     const bars = [];
     const rr = U.rng(U.strSeed(cat));
     for (let i = 0; i < 46; i++) bars.push(1 + Math.floor(rr() * 3), 1 + Math.floor(rr() * 2));
-    return { cat, tracks, cur, rec, bars };
+    return { cat, tracks, cur, rec, sheen, bars };
   },
   draw(g, S) {
     const { w, h, pad, A, opt } = S;
@@ -58,18 +79,7 @@ Looks.register({
     g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
 
     // layout in local units: the content column is 1000 wide
-    let cw, ox, oy, cardDx, cardDy;
-    const gap = 70;
-    if (S.portrait) {
-      cw = Math.min(w * 0.72, (h * 0.86) / 1.6);
-      ox = (w - cw) / 2; oy = h * 0.455 - (cw * 1.58) / 2;
-      cardDx = 0; cardDy = 0;
-    } else {
-      cw = Math.min((h * 0.84) / 0.92, (w - pad * 2 - gap * 0.5) / 2.07);
-      const tot = cw * (2 + gap / 1000);
-      ox = (w - tot) / 2; oy = h / 2 - (cw * 0.92) / 2;
-      cardDx = 1000 + gap; cardDy = 72 - 921;
-    }
+    const { cw, ox, oy, cardDx, cardDy, gap } = layout(S);
     const s = cw / 1000, px = 1 / s;
     g.save(); g.translate(ox, oy); g.scale(s, s);
     const ink = '#141414', grey = '#8a8a86';
@@ -102,14 +112,7 @@ Looks.register({
     g.save(); g.translate(rcx, rcy); g.rotate((S.t * 0.555) * U.TAU);
     g.drawImage(C.rec, -rr, -rr, rr * 2, rr * 2);
     g.restore();
-    // static sheen
-    if (g.createConicGradient) {
-      const cg = g.createConicGradient(-0.6, rcx, rcy);
-      cg.addColorStop(0, 'rgba(255,255,255,0)'); cg.addColorStop(0.08, 'rgba(160,220,205,0.13)'); cg.addColorStop(0.16, 'rgba(255,255,255,0)');
-      cg.addColorStop(0.5, 'rgba(255,255,255,0)'); cg.addColorStop(0.58, 'rgba(160,220,205,0.1)'); cg.addColorStop(0.66, 'rgba(255,255,255,0)');
-      cg.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = cg; g.beginPath(); g.arc(rcx, rcy, rr, 0, U.TAU); g.arc(rcx, rcy, rr * 0.49, 0, U.TAU, true); g.fill();
-    }
+    g.drawImage(C.sheen, rcx - rr, rcy - rr, rr * 2, rr * 2);
     // tonearm
     const pvx = rcx + rr * 1.0, pvy = rcy - rr * 1.05, sxx = rcx + rr * 0.72, syy = rcy - rr * 0.5;
     g.strokeStyle = '#d6d6d2'; g.lineWidth = 3 * px; g.lineCap = 'round';
@@ -124,9 +127,9 @@ Looks.register({
     {
       const x0 = 0, x1 = 320;
       g.fillStyle = '#0b0b0a'; g.fillRect(x0, cy0, x1 - x0, ch);
-      const n = 34, sp = A.spectrum(S.t, n, { min: 40, max: 12000 }), bw = (x1 - x0 - 16) / n;
+      const n = 34, sp = A.spectrum(S.t, n, { min: 40, max: 12000, smooth: false, size: 2048 }), bw = (x1 - x0 - 16) / n;
       for (let i = 0; i < n; i++) {
-        const v = Math.pow(sp[i], 1.4), bh = Math.max(4, v * ch * 0.88);
+        const v = Math.pow(sp[i], 1.1), bh = Math.max(4, v * ch * 0.95);
         const x = x0 + 8 + i * bw;
         g.fillStyle = '#b8780f'; g.fillRect(x, cy0 + ch - bh, bw * 0.62, bh);
         g.fillStyle = '#f0b03a'; g.fillRect(x, cy0 + ch - bh, bw * 0.62, Math.min(bh, 5));
@@ -141,7 +144,7 @@ Looks.register({
     }
     // halftone: diagonal bands of dot sizes, slowly drifting with the beat
     {
-      const x0 = 680, x1 = 1000, step = 17;
+      const x0 = 680, x1 = 1000, step = 12.5;
       g.fillStyle = '#fbfbf9'; g.fillRect(x0, cy0, x1 - x0, ch);
       g.save(); g.beginPath(); g.rect(x0, cy0, x1 - x0, ch); g.clip();
       g.fillStyle = '#111';
@@ -149,9 +152,9 @@ Looks.register({
       g.beginPath();
       for (let yy = cy0 + step / 2; yy < cy0 + ch; yy += step) {
         for (let xx = x0 + step / 2; xx < x1; xx += step) {
-          const u = (xx - x0 - (yy - cy0)) / 110 + ph;
+          const u = (xx - x0 - (yy - cy0)) / 150 + ph;
           const k = 0.5 + 0.5 * Math.sin(u * U.TAU);
-          const r = 1 + k * k * 6.5;
+          const r = 0.9 + k * k * 4.6;
           g.moveTo(xx + r, yy); g.arc(xx, yy, r, 0, U.TAU);
         }
       }
@@ -168,11 +171,11 @@ Looks.register({
       const x0 = 0, x1 = 495;
       g.fillStyle = '#f0f0ec'; g.fillRect(x0, ky, x1 - x0, kh);
       U.text(g, `SIDE A · ${(opt.album || '').toUpperCase()}`, x0 + 30, ky + 46, { size: 17, font: U.FONT.SANS, weight: 700, color: ink, spacing: 2 });
-      const n = C.tracks.length, lh = Math.min(37, 440 / Math.max(1, n));
+      const n = C.tracks.length, lh = Math.min(44, 470 / Math.max(1, n));
       C.tracks.forEach((name, i) => {
-        const y = ky + 95 + i * lh, on = i === C.cur;
+        const y = ky + 100 + i * lh, on = i === C.cur;
         const txt = `A${i + 1}.  ${name}`;
-        U.text(g, txt, x0 + 30, y, { size: Math.min(31, lh * 0.84), font: U.FONT.SANS, weight: on ? 700 : 400, color: ink });
+        U.text(g, txt, x0 + 30, y, { size: Math.min(33, lh * 0.8), font: U.FONT.SANS, weight: on ? 700 : 400, color: ink });
         if (on) {
           g.fillStyle = opt.label; g.beginPath(); g.arc(x0 + 16, y - 10, 5, 0, U.TAU); g.fill();
           const tw = U.measure(g, txt, Math.min(31, lh * 0.84), U.FONT.SANS, 700);
@@ -207,3 +210,4 @@ Looks.register({
     g.restore();
   },
 });
+})();

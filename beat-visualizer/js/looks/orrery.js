@@ -39,7 +39,7 @@ Looks.register({
       bg: U.layer(S.w, S.h, (g, w, h) => {
         g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
         U.glowBlob(g, w / 2, S.portrait ? h * 0.44 : h * 0.5, S.unit * 0.5, '#15151d', 0.6);
-      }, 0.25),
+      }, 1),
     };
   },
   draw(g, S) {

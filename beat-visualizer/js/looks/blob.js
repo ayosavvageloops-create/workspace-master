@@ -66,7 +66,7 @@ Looks.register({
       const lv = A.band(t, b.band);
       const e = 0.5 * lv + 0.5 * A.band(t - 0.12, b.band);
       balls.push({
-        x: cx0 + U2 * (b.x + b.ax * U.vnoise(b.ph, t * 0.16)),
+        x: cx0 + U2 * (b.x * 1.25 + b.ax * U.vnoise(b.ph, t * 0.16)),
         y: cy0 + U2 * (b.y + b.ay * U.vnoise(b.ph + 31, t * 0.14)),
         r: U2 * b.r * (0.72 + 0.5 * e),
         // wobble harmonics (2nd, 3rd, 4th), animated and pushed by level

@@ -136,9 +136,9 @@
           const xa = tx(n.s) + 1, xb = tx(n.e) - 3, y = y1 - (n.p - lo + 0.5) * rowH - nh / 2;
           const playing = n.s <= S.t && n.e > S.t, past = n.e <= S.t;
           U.rrect(g, xa, y, Math.max(nh, xb - xa), nh, nh / 2);
-          g.fillStyle = U.rgba(col, playing ? 0.3 : 0.1); g.fill();
-          g.lineWidth = playing ? 3 : 2;
-          g.strokeStyle = U.rgba(U.mix(col, '#2a2410', playing ? 0.25 : 0), playing ? 1 : past ? 0.95 : 0.55);
+          g.fillStyle = U.rgba(col, playing ? 0.32 : past ? 0.14 : 0.08); g.fill();
+          g.lineWidth = playing ? 3.5 : 2.5;
+          g.strokeStyle = U.rgba(U.mix(col, '#2a2410', playing ? 0.25 : 0), playing ? 1 : past ? 0.95 : 0.7);
           g.stroke();
         }
       }
