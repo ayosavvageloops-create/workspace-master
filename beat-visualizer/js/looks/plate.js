@@ -18,7 +18,8 @@
     const x0 = S.pad, x1 = w - S.pad;
     const ky = portrait ? h * 0.1 : h * 0.19;          // ruler top
     const rul = unit * 0.026;
-    const y0 = ky + rul, y1 = portrait ? h * 0.8 : h - S.pad;
+    const markTop = (portrait ? h - unit * 0.16 : h - S.pad * 0.9) - unit * 0.035;   // core handle strip
+    const y0 = ky + rul, y1 = Math.min(portrait ? h * 0.8 : h - S.pad, markTop - unit * 0.015);
     const kw = Math.max(unit * 0.05, (x1 - x0) * 0.055);
     return { x0, x1, ky, rul, y0, y1, kw, rx0: x0 + kw };
   }
@@ -75,8 +76,18 @@
 
       // header + legend
       const top = S.pad + u * (S.portrait ? 0.035 : 0.03);
-      U.text(g, `${S.meta.title || 'untitled'} · ${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`, L.x0, top, { size: u * 0.03, font: mono, color: '#26292c' });
-      U.text(g, S.timeLabel(), L.x1, top, { size: u * 0.03, font: mono, color: '#26292c', align: 'right' });
+      // time on the right, then "title · bpm · key" fitted into the rest (only the title is shortened)
+      const hs = u * 0.03;
+      const tw = U.text(g, S.timeLabel(), L.x1, top, { size: hs, font: mono, color: '#26292c', align: 'right' });
+      const sub = ` · ${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`;
+      const room = L.x1 - L.x0 - tw - u * 0.04;
+      const title = S.meta.title || 'untitled';
+      let size = hs;
+      const full = U.textWidth(g, title + sub, { size, font: mono });
+      if (full > room) size = Math.max(hs * 0.72, hs * room / full);
+      const subW = U.textWidth(g, sub, { size, font: mono });
+      const ttw = U.text(g, title, L.x0, top, { size, font: mono, color: '#26292c', max: room - subW });
+      U.text(g, sub, L.x0 + ttw, top, { size, font: mono, color: '#6a737c' });
       let lx = L.x0;
       const ly = top + u * 0.034;
       for (const p of S.allParts) {

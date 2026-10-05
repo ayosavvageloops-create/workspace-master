@@ -100,7 +100,7 @@
 
       // ---- layout: map square plus an info block that stays clear of the handle strip ----
       const bot = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.045;
-      const tSize = unit * 0.05, fs = unit * 0.0165;
+      let tSize = unit * 0.05, fs = unit * 0.0165;
       const rowsN = S.meta.key ? 6 : 5;
       let mx, my, ms, ix, colW, side = h / w < 1.1;
       if (!side) {
@@ -111,6 +111,8 @@
       } else {
         ms = Math.min(h - pad * 1.4, w * 0.6); mx = w - ms - pad * 1.0; my = (h - ms) / 2;
         ix = pad * 1.2; colW = mx - ix - pad * 0.8;
+        // a narrow column (1:1) gets proportionally smaller type
+        tSize = Math.min(tSize, colW * 0.12); fs = Math.min(fs, colW / 19);
       }
       const P = (p) => [mx + p[0] * ms, my + p[1] * ms];
       // bands averaged over the last quarter second so lines and trains do not flicker
