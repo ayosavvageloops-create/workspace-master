@@ -26,26 +26,27 @@
         pitches = []; for (let p = lo; p <= hi; p++) pitches.push(p);
       }
       const row = new Map(pitches.map((p, i) => [p, i]));
-      // paper with a fine dot screen (full res so the dots stay crisp)
+      // paper tone (soft, quarter res) + a fine dot screen tile used as a pattern each frame
       const paper = U.layer(w, h, (g) => {
         g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
-        const step = Math.max(3, Math.round(unit * 0.0042));
-        const dot = U.layer(step * 8, step * 8, (dg) => {
-          dg.fillStyle = U.rgba(U.mix(opt.bg, '#7a5a40', 0.35), 0.55);
-          for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
-            dg.beginPath(); dg.arc(x * step + step / 2 + (y % 2 ? step / 2 : 0), y * step + step / 2, step * 0.24, 0, U.TAU); dg.fill();
-          }
-        });
-        g.fillStyle = g.createPattern(dot, 'repeat'); g.fillRect(0, 0, w, h);
-        // uneven ink density / paper tone
         const r = U.rng(S.seed + 3);
-        for (let i = 0; i < 6; i++) U.glowBlob(g, r() * w, r() * h, unit * (0.3 + r() * 0.4), r() > 0.5 ? '#ffffff' : '#c9a98a', 0.12);
+        for (let i = 0; i < 6; i++) U.glowBlob(g, r() * w, r() * h, unit * (0.3 + r() * 0.4), r() > 0.5 ? '#ffffff' : '#c9a98a', 0.14);
+      }, 0.25);
+      const step = Math.max(3, Math.round(unit * 0.0042));
+      const dots = U.layer(step * 8, step * 8, (dg) => {
+        dg.fillStyle = U.rgba(U.mix(opt.bg, '#7a5a40', 0.4), 0.5);
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+          dg.beginPath(); dg.arc(x * step + step / 2 + (y % 2 ? step / 2 : 0), y * step + step / 2, step * 0.24, 0, U.TAU); dg.fill();
+          if (y % 2 && x === 7) { dg.beginPath(); dg.arc(step / 2 - step / 2, y * step + step / 2, step * 0.24, 0, U.TAU); dg.fill(); }
+        }
       });
-      return { row, nRows: pitches.length, paper };
+      return { row, nRows: pitches.length, paper, dots };
     },
     draw(g, S) {
       const { w, h, unit, opt, cache } = S;
       g.drawImage(cache.paper, 0, 0, w, h);
+      g.fillStyle = g.createPattern(cache.dots, 'repeat');
+      g.fillRect(0, 0, w, h);
       const off = (opt.offset / 1080) * unit * 1.0;
       const pink = opt.accent, ink = opt.ink;
 

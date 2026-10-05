@@ -121,34 +121,34 @@
     prepare(S) {
       const L = layout(S), { gap } = L;
       const r = U.rng(S.seed + 5);
-      // paper + hand-ruled staves + clefs + key signatures (static)
-      const paper = U.layer(S.w, S.h, (g, w, h) => {
-        g.fillStyle = S.opt.bg; g.fillRect(0, 0, w, h);
-        for (const sys of L.systems) {
-          g.strokeStyle = 'rgba(70,68,62,0.72)';
-          g.lineWidth = Math.max(1, gap * 0.06);
-          for (let l = 0; l < 5; l++) {
-            const y = sys.bottom - l * gap, ph = r() * 10, f = 2 + r() * 2, a = gap * (0.07 + r() * 0.07);
-            g.beginPath();
-            for (let x = L.x0; x <= L.x1 + 1; x += 12) {
-              const yy = y + Math.sin((x / (L.x1 - L.x0)) * f * Math.PI + ph) * a;
-              if (x === L.x0) g.moveTo(x, yy); else g.lineTo(x, yy);
-            }
-            g.stroke();
-          }
-          bassClef(g, L.x0 + gap * 0.25, sys.bottom, gap, '#141414');
-          const sig = L.sig, steps = sig > 0 ? SHARP_STEPS : FLAT_STEPS;
-          for (let k = 0; k < Math.abs(sig); k++) {
-            accidental(g, sig > 0 ? '#' : 'b', L.x0 + gap * (4.0 + k * 0.95), sys.bottom - steps[k] * gap / 2, gap, '#24a093');
-          }
+      // hand-ruled staff lines: precomputed wobbly polylines, stroked each frame
+      const lines = [];
+      for (const sys of L.systems) {
+        for (let l = 0; l < 5; l++) {
+          const y = sys.bottom - l * gap, ph = r() * 10, f = 2 + r() * 2, a = gap * (0.07 + r() * 0.07);
+          const pts = [];
+          for (let x = L.x0; x <= L.x1 + 1; x += 16) pts.push(x, y + Math.sin((x / (L.x1 - L.x0)) * f * Math.PI + ph) * a);
+          lines.push(pts);
         }
-      });
-      return { L, paper };
+      }
+      return { L, lines };
     },
     draw(g, S) {
       const { w, h, unit, opt, cache } = S;
-      const { L, paper } = cache, { gap } = L;
-      g.drawImage(paper, 0, 0, w, h);
+      const { L } = cache, { gap } = L;
+      g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
+      g.strokeStyle = 'rgba(70,68,62,0.72)';
+      g.lineWidth = Math.max(1, gap * 0.06);
+      g.beginPath();
+      for (const pts of cache.lines) { g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); }
+      g.stroke();
+      for (const sys of L.systems) {
+        bassClef(g, L.x0 + gap * 0.25, sys.bottom, gap, '#141414');
+        const sig = L.sig, steps = sig > 0 ? SHARP_STEPS : FLAT_STEPS;
+        for (let k = 0; k < Math.abs(sig); k++) {
+          accidental(g, sig > 0 ? '#' : 'b', L.x0 + gap * (4.0 + k * 0.95), sys.bottom - steps[k] * gap / 2, gap, '#24a093');
+        }
+      }
 
       const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
       let lastEnd = 0;

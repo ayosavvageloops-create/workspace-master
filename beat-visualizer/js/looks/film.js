@@ -153,7 +153,7 @@
       if (opt.grain > 0) {
         const t = C.grain, ox = Math.floor(U.hash(fr, 21) * t.width), oy = Math.floor(U.hash(fr, 22) * t.height);
         g.save();
-        g.globalAlpha = U.clamp(opt.grain * 6);
+        g.globalAlpha = U.clamp(opt.grain * 4);
         g.translate(-ox, -oy);
         g.fillStyle = g.createPattern(t, 'repeat');
         g.fillRect(ox, oy, w, h);
