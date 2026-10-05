@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dolphin Outreach</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">🐬 Dolphin Outreach <small>× IG Sender Pro</small></div>
+  <nav id="tabs">
+    <button data-tab="run" class="active">Запуск</button>
+    <button data-tab="artists">Артисты</button>
+    <button data-tab="templates">Опенеры</button>
+    <button data-tab="profiles">Профили</button>
+    <button data-tab="settings">Настройки</button>
+  </nav>
+  <div id="stats" class="stats"></div>
+</header>
+
+<main>
+  <!-- ЗАПУСК -->
+  <section id="tab-run" class="tab active">
+    <div class="card">
+      <h2>Сессия рассылки</h2>
+      <div class="row">
+        <label>Окон одновременно <input id="runConc" type="number" min="1" max="20"></label>
+        <label>Артистов на профиль <input id="runPer" type="number" min="1" max="200"></label>
+        <span class="muted" id="runSelInfo"></span>
+      </div>
+      <div class="row">
+        <button id="btnPlan">Показать план</button>
+        <button id="btnStart" class="primary">▶ Запустить</button>
+        <button id="btnStop" class="danger">⏹ Остановить</button>
+      </div>
+      <div id="plan"></div>
+    </div>
+    <div class="card">
+      <h2>Окна</h2>
+      <div id="slots" class="slots"><p class="muted">Пока ничего не запущено.</p></div>
+    </div>
+    <div class="card">
+      <h2>Лог</h2>
+      <div id="log" class="log"></div>
+    </div>
+  </section>
+
+  <!-- АРТИСТЫ -->
+  <section id="tab-artists" class="tab">
+    <div class="card">
+      <h2>Импорт</h2>
+      <p class="muted">CSV / TSV / вставка из Google Sheets. Понимает экспорт Artist Finder
+        (<code>artist, instagram, track, message…</code>): ник из <code>instagram</code>, опенер из <code>message</code>.
+        Без заголовков: <code>ник, имя, опенер</code> по строке или просто список ников / ссылок.
+        Если опенера нет — он соберётся из шаблонов на вкладке «Опенеры». Дубли пропускаются.</p>
+      <textarea id="importText" rows="6" placeholder="instagram,artist,message&#10;@lilartist,Lil Artist,Yo bro, saw your last drop…"></textarea>
+      <div class="row">
+        <input type="file" id="importFile" accept=".csv,.tsv,.txt">
+        <button id="btnImport" class="primary">Импортировать</button>
+        <span id="importResult" class="muted"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <input id="artQ" placeholder="поиск: ник, имя, текст">
+        <select id="artStatus">
+          <option value="">все</option><option value="new">новые</option><option value="queued">в работе</option>
+          <option value="sent">отправлено</option><option value="skipped">пропущены</option><option value="failed">ошибки</option>
+        </select>
+        <button id="btnRegen">Пересобрать опенеры (новые)</button>
+        <a href="/api/artists/export" class="btn">Экспорт CSV</a>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="artAll"> выбрать все</label>
+        <button id="btnArtReset">Вернуть в очередь</button>
+        <button id="btnArtDelete" class="danger">Удалить</button>
+        <span id="artCount" class="muted"></span>
+      </div>
+      <table class="tbl">
+        <thead><tr><th></th><th>Артист</th><th>Опенер (клик — править)</th><th>Статус</th><th>Профиль</th></tr></thead>
+        <tbody id="artBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ОПЕНЕРЫ -->
+  <section id="tab-templates" class="tab">
+    <div class="card">
+      <h2>Шаблоны опенеров</h2>
+      <p class="muted">Каждому артисту без своего опенера случайно выбирается шаблон (с учётом веса) и собирается
+        уникальный текст. <code>{Yo|Hey|What's good}</code> — случайный вариант, <code>{{first_name}}</code>, <code>{{name}}</code>,
+        <code>{{username}}</code>, <code>{{track}}</code> и любая колонка из CSV. <code>{{first_name:bro}}</code> — «bro», если имени нет.
+        Новая строка в тексте = перенос строки в сообщении.</p>
+      <div id="tplList"></div>
+      <div class="row">
+        <button id="btnTplAdd">+ Шаблон</button>
+        <button id="btnTplSave" class="primary">Сохранить</button>
+        <span id="tplResult" class="muted"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ПРОФИЛИ -->
+  <section id="tab-profiles" class="tab">
+    <div class="card">
+      <h2>Профили Dolphin</h2>
+      <div class="row">
+        <button id="btnProfRefresh" class="primary">Загрузить из Dolphin</button>
+        <input id="profFilter" placeholder="фильтр: имя или тег">
+        <button id="btnProfSelFiltered">Выбрать отфильтрованные</button>
+        <button id="btnProfSelNone">Снять выбор</button>
+        <span id="profResult" class="muted"></span>
+      </div>
+      <div class="row">
+        <input id="manId" placeholder="ID профиля"> <input id="manName" placeholder="название">
+        <button id="btnProfManual">Добавить вручную</button>
+      </div>
+      <p class="muted">Порядок запуска = порядок выбора. Сегодня отправлено / лимит показаны справа.</p>
+      <div id="profList" class="prof-list"></div>
+    </div>
+  </section>
+
+  <!-- НАСТРОЙКИ -->
+  <section id="tab-settings" class="tab">
+    <div class="card">
+      <h2>Dolphin{anty}</h2>
+      <label class="block">API-токен <input id="cfgToken" type="password" placeholder="Dolphin → Настройки → API → Создать токен"> <span id="cfgTokenHint" class="muted"></span></label>
+      <label class="block">Local API <input id="cfgLocal"></label>
+      <label><input type="checkbox" id="cfgHeadless"> headless (без окон — не рекомендуется для Instagram)</label>
+    </div>
+    <div class="card">
+      <h2>Рассылка</h2>
+      <div class="grid">
+        <label>Окон одновременно <input id="cfgConc" type="number" min="1"></label>
+        <label>Артистов на профиль <input id="cfgPer" type="number" min="1"></label>
+        <label>Лимит отправок на профиль в сутки <input id="cfgDaily" type="number" min="1"></label>
+        <label>Пауза между запуском окон, сек <input id="cfgStagger" type="number" min="0"></label>
+        <label>Макс. время на профиль, мин <input id="cfgTimeout" type="number" min="5"></label>
+        <label><input type="checkbox" id="cfgClose"> закрывать профиль после рассылки</label>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Расширение</h2>
+      <div class="grid">
+        <label>Режим
+          <select id="cfgMode"><option value="igsender">IG Sender Pro — полностью автоматически</option><option value="manual">Вручную — только открыть профиль</option></select>
+        </label>
+        <label>Название расширения <input id="cfgExtName"></label>
+        <label>ID расширения (необязательно) <input id="cfgExtId"></label>
+        <label>Стартовая страница <input id="cfgOpenUrl"></label>
+        <label>Пауза между артистами, сек (пусто — как в расширении)
+          <span class="row"><input id="cfgDMin" type="number" placeholder="мин"> <input id="cfgDMax" type="number" placeholder="макс"></span></label>
+        <label>Способы отправки
+          <select id="cfgMethods"><option value="">как настроено в расширении</option><option value="dm">только чат</option><option value="dm,story">чат + ответ на историю</option><option value="dm,story,post">чат + история + пост</option></select>
+        </label>
+      </div>
+      <div class="row"><button id="btnCfgSave" class="primary">Сохранить настройки</button><span id="cfgResult" class="muted"></span></div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

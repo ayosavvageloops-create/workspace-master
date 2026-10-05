@@ -1,0 +1,4 @@
+config.json
+data/*.json
+data/*.bak
+!data/.gitkeep

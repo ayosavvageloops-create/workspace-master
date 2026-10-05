@@ -1,0 +1,12 @@
+{
+  "name": "dolphin-outreach",
+  "version": "1.0.0",
+  "description": "Запуск профилей Dolphin{anty} потоками + передача списка артистов и опенеров в расширение авторассылки",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

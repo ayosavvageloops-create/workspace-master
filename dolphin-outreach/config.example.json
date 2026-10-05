@@ -1,0 +1,16 @@
+{
+  "dolphin": {
+    "token": "ВСТАВЬ_API_ТОКЕН_DOLPHIN"
+  },
+  "run": {
+    "concurrency": 3,
+    "artistsPerProfile": 25,
+    "dailyLimitPerProfile": 25
+  },
+  "extension": {
+    "mode": "igsender",
+    "name": "IG Sender Pro",
+    "delays": { "min": 60, "max": 180 },
+    "methods": null
+  }
+}
