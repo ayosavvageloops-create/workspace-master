@@ -34,7 +34,7 @@ Looks.register({
     }, 1);
 
     // trees + ground silhouette: transparent layer cut to the horizon band
-    const band = { y0: Math.round(hzY - h * 0.15), y1: Math.round(hzY + h * 0.03) };
+    const band = { y0: Math.round(hzY - h * 0.15), y1: Math.round(hzY + h * 0.03) }; // y0 lowered to the tallest canopy below
     const trees = U.layer(w, h, (g) => {
       g.fillStyle = '#050407';
       // ground edge with a faint pink rim
@@ -55,10 +55,11 @@ Looks.register({
       g.fillStyle = '#050407';
       // trees, back (small) then front (big)
       const list = [];
-      for (let i = 0; i < 34; i++) {
+      const TS = S.portrait ? w : h * 0.85, NT = Math.round(34 * w / TS);
+      for (let i = 0; i < NT; i++) {
         const x = r() * w * 1.1 - w * 0.05;
         const big = r() < 0.45;
-        list.push({ x, s: (big ? 0.055 + r() * 0.05 : 0.018 + r() * 0.025) * Math.max(w, h * 0.56), big });
+        list.push({ x, s: (big ? 0.055 + r() * 0.05 : 0.018 + r() * 0.025) * TS, big });
       }
       list.sort((a, b) => a.s - b.s);
       for (const t of list) {
@@ -78,6 +79,7 @@ Looks.register({
         for (let k = 0; k < nc; k++) {
           const ex = t.x + (r() - 0.5) * s * 0.7, ey = cy - r() * s * 0.25;
           const rx = s * (0.55 + r() * 0.3), ry = s * (0.38 + r() * 0.2);
+          band.y0 = Math.min(band.y0, Math.floor(ey - ry - 4));
           g.beginPath(); g.ellipse(ex, ey, rx, ry, 0, Math.PI * 1.0, Math.PI * 2.0); g.ellipse(ex, ey, rx, ry * 0.55, 0, 0, Math.PI); g.fill();
         }
       }

@@ -30,7 +30,7 @@ Looks.register({
     if (S.portrait) {
       r = w * 0.34; cx = w / 2; cy = h * 0.36; mx0 = w * 0.12; mx1 = w * 0.88; my = cy + r + h * 0.075;
     } else {
-      r = h * 0.33; cx = w * 0.3; cy = h * 0.5; mx0 = w * 0.55; mx1 = w * 0.9; my = h * 0.3;
+      r = h * 0.33; cx = w * 0.3; cy = h * 0.5; mx0 = w * 0.55; mx1 = w * 0.9; my = h * 0.36;
     }
     const mw = mx1 - mx0;
 

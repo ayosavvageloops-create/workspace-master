@@ -65,7 +65,7 @@ Looks.register({
 
     // form: centre, size (taller than wide, like a head or a stone)
     const cx = w * (S.portrait ? 0.54 : 0.5), cy = h * (S.portrait ? 0.47 : 0.5);
-    const R = S.portrait ? w * 0.25 : h * 0.26;
+    const R = S.portrait ? w * 0.25 : h * 0.2;
     const yaw = opt.spin * (t * 0.12 + 0.25 * Math.sin(t * 0.3)), pitch = 0.15 * Math.sin(t * 0.21);
     const cyw = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
     // lobe amplitudes from the bands (smoothed a little by averaging two instants)
