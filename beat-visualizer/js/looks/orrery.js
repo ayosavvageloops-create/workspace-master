@@ -48,10 +48,14 @@ Looks.register({
     const ink = 'rgba(235,235,240,';
 
     // header + footer
-    U.text(g, S.meta.title, pad, pad + unit * 0.045, { size: unit * 0.05, font: U.FONT.MONO, weight: 300, color: '#e4e4e8', spacing: 1 });
-    U.text(g, S.sub.toUpperCase(), pad, pad + unit * 0.078, { size: unit * 0.016, font: U.FONT.MONO, color: 'rgba(255,255,255,0.36)', spacing: unit * 0.006 });
-    U.text(g, 'TWELVE RINGS · RATE = BAND LEVEL · ALIGNMENT IS THE EVENT', pad, h - pad - (S.portrait ? unit * 0.06 : 0),
-      { size: unit * 0.0145, font: U.FONT.MONO, color: 'rgba(255,255,255,0.36)', spacing: unit * 0.0035 });
+    // header: in portrait it may span the width; otherwise it must stay left of the dial
+    const headMax = S.portrait ? w - pad * 2 : Math.max(unit * 0.3, w / 2 - (S.portrait ? 0 : h * 0.37) - pad * 1.5);
+    U.text(g, S.meta.title, pad, pad + unit * 0.045, { size: unit * 0.05, font: U.FONT.MONO, weight: 300, color: '#e4e4e8', spacing: 1, max: headMax });
+    U.text(g, S.sub.toUpperCase(), pad, pad + unit * 0.078, { size: unit * 0.016, font: U.FONT.MONO, color: 'rgba(255,255,255,0.36)', spacing: unit * 0.006, max: headMax });
+    // footer: below the handle strip in portrait (handle sits at h - unit*0.16), above it otherwise
+    const footY = S.portrait ? h - pad - unit * 0.06 : h - pad * 0.9 - unit * 0.05;
+    U.text(g, 'TWELVE RINGS · RATE = BAND LEVEL · ALIGNMENT IS THE EVENT', pad, footY,
+      { size: unit * 0.0145, font: U.FONT.MONO, color: 'rgba(255,255,255,0.36)', spacing: unit * 0.0035, max: w - pad * 2 });
 
     const cx = w / 2, cy = S.portrait ? h * 0.44 : h * 0.5;
     const R = S.portrait ? w * 0.38 : h * 0.37;
@@ -87,7 +91,9 @@ Looks.register({
       return C.cum[k * 12 + i] * (1 - u) + C.cum[(k + 1) * 12 + i] * u;
     };
     const ang = (i, t) => C.rings[i].a0 - Math.PI / 2 + C.rings[i].k * opt.speed * cumAt(i, t);
-    const lv = A.bands12(S.t);
+    // band levels smoothed over ~70 ms so planet sizes do not flicker
+    const lv = new Float32Array(12);
+    for (let k = 0; k < 5; k++) { const b = A.bands12(S.t - k / 60); for (let i = 0; i < 12; i++) lv[i] += b[i] / 5; }
     const P = [];
     for (let i = 0; i < 12; i++) {
       const a = ang(i, S.t), rr = ringR(i);
@@ -95,10 +101,13 @@ Looks.register({
     }
 
     // labels: the low bound near the inner rings, the loudest band at the top of the dial
-    let top = 0; for (let i = 1; i < 12; i++) if (lv[i] > lv[top]) top = i;
+    // the dial label names the loudest upper band, re-read once per beat (no flicker)
+    const tb = A.beatOffset + A.beatIndex(S.t) * S.spb + 0.03;
+    const lb = A.bands12(tb);
+    let top = 6; for (let i = 7; i < 12; i++) if (lb[i] > lb[top]) top = i;
     const hzLab = (hz) => (hz >= 1000 ? (hz / 1000).toFixed(1) + ' kHz' : Math.round(hz / 10) * 10 + ' Hz');
     const lab = { size: unit * 0.0125, font: U.FONT.MONO, color: 'rgba(255,255,255,0.42)', spacing: 1 };
-    U.text(g, '| ' + hzLab(C.rings[Math.max(top, 6)].hz), cx - unit * 0.002, cy - R - unit * 0.012, lab);
+    U.text(g, '| ' + hzLab(C.rings[top].hz), cx - unit * 0.002, cy - R - unit * 0.012, lab);
     U.text(g, hzLab(C.rings[0].hz), cx + R * 0.05, cy - ringR(3) - unit * 0.006, lab);
 
     // alignment: pairs within a few degrees — draw a ray from the sun to the farther planet

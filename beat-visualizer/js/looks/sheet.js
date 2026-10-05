@@ -90,7 +90,7 @@
   function layout(S) {
     const { w, h, portrait, pad } = S;
     const n = Math.max(2, Math.min(6, +S.opt.systems || 4));
-    const yA = portrait ? h * 0.2 : h * 0.17, yB = portrait ? h * 0.865 : h * 0.88;
+    const yA = portrait ? h * 0.2 : h * 0.17, yB = portrait ? Math.min(h * 0.865, h - S.unit * 0.21) : h * 0.88;
     const sp = (yB - yA) / n;
     const gap = Math.min(sp * 0.105, S.unit * 0.034);
     const x0 = pad, x1 = w - pad;
@@ -160,8 +160,12 @@
 
       // header
       const hy = S.portrait ? h * 0.085 : S.pad + unit * 0.02;
-      const head1 = [String(S.meta.title || '').toUpperCase(), `${Math.round(S.bpm)} BPM`, S.meta.key, `${nBars} BARS`, `PAGE ${page + 1}/${pages}`].filter(Boolean).join(' · ');
-      U.text(g, head1, L.x0, hy, { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(60,60,55,0.55)', spacing: unit * 0.004 });
+      // title shrinks/truncates first so the bpm, key, bar and page info always stay readable
+      const hs = { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(60,60,55,0.55)', spacing: unit * 0.004 };
+      const rest = ' · ' + [`${Math.round(S.bpm)} BPM`, S.meta.key, `${nBars} BARS`, `PAGE ${page + 1}/${pages}`].filter(Boolean).join(' · ');
+      const restW = U.textWidth(g, rest, hs);
+      const tw = U.text(g, String(S.meta.title || 'untitled').toUpperCase(), L.x0, hy, { ...hs, max: Math.max(unit * 0.1, L.x1 - L.x0 - restW) });
+      U.text(g, rest, L.x0 + tw, hy, { ...hs, max: L.x1 - L.x0 - tw });
 
       const chordPart = S.parts.find((p) => p.role === 'chords');
       const progression = [];
@@ -243,7 +247,7 @@
               const hx = x + (side ? (up ? 1 : -1) * gap * 1.1 : 0), y = yOf(o.step);
               head(g, hx, y, gap, c);
               if (o.acc) accidental(g, o.acc, x - gap * 1.45 - (side && !up ? gap * 1.1 : 0), y, gap * 0.85, c);
-              if (mark && opt.octaveMarks) U.text(g, mark, hx + gap * 0.85, y - gap * 0.15, { size: gap * 0.5, font: U.FONT.MONO, color: 'rgba(60,60,55,0.55)' });
+              if (mark && opt.octaveMarks && o === heads[heads.length - 1]) U.text(g, mark, hx + gap * 0.85, y - gap * 0.15, { size: gap * 0.5, font: U.FONT.MONO, color: 'rgba(60,60,55,0.55)' });
             }
             // stem
             g.strokeStyle = c; g.lineWidth = Math.max(1.2, gap * 0.1);
@@ -256,13 +260,14 @@
       }
 
       // progression written at the bottom
-      const fy = S.portrait ? h * 0.945 : h - S.pad * 0.55;
+      const fy = S.portrait ? h * 0.945 : h - S.pad * 0.9;
+      const fmax = S.portrait ? L.x1 - L.x0 : w / 2 - L.x0 - unit * 0.2;
       if (progression.length) {
-        U.text(g, progression.join(' – '), L.x0, fy, { size: gap * 1.35, font: U.FONT.HAND, weight: 700, color: '#161616' });
+        U.text(g, progression.join(' – '), L.x0, fy, { size: gap * 1.35, font: U.FONT.HAND, weight: 700, color: '#161616', max: fmax });
       } else if (!any) {
-        U.text(g, S.parts.length ? 'tacet' : 'no notes yet · add a midi file', L.x0, fy, { size: gap * 1.35, font: U.FONT.HAND, weight: 700, color: 'rgba(22,22,22,0.6)' });
+        U.text(g, S.parts.length ? 'tacet' : 'no notes yet · add a midi file', L.x0, fy, { size: gap * 1.35, font: U.FONT.HAND, weight: 700, color: 'rgba(22,22,22,0.6)', max: fmax });
       }
-      if (!S.portrait) U.text(g, S.timeLabel(), L.x1, fy, { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(60,60,55,0.55)', align: 'right', spacing: unit * 0.004 });
+      if (!S.portrait) U.text(g, S.timeLabel(), L.x1, fy, { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(60,60,55,0.55)', align: 'right', spacing: unit * 0.004, max: fmax });
     },
   });
 })();

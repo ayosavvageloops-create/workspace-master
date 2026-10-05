@@ -4,6 +4,16 @@
   const ROLE = { bass: '#b493ff', chords: '#5fe3d2', lead: '#ff7f9f', drums: '#ffd27a', other: '#8fc4ff' };
   const colOf = (p) => ROLE[p.role] || ROLE.other;
 
+  // header: time label right; "title · bpm · key" left, where only the title shrinks/truncates
+  function drawHeader(g, S, x0, x1, y, o, bpmWord) {
+    const rw = U.text(g, S.timeLabel(), x1, y, { ...o, align: 'right', max: (x1 - x0) * 0.4 });
+    const avail = x1 - x0 - rw - S.unit * 0.04;
+    const rest = ` · ${Math.round(S.bpm)} ${bpmWord}${S.meta.key ? ' · ' + S.meta.key : ''}`;
+    const restW = U.textWidth(g, rest, o);
+    const tw = U.text(g, String(S.meta.title || 'untitled'), x0, y, { ...o, max: Math.max(S.unit * 0.08, avail - restW) });
+    U.text(g, rest, x0 + tw, y, { ...o, max: Math.max(1, avail - tw) });
+  }
+
   Looks.register({
     id: 'rage-field',
     name: 'rage-field',
@@ -41,12 +51,12 @@
       // header + legend
       const top = S.portrait ? h * 0.047 : pad + unit * 0.03;
       const ts = { size: unit * 0.03, font: U.FONT.PLEX, color: '#e8e8e8' };
-      U.text(g, `${S.meta.title} · ${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`, pad, top, ts);
-      U.text(g, S.timeLabel(), w - pad, top, { ...ts, align: 'right' });
+      drawHeader(g, S, pad, w - pad, top, ts, 'bpm');
       const legend = S.allParts.length ? S.allParts : ['bass', 'chords', 'lead'].map((r) => ({ name: r, role: r, enabled: false, notes: [] }));
       let lx = pad;
       const ly = top + unit * 0.03, sq = unit * 0.009;
       for (const p of legend) {
+        if (lx > w - pad - unit * 0.12) break;
         const on = p.enabled && p.notes.some((n) => n.s <= S.t);
         g.fillStyle = on ? colOf(p) : U.rgba(colOf(p), 0.3);
         g.fillRect(lx, ly - sq * 1.1, sq, sq);

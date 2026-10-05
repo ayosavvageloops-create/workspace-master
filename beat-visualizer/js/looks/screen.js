@@ -1,6 +1,16 @@
 // screen — a risograph print of the piano roll: navy ink blocks with a misregistered pink
 // pass, on pinkish paper with a fine dot screen. Time scrolls right to left.
 (function () {
+  // header: time label right; "title · bpm · key" left, where only the title shrinks/truncates
+  function drawHeader(g, S, x0, x1, y, o, bpmWord) {
+    const rw = U.text(g, S.timeLabel(), x1, y, { ...o, align: 'right', max: (x1 - x0) * 0.4 });
+    const avail = x1 - x0 - rw - S.unit * 0.04;
+    const rest = ` · ${Math.round(S.bpm)} ${bpmWord}${S.meta.key ? ' · ' + S.meta.key : ''}`;
+    const restW = U.textWidth(g, rest, o);
+    const tw = U.text(g, String(S.meta.title || 'untitled'), x0, y, { ...o, max: Math.max(S.unit * 0.08, avail - restW) });
+    U.text(g, rest, x0 + tw, y, { ...o, max: Math.max(1, avail - tw) });
+  }
+
   Looks.register({
     id: 'screen',
     name: 'screen',
@@ -54,10 +64,8 @@
       const ty = S.portrait ? h * 0.047 : S.pad + unit * 0.025;
       const hs = { size: unit * 0.03, font: U.FONT.PLEX, color: U.rgba(pink, 0.85) };
       const title = `${S.meta.title} · ${Math.round(S.bpm)} BPM${S.meta.key ? ' · ' + S.meta.key : ''}`;
-      U.text(g, title, S.pad + off, ty - off * 1.2, hs);
-      U.text(g, S.timeLabel(), w - S.pad + off, ty - off * 1.2, { ...hs, align: 'right' });
-      U.text(g, title, S.pad, ty, { ...hs, color: '#141414' });
-      U.text(g, S.timeLabel(), w - S.pad, ty, { ...hs, color: '#141414', align: 'right' });
+      drawHeader(g, S, S.pad + off, w - S.pad + off, ty - off * 1.2, hs, 'BPM');
+      drawHeader(g, S, S.pad, w - S.pad, ty, { ...hs, color: '#141414' }, 'BPM');
 
       // roll geometry
       const x0 = S.pad * 0.4, x1 = w - S.pad * 0.4;

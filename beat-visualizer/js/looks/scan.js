@@ -11,7 +11,7 @@ Looks.register({
   controls: [
     { key: 'bg', label: 'Background', type: 'color' },
     { key: 'orbit', label: 'Camera orbit', type: 'range', min: 0, max: 3, step: 0.05 },
-    { key: 'jitter', label: 'Jitter', type: 'range', min: 0, max: 3, step: 0.05 },
+    { key: 'jitter', label: 'Kick scatter', type: 'range', min: 0, max: 3, step: 0.05 },
     { key: 'band', label: 'Scan band', type: 'toggle' },
   ],
   prepare(S) {
@@ -84,25 +84,33 @@ Looks.register({
       g.fillStyle = sg; g.beginPath(); g.arc(0, 0, geom.shadowR, 0, U.TAU); g.fill();
       g.restore();
     }, 1);
-    return { pts, n, seedv, sphere, bg, geom };
+    const kicks = scan_kicks(S.A, S.spb);
+    return { pts, n, seedv, sphere, bg, geom, kicks };
   },
   draw(g, S) {
     const { A, opt, unit, cache: C } = S;
     const { pts, n, seedv, geom } = C;
     g.drawImage(C.bg, 0, 0);
-    const t = S.t, lvl = A.level(t), hit = A.pulse(t, 'hit', 0.2);
+    const t = S.t;
+    // level averaged over ~0.6 s: density follows the section, not every transient
+    let lvl = 0; for (let k = 0; k < 8; k++) lvl += A.level(t - k * 0.08) / 8;
 
     // camera: slow orbit around the room's middle, looking slightly down
-    const yaw = opt.orbit * 0.07 * Math.sin(t * 0.21) + 0.012 * opt.orbit * Math.sin(t * 0.9);
-    const pitch = 0.03 + opt.orbit * 0.012 * Math.sin(t * 0.17);
+    const yaw = opt.orbit * 0.045 * Math.sin(t * 0.12);
+    const pitch = 0.03 + opt.orbit * 0.006 * Math.sin(t * 0.09);
     const tx = 0, ty = 1.5, tz = 1.0, dist = 5.1;
     const cyw = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
     const camX = tx - syw * cp * dist, camY = ty + sp * dist, camZ = tz - cyw * cp * dist;
     const f = geom.f, ox = geom.cx, oy = geom.cy;
     // scan band: a vertical slab sweeping across the room once per bar
     const bandX = -2.4 + 4.8 * ((((t - A.beatOffset) / S.bar) % 1) + 1) % 1;
-    const keep = 0.55 + 0.45 * Math.min(1, lvl * 1.3);
-    const jstep = Math.floor(t * 15), jamp = opt.jitter * (0.006 + 0.03 * hit);
+    const keep = 0.6 + 0.4 * Math.min(1, lvl * 1.3);
+    // kick scatter: each strong kick nudges every point along a seeded direction, then it settles
+    const kk = C.kicks;
+    let lo = 0, up = kk.length - 1, e = -1;
+    while (lo <= up) { const m = (lo + up) >> 1; if (kk[m].t <= t) { e = m; lo = m + 1; } else up = m - 1; }
+    const kAge = e >= 0 ? t - kk[e].t : 9;
+    const jamp = e >= 0 ? opt.jitter * 0.045 * kk[e].s * Math.exp(-kAge / 0.22) * Math.min(1, kAge / 0.03) : 0;
 
     // project into buckets by kind and depth so each bucket is a single fill
     const paths = [new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D()];
@@ -111,8 +119,8 @@ Looks.register({
       if (sv > keep) continue;
       const k = pts[i * 4 + 3];
       let x = pts[i * 4], y = pts[i * 4 + 1], z = pts[i * 4 + 2];
-      if (jamp > 0) {
-        x += (U.hash(i, jstep) - 0.5) * jamp; y += (U.hash(i, jstep, 1) - 0.5) * jamp;
+      if (jamp > 0.0005) {
+        x += (U.hash(i, e) - 0.5) * jamp; y += (U.hash(i, e, 1) - 0.5) * jamp;
       }
       // world -> camera
       const dx = x - camX, dy = y - camY, dz = z - camZ;
@@ -168,4 +176,15 @@ function scan_geom(S) {
   const { w, h } = S;
   const f = S.portrait ? w * 1.5 : h * 1.15;
   return { f, cx: w / 2, cy: S.portrait ? h * 0.46 : h * 0.4, shadowY: S.portrait ? h * 0.8 : h * 0.9, shadowR: S.portrait ? w * 0.42 : h * 0.5 };
+}
+
+// strong low-end onsets at least half a beat apart
+function scan_kicks(A, spb) {
+  const out = [];
+  for (const o of A.onsets.bass) {
+    if (o.s < 0.3) continue;
+    if (out.length && o.t - out[out.length - 1].t < spb * 0.5) continue;
+    out.push(o);
+  }
+  return out;
 }

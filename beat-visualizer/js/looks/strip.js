@@ -1,5 +1,16 @@
 // strip — a horizontal piano roll of every part, outlined notes passing a fixed playhead
 // on a pale paper background with soft colour blooms.
+(function () {
+  // header: time label right; "title · bpm · key" left, where only the title shrinks/truncates
+  function drawHeader(g, S, x0, x1, y, o, bpmWord) {
+    const rw = U.text(g, S.timeLabel(), x1, y, { ...o, align: 'right', max: (x1 - x0) * 0.4 });
+    const avail = x1 - x0 - rw - S.unit * 0.04;
+    const rest = ` · ${Math.round(S.bpm)} ${bpmWord}${S.meta.key ? ' · ' + S.meta.key : ''}`;
+    const restW = U.textWidth(g, rest, o);
+    const tw = U.text(g, String(S.meta.title || 'untitled'), x0, y, { ...o, max: Math.max(S.unit * 0.08, avail - restW) });
+    U.text(g, rest, x0 + tw, y, { ...o, max: Math.max(1, avail - tw) });
+  }
+
 Looks.register({
   id: 'strip',
   name: 'strip',
@@ -33,11 +44,11 @@ Looks.register({
 
     // header + legend
     const top = pad + S.unit * 0.03;
-    U.text(g, `${S.meta.title} · ${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`, pad, top, { size: S.unit * 0.026, font: U.FONT.MONO, color: '#222' });
-    U.text(g, S.timeLabel(), w - pad, top, { size: S.unit * 0.026, font: U.FONT.MONO, color: '#222', align: 'right' });
+    drawHeader(g, S, pad, w - pad, top, { size: S.unit * 0.026, font: U.FONT.MONO, color: '#222' }, 'bpm');
     let lx = pad;
     const ly = top + S.unit * 0.028;
     for (const p of S.allParts) {
+      if (lx > w - pad - S.unit * 0.12) break;
       const on = p.enabled && p.notes.some((n) => n.s <= S.t);
       g.strokeStyle = on ? p.color : '#bbb'; g.lineWidth = 2;
       g.beginPath(); g.arc(lx + 6, ly - 6, 5, 0, U.TAU); g.stroke();
@@ -78,3 +89,4 @@ Looks.register({
     g.beginPath(); g.moveTo(phx - 8, y0 - 12); g.lineTo(phx + 8, y0 - 12); g.lineTo(phx, y0); g.closePath(); g.fill();
   },
 });
+})();

@@ -46,13 +46,18 @@
       const { w, h, unit, portrait } = S;
       // layout: content column(s)
       let L;
-      if (portrait) {
+      if (w / h <= 1.3) {
+        // single column (9:16, 4:5, 1:1): stack from the top, footer stops above the handle watermark
         const cx0 = w * 0.168, cx1 = w * 0.83;
+        const my0 = unit * 0.11, my1 = h - unit * 0.11;
+        const headY = my0 + unit * 0.05, barsY0 = headY + unit * 0.171 + unit * 0.035;
+        const handleTop = (portrait ? h - unit * 0.16 : h - S.pad * 0.9) - unit * 0.036;
+        const infoY = handleTop - unit * 0.012, titleY = infoY - unit * 0.034;
         L = {
-          head: { x0: cx0, x1: cx1, y: h * 0.107 },
-          bars: { x0: cx0, x1: cx1, y0: h * 0.225, y1: h * 0.872 },
-          foot: { x: cx0, y: h * 0.888 },
-          marks: { x0: w * 0.135, x1: w * 0.86, y0: h * 0.072, y1: h * 0.928 },
+          head: { x0: cx0, x1: cx1, y: headY },
+          bars: { x0: cx0, x1: cx1, y0: barsY0, y1: titleY - unit * 0.045 },
+          foot: { x: cx0, y: titleY, w: cx1 - cx0 },
+          marks: { x0: w * 0.135, x1: w * 0.86, y0: my0, y1: my1 },
           patchCols: 4,
         };
       } else {
@@ -60,7 +65,7 @@
         L = {
           head: { x0: hx0, x1: hx1, y: h * 0.16 },
           bars: { x0: w * 0.42, x1: w * 0.9, y0: h * 0.1, y1: h * 0.9 },
-          foot: { x: hx0, y: h * 0.8 },
+          foot: { x: hx0, y: h * 0.8, w: hx1 - hx0 },
           marks: { x0: w * 0.065, x1: w * 0.935, y0: h * 0.075, y1: h * 0.925 },
           patchCols: 2,
         };
@@ -175,11 +180,11 @@
 
       // footer
       const F = L.foot;
-      U.text(g, S.meta.title || 'untitled', F.x, F.y, { size: unit * 0.034, font: U.FONT.MONO, weight: 700, color: INK });
+      U.text(g, S.meta.title || 'untitled', F.x, F.y, { size: unit * 0.034, font: U.FONT.MONO, weight: 700, color: INK, max: F.w });
       const nPl = parts.length ? started.length : 0;
       const bits = [`${Math.round(S.bpm)} BPM`, S.meta.key, parts.length ? `${nPl} plate${nPl === 1 ? '' : 's'}` : 'no plates',
         `proof ${Math.min(page + 1, pages)}/${pages}`, `${Math.round(S.prog * 100)}%`].filter(Boolean);
-      U.text(g, bits.join('  ·  '), F.x, F.y + unit * 0.032, { size: unit * 0.0175, font: U.FONT.MONO, weight: 700, color: '#2a2a2a' });
+      U.text(g, bits.join('  ·  '), F.x, F.y + unit * 0.034, { size: unit * 0.0175, font: U.FONT.MONO, weight: 700, color: '#2a2a2a', max: F.w });
       if (!parts.length) {
         U.text(g, 'NO PARTS TO PROOF', (B.x0 + B.x1) / 2, B.y0 + blockH * 0.5 + labH, { size: unit * 0.02, font: U.FONT.MONO, weight: 700, color: '#9a9a92', align: 'center', spacing: 3 });
       }

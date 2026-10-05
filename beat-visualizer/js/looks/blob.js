@@ -63,8 +63,9 @@ Looks.register({
     const balls = [];
     for (let i = 0; i < n; i++) {
       const b = C.base[i];
-      const lv = A.band(t, b.band);
-      const e = 0.5 * lv + 0.5 * A.band(t - 0.12, b.band);
+      // band level averaged over ~200 ms: sizes breathe with the music without twitching
+      let e = 0;
+      for (let k = 0; k < 6; k++) e += A.band(t - k * 0.04, b.band) / 6;
       balls.push({
         x: cx0 + U2 * (b.x * 1.25 + b.ax * U.vnoise(b.ph, t * 0.16)),
         y: cy0 + U2 * (b.y + b.ay * U.vnoise(b.ph + 31, t * 0.14)),
@@ -78,7 +79,7 @@ Looks.register({
     }
     // satellite: a tiny drop below the cluster
     const sat = { x: cx0 + U2 * (0.03 + 0.03 * U.vnoise(5.5, t * 0.2)), y: cy0 + U2 * (0.36 + 0.02 * U.vnoise(8.5, t * 0.2)),
-      r: U2 * 0.02 * (0.8 + 0.5 * A.pulse(t, 'high', 0.2)), a2: 0.1, a3: 0, a4: 0, p2: t, p3: 0, p4: 0 };
+      r: U2 * 0.02 * (0.8 + 0.4 * (0.5 * A.pulse(t, 'high', 0.25) + 0.5 * A.pulse(t - 0.05, 'high', 0.25))), a2: 0.1, a3: 0, a4: 0, p2: t, p3: 0, p4: 0 };
     balls.push(sat);
     for (const b of balls) {
       b.c2 = Math.cos(b.p2); b.s2 = Math.sin(b.p2); b.c3 = Math.cos(b.p3); b.s3 = Math.sin(b.p3); b.c4 = Math.cos(b.p4); b.s4 = Math.sin(b.p4);

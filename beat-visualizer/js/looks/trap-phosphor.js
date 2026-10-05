@@ -15,7 +15,11 @@
     const { w, h, unit, portrait } = S;
     let bx, by, bw, bh;
     if (portrait) { bx = w * 0.055; bw = w - bx * 2; by = h * 0.03; bh = h * 0.77; }
-    else { bh = h * 0.9; by = h * 0.05; bw = Math.min(w - S.pad * 2, bh * 1.25); bx = (w - bw) / 2; }
+    else {
+      // keep the bottom strip free for the core's handle watermark
+      const markTop = h - S.pad * 0.9 - unit * 0.035;
+      by = h * 0.045; bh = markTop - by - unit * 0.015; bw = Math.min(w - S.pad * 2, bh * 1.25); bx = (w - bw) / 2;
+    }
     const b = unit * 0.026; // bezel thickness
     const sx = bx + b, sy = by + b, sw = bw - b * 2, sh = bh - b * 2;
     const ix = sx + sw * 0.035, iw = sw * 0.93;                       // inner content x span
@@ -99,12 +103,15 @@
       // title (pixel font) — slight glow via a second, wider pass
       const tSize = L.sh * (S.portrait ? 0.04 : 0.06);
       const title = (S.meta.title || 'untitled').toUpperCase();
-      if (opt.glow) U.text(g, title, L.ix, L.titleY, { size: tSize, font: U.FONT.PIXEL, color: U.rgba(green, 0.25), spacing: 2.5 });
-      U.text(g, title, L.ix, L.titleY, { size: tSize, font: U.FONT.PIXEL, color: U.rgba(green, 0.85), spacing: 2 });
-      U.text(g, `${S.sub}   ${S.timeLabel(2)}`, L.ix + L.iw, L.titleY, { size: tSize * 0.6, font: U.FONT.PIXEL, color: U.rgba(green, 0.45), align: 'right', spacing: 1 });
+      if (opt.glow) { g.save(); g.shadowColor = U.rgba(green, 0.6); g.shadowBlur = tSize * 0.35; }
+      U.text(g, title, L.ix, L.titleY, { size: tSize, font: U.FONT.PIXEL, color: U.rgba(green, 0.85), spacing: 2, max: L.iw });
+      if (opt.glow) g.restore();
 
       // spectrum strip
+      // spectrum averaged over a few past instants so the bars breathe instead of flickering
       const NB = 48, sp = A.spectrum(S.t, NB, { min: 35, max: 12000 });
+      const spB = A.spectrum(S.t - 0.03, NB, { min: 35, max: 12000 }), spC = A.spectrum(S.t - 0.06, NB, { min: 35, max: 12000 });
+      for (let i = 0; i < NB; i++) sp[i] = sp[i] * 0.5 + spB[i] * 0.3 + spC[i] * 0.2;
       const bw = L.iw / NB, sh0 = L.specY1 - L.specY0;
       for (let i = 0; i < NB; i++) {
         const v = Math.max(0.3, Math.min(1, 0.25 + sp[i] * 1.2));
@@ -117,11 +124,15 @@
       let lx = L.ix;
       const ls = L.sh * 0.012;
       for (const p of S.allParts) {
+        if (lx > L.ix + L.iw * 0.5) break;
         const on = p.enabled && p.notes.some((n) => n.s <= S.t);
         g.fillStyle = on ? colOf(p) : 'rgba(110,150,90,0.3)';
         g.fillRect(lx, L.legY - ls * 0.8, ls * 0.8, ls * 0.8);
-        lx += ls * 1.4 + U.text(g, p.name, lx + ls * 1.3, L.legY, { size: ls * 1.4, font: U.FONT.PIXEL, color: on ? U.rgba(green, 0.6) : 'rgba(110,150,90,0.3)' }) + ls * 1.6;
+        lx += ls * 1.4 + U.text(g, p.name, lx + ls * 1.3, L.legY, { size: ls * 1.4, font: U.FONT.PIXEL, color: on ? U.rgba(green, 0.6) : 'rgba(110,150,90,0.3)', max: L.iw * 0.2 }) + ls * 1.6;
       }
+
+      // bpm / key / time readout on the legend line, right-aligned in the space the legend leaves
+      U.text(g, `${S.sub}   ${S.timeLabel(2)}`, L.ix + L.iw, L.legY, { size: ls * 1.6, font: U.FONT.PIXEL, color: U.rgba(green, 0.5), align: 'right', spacing: 1, max: Math.max(ls * 10, L.ix + L.iw - lx - ls * 2) });
 
       // roll: pitch on x, time on y (future below, rising)
       const ry0 = L.ry0, ry1 = L.ry1, rh = ry1 - ry0;

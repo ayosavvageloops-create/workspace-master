@@ -56,23 +56,24 @@ Looks.register({
     g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
 
     const ink = '#e8e9e4', dim = 'rgba(232,233,228,0.45)';
-    U.text(g, S.meta.title, pad * 1.1, pad + unit * 0.05, { size: unit * 0.05, font: U.FONT.PLEX, color: ink });
-    U.text(g, S.sub, pad * 1.1, pad + unit * 0.085, { size: unit * 0.017, font: U.FONT.PLEX, color: dim, spacing: 2 });
+    const X0 = pad * 1.1, X1 = w - pad * 1.1, W = X1 - X0;
+    U.text(g, S.meta.title, X0, pad + unit * 0.05, { size: unit * 0.05, font: U.FONT.PLEX, color: ink, max: W });
+    U.text(g, S.sub, X0, pad + unit * 0.085, { size: unit * 0.017, font: U.FONT.PLEX, color: dim, spacing: 2, max: W });
 
-    // ---- layout ----
-    const gap = unit * 0.03, X0 = pad * 1.1, X1 = w - pad * 1.1, W = X1 - X0;
+    // ---- layout: fill the band between the header and the handle-safe strip ----
+    const gap = unit * 0.03;
+    const top = pad + unit * 0.12, bot = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.045, avH = bot - top;
     let wave, phase, bands, loud;
-    if (S.portrait) {
-      const y0 = h * 0.265;
-      wave = { x: X0, y: y0, w: W, h: h * 0.165 };
-      const ry = wave.y + wave.h + gap, rh = h * 0.193, pw = W * 0.385;
+    if (avH / W >= 0.75) {
+      const total = Math.min(avH, W * 1.06), hs = total - gap * 2, y0 = top + (avH - total) * 0.65;
+      wave = { x: X0, y: y0, w: W, h: hs * 0.33 };
+      const ry = wave.y + wave.h + gap, rh = hs * 0.39, pw = Math.min(W * 0.385, rh * 1.15);
       phase = { x: X0, y: ry, w: pw, h: rh };
       bands = { x: X0 + pw + gap, y: ry, w: W - pw - gap, h: rh };
-      loud = { x: X0, y: ry + rh + gap, w: W, h: h * 0.139 };
+      loud = { x: X0, y: ry + rh + gap, w: W, h: hs * 0.28 };
     } else {
-      const y0 = h * 0.22;
-      wave = { x: X0, y: y0, w: W, h: h * 0.3 };
-      const ry = wave.y + wave.h + gap, rh = h - pad * 1.2 - ry, pw = rh;
+      wave = { x: X0, y: top, w: W, h: avH * 0.44 };
+      const ry = wave.y + wave.h + gap, rh = bot - ry, pw = Math.min(rh, W * 0.22);
       phase = { x: X0, y: ry, w: pw, h: rh };
       const bw = (W - pw - gap * 2) * 0.42;
       bands = { x: X0 + pw + gap, y: ry, w: bw, h: rh };
@@ -130,9 +131,9 @@ Looks.register({
       g.strokeRect(cx - side / 2, cy - side / 2, side, side);
       g.strokeStyle = 'rgba(255,255,255,0.09)';
       g.beginPath(); g.moveTo(cx, cy - side / 2); g.lineTo(cx, cy + side / 2); g.moveTo(cx - side / 2, cy); g.lineTo(cx + side / 2, cy); g.stroke();
-      const n = 220, st = A.stereo(S.t, n, 0.03);
+      const n = 220, st = A.stereo(S.t, n, 0.03), cw = A.stereo(S.t, 900, 0.3);
       let sl = 0, sr = 0, slr = 0;
-      for (let i = 0; i < n; i++) { sl += st.l[i] * st.l[i]; sr += st.r[i] * st.r[i]; slr += st.l[i] * st.r[i]; }
+      for (let i = 0; i < 900; i++) { sl += cw.l[i] * cw.l[i]; sr += cw.r[i] * cw.r[i]; slr += cw.l[i] * cw.r[i]; }
       const corr = sl && sr ? slr / Math.sqrt(sl * sr) : 0;
       const k = (side * 0.5) / C.top;
       g.save(); g.beginPath(); g.rect(cx - side / 2, cy - side / 2, side, side); g.clip();
@@ -177,7 +178,7 @@ Looks.register({
       const L = A.lufs, f1 = (v) => (v <= -99 ? '-inf' : v.toFixed(1));
       const vals = [['I', f1(L.integrated)], ['S', f1(Math.max(-99.9, L.shortTerm(S.t)))], ['TP', f1(L.truePeak)], ['LRA', L.lra.toFixed(1)]];
       const ix = loud.x + unit * 0.012, iw = loud.w - unit * 0.024;
-      const colW = iw / 4.1, big = Math.min(unit * 0.05, colW / 3.6);
+      const colW = iw / 4.1, big = Math.min(unit * 0.05, colW / 3.6, loud.h * 0.24);
       vals.forEach(([k, v], i) => {
         const x = ix + i * colW;
         U.text(g, k, x, loud.y + unit * 0.044, lab);

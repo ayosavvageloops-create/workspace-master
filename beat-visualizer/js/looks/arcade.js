@@ -33,8 +33,10 @@
     const cx = w / 2;
     const yV = h * (portrait ? 0.105 : 0.06);         // vanishing point
     const yTop = h * (portrait ? 0.168 : 0.15);       // far end of the track
-    const yHit = h * (portrait ? 0.862 : 0.82);
-    const yBot = h * (portrait ? 0.945 : 0.93);
+    // keep the track's foot clear of the handle watermark strip (bottom centre)
+    const handleTop = portrait ? h - S.unit * 0.16 - S.unit * 0.03 : h - S.pad * 0.9 - S.unit * 0.03;
+    const yBot = Math.min(h * (portrait ? 0.945 : 0.93), handleTop - S.unit * 0.02);
+    const yHit = yBot - h * (portrait ? 0.075 : 0.11);
     const W0 = Math.min(w * 0.42, h * 0.62);          // half width at the hit line
     const halfW = (y) => W0 * (y - yV) / (yHit - yV);
     return { cx, yV, yTop, yHit, yBot, W0, halfW };
@@ -101,13 +103,13 @@
       // ---- header ----
       const ty = S.portrait ? h * 0.047 : pad + unit * 0.03;
       const title = String(S.meta.title || 'untitled').toLowerCase();
-      U.text(g, title, pad, ty, { size: unit * 0.03, font: U.FONT.MONO, color: '#d8d8d8', spacing: unit * 0.016 });
-      U.text(g, `${Math.round(S.bpm)} BPM`, w - pad, ty, { size: unit * 0.03, font: U.FONT.MONO, color: opt.accent, spacing: unit * 0.016, align: 'right' });
+      const bpmW = U.text(g, `${Math.round(S.bpm)} BPM`, w - pad, ty, { size: unit * 0.03, font: U.FONT.MONO, color: opt.accent, spacing: unit * 0.016, align: 'right' });
+      U.text(g, title, pad, ty, { size: unit * 0.03, font: U.FONT.MONO, color: '#d8d8d8', spacing: unit * 0.016, max: w - pad * 2 - bpmW - unit * 0.05 });
       const srcLabel = opt.source === 'all' ? 'mix' : opt.source;
       U.text(g, [srcLabel, `${n} LANES`, S.meta.key].filter(Boolean).join(' · '), pad, ty + unit * 0.04,
-        { size: unit * 0.016, font: U.FONT.MONO, color: '#6a6d70', spacing: unit * 0.009 });
-      U.text(g, S.timeLabel(2), w - pad, S.portrait ? h * 0.958 : h - pad * 0.6,
-        { size: unit * 0.018, font: U.FONT.MONO, color: '#6a6d70', spacing: unit * 0.009, align: 'right' });
+        { size: unit * 0.016, font: U.FONT.MONO, color: '#6a6d70', spacing: unit * 0.009, max: w - pad * 2 });
+      U.text(g, S.timeLabel(2), w - pad, S.portrait ? h - unit * 0.085 : h - pad * 0.9,
+        { size: unit * 0.018, font: U.FONT.MONO, color: '#6a6d70', spacing: unit * 0.009, align: 'right', max: S.portrait ? w - pad * 2 : w / 2 - pad - unit * 0.2 });
 
       // ---- depth mapping: time ahead (s) -> screen y ----
       const look = Math.max(2, opt.speed) * S.spb;

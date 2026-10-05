@@ -61,7 +61,7 @@
 
       // page geometry
       const x0 = S.pad * 1.1, x1 = w - S.pad * 1.1;
-      const y0 = S.portrait ? h * 0.2 : h * 0.14, y1 = S.portrait ? h * 0.83 : h * 0.86;
+      const y0 = S.portrait ? h * 0.2 : h * 0.14, y1 = Math.min(S.portrait ? h * 0.83 : h * 0.86, S.portrait ? h - unit * 0.23 : h - S.pad * 0.9 - unit * 0.08);
       const origin = (S.A && S.A.beatOffset) || 0;
       const pageLen = S.bar * (+opt.page || 4);
       const pageIdx = Math.floor((S.t - origin) / pageLen);
@@ -162,7 +162,7 @@
 
       // ---- light bar ----
       const bx = X(now), bw = unit * 0.024;
-      const by0 = S.portrait ? h * 0.03 : h * 0.04, by1 = S.portrait ? h * 0.95 : h * 0.93;
+      const by0 = S.portrait ? h * 0.03 : h * 0.04, by1 = S.portrait ? h - unit * 0.2 : h - S.pad * 0.9 - unit * 0.05;
       const gr = g.createLinearGradient(bx - bw / 2, 0, bx + bw / 2, 0);
       gr.addColorStop(0, 'rgba(190,205,240,0.16)'); gr.addColorStop(0.2, 'rgba(190,205,240,0.07)');
       gr.addColorStop(0.75, 'rgba(190,205,240,0.1)'); gr.addColorStop(1, 'rgba(210,220,250,0.22)');
@@ -171,10 +171,16 @@
       g.fillRect(bx + bw / 2 - 1.5, by0, 1.5, by1 - by0);
 
       // ---- footer ----
-      const fy = S.portrait ? h * 0.958 : h - S.pad * 0.7;
+      // footer: below the handle strip in portrait; beside it (same baseline) otherwise
+      const fy = S.portrait ? h - unit * 0.085 : h - S.pad * 0.9;
+      const fmax = S.portrait ? w - S.pad * 2 : w / 2 - S.pad - unit * 0.2;
       const foot = [String(S.meta.title || '').toUpperCase(), `${Math.round(S.bpm)} BPM`, S.meta.key].filter(Boolean).join(' · ');
-      U.text(g, foot, S.pad, fy, { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(170,185,220,0.6)', spacing: unit * 0.004 });
-      if (!S.portrait) U.text(g, S.timeLabel(2), w - S.pad, fy, { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(170,185,220,0.45)', spacing: unit * 0.004, align: 'right' });
+      const fs = { size: unit * 0.0165, font: U.FONT.MONO, spacing: unit * 0.004 };
+      if (S.portrait) U.text(g, foot, S.pad, fy, { ...fs, color: 'rgba(170,185,220,0.6)', max: fmax });
+      else {
+        U.text(g, foot, S.pad, fy, { ...fs, color: 'rgba(170,185,220,0.6)', max: fmax });
+        U.text(g, S.timeLabel(2), w - S.pad, fy, { ...fs, color: 'rgba(170,185,220,0.45)', align: 'right', max: fmax });
+      }
 
       if (!any) {
         U.text(g, S.parts.length ? 'silence on this page' : 'no notes · add midi', w / 2, (y0 + y1) / 2,

@@ -58,15 +58,16 @@ Looks.register({
         g.fillRect(geom.bx + (r() - 0.5) * geom.size * 1.2, geom.by - r() * geom.size * 1.5, 1.5, 1.5);
       }
     }, 1);
-    return { nodes, maxD, bg, geom, X: new Float32Array(nodes.length), Y: new Float32Array(nodes.length), A: new Float32Array(nodes.length) };
+    return { nodes, maxD, bg, geom, tips: nodes.map((n, i) => (n.d >= maxD - 1 ? i : -1)).filter((i) => i > 0), X: new Float32Array(nodes.length), Y: new Float32Array(nodes.length), A: new Float32Array(nodes.length) };
   },
   draw(g, S) {
     const { A, opt, unit, cache: C } = S;
     const { nodes, geom, X, Y } = C, AN = C.A;
     g.drawImage(C.bg, 0, 0);
     const t = S.t;
-    const bass = A.band(t, 'bass'), sub = A.band(t, 'sub'), high = A.band(t, 'high'), hm = A.band(t, 'highmid');
-    const lvl = A.level(t), kick = A.pulse(t, 'bass', 0.25);
+    const sm = (b) => (A.band(t, b) + A.band(t - 0.05, b) + A.band(t - 0.1, b)) / 3;
+    const bass = sm('bass'), sub = sm('sub'), hm = sm('highmid');
+    const lvl = (A.level(t) + A.level(t - 0.1) + A.level(t - 0.2)) / 3, kick = A.pulse(t, 'bass', 0.25);
 
     // positions for this frame: sway grows with depth, pushed by level
     const sw = opt.sway * (0.012 + 0.03 * lvl);
@@ -109,17 +110,25 @@ Looks.register({
       }
     }
 
-    // sparkles on the finest tips: which ones light follows the highs, re-rolled 12x per second
-    const step = Math.floor(t * 12), p = 0.02 + 0.16 * Math.max(high * high, A.pulse(t, 'high', 0.15));
-    for (let i = 1; i < nodes.length; i++) {
-      const n = nodes[i];
-      if (n.d < C.maxD - 1) continue;
-      const hsh = U.hash(i, step);
-      if (hsh > p) continue;
-      const rr = unit * (0.002 + 0.0028 * (1 - hsh / p));
-      U.glowBlob(g, X[i], Y[i], rr * 3.5, U.hash(i, 9) < 0.35 ? '#ffe9b0' : opt.accent, 0.5);
-      g.fillStyle = U.hash(i, 9) < 0.35 ? '#fff2cc' : '#f2f8ff';
-      g.fillRect(X[i] - rr / 2, Y[i] - rr / 2, rr, rr);
+    // sparkles on the finest tips: each high-end onset lights a seeded handful of tips,
+    // which then fade out smoothly (no per-frame re-rolls)
+    const hiOn = A.onsets.high;
+    let lo = 0, up = hiOn.length - 1, last = -1;
+    while (lo <= up) { const m = (lo + up) >> 1; if (hiOn[m].t <= t) { last = m; lo = m + 1; } else up = m - 1; }
+    for (let j = last; j >= 0 && t - hiOn[j].t < 0.6; j--) {
+      const age = t - hiOn[j].t, fade = Math.exp(-age / 0.18) * (0.5 + 0.5 * hiOn[j].s);
+      const p = 0.015 + 0.06 * hiOn[j].s;
+      for (const i of C.tips) {
+        const hsh = U.hash(i, j, 77);
+        if (hsh > p) continue;
+        const rr = unit * (0.002 + 0.0028 * (1 - hsh / p)) * (0.6 + 0.4 * fade);
+        const warm = U.hash(i, 9) < 0.35;
+        U.glowBlob(g, X[i], Y[i], rr * 3.5, warm ? '#ffe9b0' : opt.accent, 0.55 * fade);
+        g.globalAlpha = Math.min(1, fade * 1.4);
+        g.fillStyle = warm ? '#fff2cc' : '#f2f8ff';
+        g.fillRect(X[i] - rr / 2, Y[i] - rr / 2, rr, rr);
+        g.globalAlpha = 1;
+      }
     }
   },
 });

@@ -115,14 +115,30 @@ Looks.register({
     }
     const blocky = U.layer(w, h, (g) => { g.imageSmoothingEnabled = false; g.drawImage(mb, 0, 0, mb.width * bs, mb.height * bs); }, 1);
 
-    return { box, base, blocky, bs, wcum, MW };
+    // glitch events: strong transients at least half a beat apart
+    const cand = A.onsets.hit.concat(A.onsets.bass).filter((o) => o.s > 0.3).sort((p, q) => p.t - q.t);
+    const events = [], gap = Math.max(0.18, S.spb * 0.5);
+    for (const o of cand) {
+      const last = events[events.length - 1];
+      if (last && o.t - last.t < gap) { if (o.s > last.s && o.t - last.t < 0.05) last.s = o.s; continue; }
+      events.push({ t: o.t, s: o.s });
+    }
+    return { box, base, blocky, bs, wcum, MW, events };
   },
   draw(g, S) {
     const { w, h, A, opt, cache: C, unit } = S;
     const { box, bs } = C;
     const hit = Math.max(A.pulse(S.t, 'hit', 0.25), A.pulse(S.t, 'bass', 0.3) * 0.9);
-    const amt = opt.amount * (0.35 + 1.1 * hit);
-    const beat = A.beatIndex(S.t), sub = Math.floor((S.t - A.beatOffset) / (S.spb / 4));
+    const beat = A.beatIndex(S.t);
+    // glitch events: the latest strong transient picks the damaged blocks; they stay put
+    // until the next event while their displacement eases back (no per-frame re-rolls)
+    const ev = C.events;
+    let lo = 0, hi = ev.length - 1, e = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (ev[m].t <= S.t) { e = m; lo = m + 1; } else hi = m - 1; }
+    const es = e >= 0 ? ev[e].s : 0, age = e >= 0 ? S.t - ev[e].t : 9;
+    const env = es * Math.exp(-age / 0.45);           // smooth decay after each event
+    const ease = 0.25 + 0.75 * env;
+    const amount = opt.amount;
 
     // base painting (bars and torn edges included)
     g.drawImage(C.base, 0, 0);
@@ -132,50 +148,57 @@ Looks.register({
     g.imageSmoothingEnabled = false;
     const cols = Math.ceil(box.w / bs), rows = Math.ceil(box.h / bs);
     const bx0 = Math.floor(box.x / bs) * bs, by0 = Math.floor(box.y / bs) * bs;
-
-    // 1) flat macroblocks: a slowly changing set (per beat), more on transients
-    const nFlat = Math.round((cols * rows) * 0.07 * (0.6 + amt));
-    for (let k = 0; k < nFlat; k++) {
-      const key = k < nFlat * 0.6 ? Math.floor(beat / 2) : sub;
-      // weighted pick: detailed / bright blocks (the sun, the cloud rim) break up more
-      const i = mosh_pick(C.wcum, U.hash(k, key, 11));
-      const n = 1 + Math.floor(U.hash(k, key, 13) * 2.2);
-      const x = (i % C.MW) * bs, y = Math.floor(i / C.MW) * bs;
-      g.drawImage(C.blocky, x, y, bs * n, bs, x, y, bs * n, bs);
-    }
-    // 2) displaced blocks: copied from a nearby source position (stale motion vectors)
-    const nDisp = Math.round(6 + 26 * amt);
+    const flat = (key, salt, n, alpha) => {
+      g.globalAlpha = alpha;
+      for (let k = 0; k < n; k++) {
+        // weighted pick: detailed / bright blocks (the sun, the cloud rim) break up more
+        const i = mosh_pick(C.wcum, U.hash(k, key, salt));
+        const m = 1 + Math.floor(U.hash(k, key, salt + 1) * 2.2);
+        const x = (i % C.MW) * bs, y = Math.floor(i / C.MW) * bs;
+        g.drawImage(C.blocky, x, y, bs * m, bs, x, y, bs * m, bs);
+      }
+      g.globalAlpha = 1;
+    };
+    // 1) flat macroblocks: a resident set that changes every two beats, plus an event set that fades
+    const cells = cols * rows;
+    flat(Math.floor(beat / 2), 11, Math.round(cells * 0.05 * amount), 1);
+    if (e >= 0) flat(e, 61, Math.round(cells * 0.05 * amount * (0.4 + es)), Math.min(1, env * 2.2));
+    // 2) displaced blocks: stale motion vectors, sliding back as the event decays
+    const nDisp = e >= 0 ? Math.round((8 + 22 * es) * amount) : 0;
     for (let k = 0; k < nDisp; k++) {
-      const cx = Math.floor(U.hash(k, sub, 21) * cols), cy = Math.floor(U.hash(k, sub, 22) * rows);
-      const sz = bs * (1 + Math.floor(U.hash(k, sub, 23) * 2.5));
-      const dx = (U.hash(k, sub, 24) - 0.5) * bs * 3, dy = (U.hash(k, sub, 25) - 0.5) * bs * 2;
+      const cx = Math.floor(U.hash(k, e, 21) * cols), cy = Math.floor(U.hash(k, e, 22) * rows);
+      const sz = bs * (1 + Math.floor(U.hash(k, e, 23) * 2.5));
+      const dx = (U.hash(k, e, 24) - 0.5) * bs * 3 * ease, dy = (U.hash(k, e, 25) - 0.5) * bs * 2 * ease;
       const x = bx0 + cx * bs, y = by0 + cy * bs;
       g.drawImage(C.base, x + dx, y + dy, sz, sz * 0.75, x, y, sz, sz * 0.75);
     }
-    // 3) smears: one row of pixels stretched down a column of blocks
-    const nSmear = Math.round(3 * amt);
+    // 3) smears: one row of pixels stretched down, shrinking as the event fades
+    const nSmear = e >= 0 ? Math.round(3 * amount * es + 0.4) : 0;
     for (let k = 0; k < nSmear; k++) {
-      const cx = Math.floor(U.hash(k, sub, 31) * cols), cy = Math.floor(U.hash(k, sub, 32) * rows);
-      const x = bx0 + cx * bs, y = by0 + cy * bs, len = bs * (1 + U.hash(k, sub, 33) * 2.5);
+      const cx = Math.floor(U.hash(k, e, 31) * cols), cy = Math.floor(U.hash(k, e, 32) * rows);
+      const sw = bs * (1 + Math.floor(U.hash(k, e, 34) * 3));
+      const x = bx0 + cx * bs, y = by0 + cy * bs, len = bs * (1 + U.hash(k, e, 33) * 2.5) * ease;
       g.globalAlpha = 0.85;
-      g.drawImage(C.base, x, y, bs * (1 + Math.floor(U.hash(k, sub, 34) * 3)), 2, x, y, bs * (1 + Math.floor(U.hash(k, sub, 34) * 3)), len);
+      g.drawImage(C.base, x, y, sw, 2, x, y, sw, len);
       g.globalAlpha = 1;
     }
-    // 4) horizontal tearing strips, shifted sideways, on the stronger hits
-    if (opt.tear) {
-      const nTear = Math.floor(amt * 2.2 + U.hash(sub, 41) * 1.2);
+    // 4) horizontal tearing strips, shifted sideways and settling back
+    if (opt.tear && e >= 0) {
+      const nTear = Math.floor(es * 2.6 * amount + U.hash(e, 41) * 0.8);
       for (let k = 0; k < nTear; k++) {
-        const y = box.y + U.hash(k, sub, 42) * box.h, sh = unit * (0.006 + 0.03 * U.hash(k, sub, 43));
-        const dx = (U.hash(k, sub, 44) - 0.5) * unit * 0.12 * amt;
+        const y = box.y + U.hash(k, e, 42) * box.h, sh = unit * (0.006 + 0.03 * U.hash(k, e, 43));
+        const dx = (U.hash(k, e, 44) - 0.5) * unit * 0.14 * amount * env;
         g.drawImage(C.base, box.x, y, box.w, sh, box.x + dx, y, box.w, sh);
-        g.fillStyle = 'rgba(255,255,255,0.07)'; g.fillRect(box.x, y, box.w, 1);
+        g.fillStyle = `rgba(255,255,255,${0.08 * env})`; g.fillRect(box.x, y, box.w, 1);
       }
     }
-    // 5) a couple of near-black dropout blocks
-    const nDrop = Math.floor(amt * 1.6);
-    for (let k = 0; k < nDrop; k++) {
-      const x = bx0 + Math.floor(U.hash(k, sub, 51) * cols) * bs, y = by0 + Math.floor(U.hash(k, sub, 52) * rows) * bs;
-      g.fillStyle = 'rgba(20,12,40,0.85)'; g.fillRect(x, y, bs, bs * 0.6);
+    // 5) near-black dropout blocks, only right on the hit
+    if (e >= 0 && age < 0.18) {
+      const nDrop = Math.floor(es * 2 * amount);
+      for (let k = 0; k < nDrop; k++) {
+        const x = bx0 + Math.floor(U.hash(k, e, 51) * cols) * bs, y = by0 + Math.floor(U.hash(k, e, 52) * rows) * bs;
+        g.fillStyle = `rgba(20,12,40,${0.85 * (1 - age / 0.18)})`; g.fillRect(x, y, bs, bs * 0.6);
+      }
     }
     g.imageSmoothingEnabled = true;
     g.restore();

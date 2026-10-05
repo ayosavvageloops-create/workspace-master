@@ -14,7 +14,7 @@
     const { w, h, portrait } = S;
     let bw, bh;
     if (portrait) { bw = w * 0.89; bh = bw * 0.48; }
-    else { bh = h * 0.5; bw = bh / 0.48; }
+    else { bw = Math.min(w * 0.89, (h * 0.5) / 0.48); bh = bw * 0.48; }
     const bx = (w - bw) / 2, by = portrait ? h * 0.425 - bh / 2 : (h - bh) / 2 - h * 0.03;
     const lx = bx + bw * 0.072, ly = by + bh * 0.16, lw = bw * 0.6, lh = bh * 0.6;
     const pr = bh * 0.205, px = bx + bw * 0.835, py = by + bh * 0.42;
@@ -131,8 +131,20 @@
         const tw = U.text(g, label, fx, ly + lh * 0.14, { size: fs, font: U.FONT.PIXEL, color: on ? ink : 'rgba(40,60,0,0.3)', align: 'right', spacing: 0.5 });
         fx -= tw + fs * 0.6;
       }
-      // title
-      U.text(g, (S.meta.title || 'untitled').toUpperCase(), lx + pad, ly + lh * 0.37, { size: lh * 0.27, font: U.FONT.PIXEL, color: ink, spacing: 2 });
+      // title: a scrolling marquee when it is wider than the lcd (pauses at the start of each pass)
+      const title = (S.meta.title || 'untitled').toUpperCase();
+      const tOpt = { size: lh * 0.27, font: U.FONT.PIXEL, color: ink, spacing: 2 };
+      const tw0 = U.textWidth(g, title, tOpt), avail = lw - pad * 2;
+      if (tw0 <= avail) U.text(g, title, lx + pad, ly + lh * 0.37, tOpt);
+      else {
+        const gap = lh * 0.6, loop = tw0 + gap, speed = lh * 0.55, hold = 1.6;
+        const period = hold + loop / speed, ph = ((S.t % period) + period) % period;
+        const off = ph < hold ? 0 : (ph - hold) * speed;
+        g.save(); g.beginPath(); g.rect(lx + pad * 0.6, ly + lh * 0.18, lw - pad * 1.2, lh * 0.24); g.clip();
+        U.text(g, title, lx + pad - off, ly + lh * 0.37, tOpt);
+        U.text(g, title, lx + pad - off + loop, ly + lh * 0.37, tOpt);
+        g.restore();
+      }
 
       // mini roll: pitch across, time down (future below), dotted lcd pixels
       const rx0 = lx + pad, rx1 = lx + lw - pad, ry0 = ly + lh * 0.42, ry1 = ly + lh * 0.7;
@@ -164,7 +176,8 @@
       const by = ly + lh * 0.89;
       const tw = U.text(g, cur, lx + pad, by, { size: lh * 0.25, font: U.FONT.PIXEL, color: ink, spacing: 1 });
       U.text(g, '/ ' + tot, lx + pad + tw + lh * 0.04, by, { size: lh * 0.085, font: U.FONT.PIXEL, color: ink, spacing: 0.5 });
-      U.text(g, `${Math.round(S.bpm)} BPM${S.meta.key ? ' · ' + S.meta.key : ''}`, lx + lw - pad, by, { size: lh * 0.085, font: U.FONT.PIXEL, color: ink, align: 'right', spacing: 0.5 });
+      const used = lx + pad + tw + lh * 0.04 + U.textWidth(g, '/ ' + tot, { size: lh * 0.085, font: U.FONT.PIXEL, spacing: 0.5 });
+      U.text(g, `${Math.round(S.bpm)} BPM${S.meta.key ? ' · ' + S.meta.key : ''}`, lx + lw - pad, by, { size: lh * 0.085, font: U.FONT.PIXEL, color: ink, align: 'right', spacing: 0.5, max: lx + lw - pad - used - lh * 0.06 });
       const dotsY = by + lh * 0.045, dn = Math.floor((lw - pad * 2) / (ps * 1.6));
       for (let i = 0; i < dn; i++) {
         g.fillStyle = i / dn <= S.prog ? ink : ghost;
@@ -173,8 +186,13 @@
 
       // LED meter on the body
       const N = 12, mw = L.meterW / N;
-      const vals = opt.meter === 'level' ? null : A.bands12(S.t);
-      const lvl = A.level(S.t);
+      // meter values averaged over a few past instants so segments don't flicker frame to frame
+      let vals = null;
+      if (opt.meter !== 'level') {
+        vals = new Float32Array(12);
+        for (const [dt, wt] of [[0, 0.45], [0.03, 0.3], [0.06, 0.25]]) { const b = A.bands12(S.t - dt); for (let i = 0; i < 12; i++) vals[i] += b[i] * wt; }
+      }
+      const lvl = A.level(S.t) * 0.5 + A.level(S.t - 0.03) * 0.3 + A.level(S.t - 0.06) * 0.2;
       for (let i = 0; i < N; i++) {
         const v = vals ? U.clamp(vals[i] * 1.15) : (i / N < lvl ? 1 : 0.15);
         const hh = L.meterH * (0.3 + 0.7 * v);

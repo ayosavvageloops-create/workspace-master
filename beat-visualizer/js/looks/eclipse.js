@@ -61,7 +61,10 @@
       g.drawImage(cache.bg, 0, 0, w, h);
 
       // ---- rim from the spectrum ----
-      const N = 24, sp = A.spectrum(S.t, N, { min: 40, max: 9000 });
+      // 12 precomputed log bands, averaged over ~100 ms so the rim breathes instead of jittering
+      const N = 12, sp = new Float32Array(N);
+      const taps = [[0, 0.34], [1 / 30, 0.28], [2 / 30, 0.22], [3 / 30, 0.16]];
+      for (const [dt, wt] of taps) { const b = A.bands12(S.t - dt); for (let i = 0; i < N; i++) sp[i] += b[i] * wt; }
       const pulse = A.pulse(S.t, 'bass', 0.22);
       const rot = S.t * 0.12;
       const amp = opt.ripple * R;
@@ -137,11 +140,13 @@
       g.stroke();
 
       // ---- footer ----
-      const fy = S.portrait ? h * 0.958 : h - S.pad * 0.7;
+      // below the handle strip in portrait; beside it (same baseline) otherwise
+      const fy = S.portrait ? h - unit * 0.085 : h - S.pad * 0.9;
+      const fs = { size: unit * 0.0165, font: U.FONT.MONO, spacing: unit * 0.004 };
       const foot = [String(S.meta.title || '').toUpperCase(), `${Math.round(S.bpm)} BPM`, S.meta.key].filter(Boolean).join(' · ');
-      U.text(g, foot, S.pad, fy, { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(40,42,48,0.55)', spacing: unit * 0.004 });
       const chord = Parts.chordAt(S.parts, S.t).name;
-      if (chord) U.text(g, chord, w - S.pad, fy, { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(40,42,48,0.45)', spacing: unit * 0.004, align: 'right' });
+      const cw = chord ? U.text(g, chord, w - S.pad, fy, { ...fs, color: 'rgba(40,42,48,0.45)', align: 'right' }) + unit * 0.04 : 0;
+      U.text(g, foot, S.pad, fy, { ...fs, color: 'rgba(40,42,48,0.55)', max: S.portrait ? w - S.pad * 2 - cw : w / 2 - S.pad - unit * 0.2 });
     },
   });
 })();

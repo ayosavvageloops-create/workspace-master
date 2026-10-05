@@ -20,9 +20,14 @@
       { key: 'glow', label: 'Radar glow', type: 'toggle' },
     ],
     prepare(S) {
-      const { w, h, unit, portrait } = S;
-      const cx = w / 2, cy = portrait ? h * 0.505 : h * 0.52;
-      const R = portrait ? unit * 0.33 : unit * 0.36;
+      const { w, h, unit, portrait, pad } = S;
+      // layout: wide formats keep the legend bottom-left beside the dial; others stack it above the handle watermark
+      const wide = w / h > 1.3;
+      const handleTop = (portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.036;
+      const fy = wide ? h - pad * 0.9 - unit * 0.012 : handleTop - unit * 0.004;
+      const headBot = pad * 0.9 + unit * 0.11, footTop = wide ? h - pad * 0.6 : fy - unit * 0.13;
+      const cx = w / 2, cy = wide ? h * 0.52 : (headBot + footTop) / 2;
+      const R = Math.min(portrait ? unit * 0.33 : unit * 0.36, (footTop - headBot) / 2 / 1.27);
       const bg = U.layer(w, h, (c) => {
         c.fillStyle = S.opt.bg; c.fillRect(0, 0, w, h);
         U.glowBlob(c, cx, cy, R * 1.35, '#2a2150', 0.55);
@@ -45,7 +50,7 @@
           c.beginPath(); c.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); c.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); c.stroke();
         }
       }, 1);
-      return { cx, cy, R, dial };
+      return { cx, cy, R, dial, wide, fy };
     },
     draw(g, S) {
       const { w, h, unit, pad, opt, parts, t } = S;
@@ -126,26 +131,27 @@
 
       // centre key
       g.fillStyle = U.rgba(S.opt.bg, 0.85);
-      g.beginPath(); g.arc(cx, cy, unit * 0.028, 0, U.TAU); g.fill();
-      U.text(g, S.meta.key || '·', cx, cy + unit * 0.014, { size: unit * 0.04, font: U.FONT.MONO, color: '#f4f2ff', align: 'center' });
+      g.beginPath(); g.arc(cx, cy, Math.min(rIn * 0.9, unit * 0.045), 0, U.TAU); g.fill();
+      U.text(g, S.meta.key || '·', cx, cy + unit * 0.014, { size: unit * 0.04, font: U.FONT.MONO, color: '#f4f2ff', align: 'center', max: rIn * 1.6 });
       if (!parts.length) U.text(g, 'NO PARTS', cx, cy + R * 0.5, { size: unit * 0.014, font: U.FONT.MONO, color: 'rgba(200,195,235,0.45)', align: 'center', spacing: 4 });
 
       // header
-      const top = pad * 0.9 + unit * 0.05;
-      U.text(g, S.meta.title || 'untitled', pad * 0.9, top, { size: unit * 0.06, font: U.FONT.PLEX, color: '#f2f2f4' });
-      U.text(g, `ORACLE · ONE TURN = ${+opt.loop || 4} BARS`, pad * 0.9, top + unit * 0.036, { size: unit * 0.016, font: U.FONT.MONO, color: 'rgba(220,220,230,0.45)', spacing: 1.5 });
+      const top = pad * 0.9 + unit * 0.05, wide = S.cache.wide;
+      const tMax = wide ? cx - R * 1.3 - pad * 0.9 : w - pad * 1.8;
+      U.text(g, S.meta.title || 'untitled', pad * 0.9, top, { size: unit * 0.06, font: U.FONT.PLEX, color: '#f2f2f4', max: tMax });
+      U.text(g, `ORACLE · ONE TURN = ${+opt.loop || 4} BARS`, pad * 0.9, top + unit * 0.036, { size: unit * 0.016, font: U.FONT.MONO, color: 'rgba(220,220,230,0.45)', spacing: 1.5, max: tMax });
 
       // legend + footer
-      const fy = h - pad * 0.9 - unit * 0.012;
-      g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(pad * 0.9, fy - unit * 0.035, w - pad * 1.8, 1);
-      U.text(g, S.sub, pad * 0.9, fy, { size: unit * 0.017, font: U.FONT.MONO, color: 'rgba(220,220,230,0.45)', spacing: 1 });
+      const fy = S.cache.fy, fw = wide ? Math.min(w * 0.3, cx - R * 1.3 - pad * 0.9) : w - pad * 1.8;
+      g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(pad * 0.9, fy - unit * 0.035, fw, 1);
+      U.text(g, S.sub, pad * 0.9, fy, { size: unit * 0.017, font: U.FONT.MONO, color: 'rgba(220,220,230,0.45)', spacing: 1, max: fw });
       const legend = S.allParts.length ? S.allParts : [{ role: 'bass', name: 'bass' }, { role: 'chords', name: 'chords' }, { role: 'lead', name: 'lead' }];
-      const lgY = fy - unit * 0.07, step = unit * 0.145;
+      const lgY = fy - unit * 0.07, nL = Math.min(5, legend.length), step = Math.min(unit * 0.145, fw / Math.max(1, nL));
       legend.slice(0, 5).forEach((p, i) => {
         const x = pad * 0.9 + i * step;
         g.fillStyle = p.enabled === false ? 'rgba(255,255,255,0.15)' : colOf(p);
         g.fillRect(x, lgY - unit * 0.026, unit * 0.028, Math.max(2, unit * 0.003));
-        U.text(g, String(p.name || p.role).toUpperCase(), x, lgY, { size: unit * 0.015, font: U.FONT.MONO, color: 'rgba(220,220,230,0.5)', spacing: 1 });
+        U.text(g, String(p.name || p.role).toUpperCase(), x, lgY, { size: unit * 0.015, font: U.FONT.MONO, color: 'rgba(220,220,230,0.5)', spacing: 1, max: step - unit * 0.012 });
       });
     },
   });
