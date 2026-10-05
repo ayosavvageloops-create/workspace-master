@@ -46,7 +46,14 @@
         gr.addColorStop(0, '#2c2d33'); gr.addColorStop(0.55, '#1a1b1f'); gr.addColorStop(1, '#0c0c0e');
         g.fillStyle = gr; g.fillRect(0, 0, lw, lh);
       }, 0.5);
-      return { cx, cy, R, bg, sun, changes };
+      // the moon's soft cast shadow, pre-blurred (a radial falloff around the disc edge)
+      const mr = R * 0.86, sr = mr * 1.3;
+      const shadow = U.layer(sr * 2, sr * 2, (g) => {
+        const gr = g.createRadialGradient(sr, sr, mr * 0.85, sr, sr, sr);
+        gr.addColorStop(0, 'rgba(40,42,48,0.24)'); gr.addColorStop(0.35, 'rgba(40,42,48,0.1)'); gr.addColorStop(1, 'rgba(40,42,48,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, sr * 2, sr * 2);
+      }, 0.25);
+      return { cx, cy, R, bg, sun, changes, shadow, sr };
     },
     draw(g, S) {
       const { w, h, unit, opt, cache, A } = S;
@@ -120,13 +127,8 @@
       }
 
       // moon with a soft cast shadow
-      g.save();
-      g.shadowColor = 'rgba(40,42,48,0.22)';
-      g.shadowBlur = unit * 0.05;
-      g.shadowOffsetX = unit * 0.004;
-      g.fillStyle = opt.bg;
-      g.beginPath(); g.arc(mx, my, mr, 0, U.TAU); g.fill();
-      g.restore();
+      const sr = cache.sr;
+      g.drawImage(cache.shadow, mx - sr + unit * 0.006, my - sr + unit * 0.004, sr * 2, sr * 2);
       const mg = g.createRadialGradient(mx - mr * 0.3, my - mr * 0.3, 0, mx, my, mr);
       mg.addColorStop(0, U.mix(opt.bg, '#ffffff', 0.6)); mg.addColorStop(1, U.mix(opt.bg, '#d8d8d4', 0.35));
       g.fillStyle = mg;

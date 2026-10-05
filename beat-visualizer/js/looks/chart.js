@@ -46,21 +46,18 @@
         side.addColorStop(0.88, 'rgba(1,2,6,0)'); side.addColorStop(1, 'rgba(1,2,6,0.55)');
         g.fillStyle = side; g.fillRect(0, 0, w, h);
       }, 0.25);
-      // faint background stars at full res (tiny dots)
-      const stars = U.layer(S.w, S.h, (g, w, h) => {
-        const r = U.rng(S.seed + 11);
-        for (let i = 0; i < 260; i++) {
-          const x = r() * w, y = r() * h, s = r();
-          g.fillStyle = `rgba(200,215,255,${0.08 + s * s * 0.35})`;
-          g.beginPath(); g.arc(x, y, S.unit * (0.0008 + s * s * 0.0017), 0, U.TAU); g.fill();
-        }
-      }, 0.5);
+      // faint background stars: positions precomputed, drawn as tiny squares each frame
+      const r = U.rng(S.seed + 11), stars = [];
+      for (let i = 0; i < 240; i++) {
+        const sz = r();
+        stars.push({ x: r() * S.w, y: r() * S.h, s: S.unit * (0.0014 + sz * sz * 0.0028), c: `rgba(200,215,255,${(0.1 + sz * sz * 0.4).toFixed(3)})` });
+      }
       return { parts, sky, stars };
     },
     draw(g, S) {
       const { w, h, unit, opt, cache } = S;
       g.drawImage(cache.sky, 0, 0, w, h);
-      g.drawImage(cache.stars, 0, 0, w, h);
+      for (const st of cache.stars) { g.fillStyle = st.c; g.fillRect(st.x, st.y, st.s, st.s); }
 
       // page geometry
       const x0 = S.pad * 1.1, x1 = w - S.pad * 1.1;

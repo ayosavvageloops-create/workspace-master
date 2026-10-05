@@ -64,7 +64,7 @@
       const t0 = S.t - win * opt.playhead - S.bar, t1 = S.t + win * (1 - opt.playhead);
       const holdS = opt.hold * S.spb;
       const d = Math.max(3, rowH * 0.12);                                 // 3D depth
-      const dh = Math.min(rowH * 0.95, u * 0.075), dw = Math.max(6, dh * 0.34);
+      const dh = Math.min(Math.max(rowH * 0.95, u * 0.045), u * 0.075), dw = Math.max(6, dh * 0.34);
       const pt = Math.max(5, Math.min(rowH * 0.16, u * 0.014)), legH = Math.min(rowH * 1.25, u * 0.1), legW = dw * 0.7;
       const shade = (p) => (p.role === 'bass' ? U.mix(opt.accent, '#2a1a70', 0.25) : p.role === 'lead' ? U.mix(opt.accent, '#b9a6ff', 0.35) : opt.accent);
 

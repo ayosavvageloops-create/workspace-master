@@ -21,7 +21,7 @@
     // waveform lane
     const wy0 = 78 * k, wy1 = H * 0.55;
     g.fillStyle = '#1b1f22'; g.fillRect(cx0, wy0, cw, wy1 - wy0);
-    const N = 300, sr = A.sr, src = A.M, wcy = (wy0 + wy1) / 2, wamp = (wy1 - wy0) * 0.47;
+    const N = Math.round(cw / 3.2), sr = A.sr, src = A.M, wcy = (wy0 + wy1) / 2, wamp = (wy1 - wy0) * 0.47;
     let top = 0; const vals = new Float32Array(N);
     for (let i = 0; i < N; i++) {
       const a = Math.floor((S.clipStart + (i / N) * S.clipLen) * sr), b = Math.floor((S.clipStart + ((i + 1) / N) * S.clipLen) * sr);
@@ -31,8 +31,8 @@
     g.fillStyle = U.rgba(opt.accent, 0.9);
     const bw = cw / N;
     for (let i = 0; i < N; i++) {
-      const v = Math.pow(vals[i] / (top || 1), 0.8) * (0.75 + 0.25 * U.hash(i, 9)), hh = Math.max(1, v * wamp);
-      g.fillRect(cx0 + i * bw, wcy - hh, Math.max(1, bw * 0.45), hh * 2);
+      const v = Math.pow(vals[i] / (top || 1), 0.6) * (0.75 + 0.25 * U.hash(i, 9)), hh = Math.max(1, v * wamp);
+      g.fillRect(Math.round(cx0 + i * bw), wcy - hh, Math.max(1, Math.round(bw * 0.4)), hh * 2);
     }
     // gap lane
     const gy0 = wy1, gy1 = H * 0.6;
@@ -41,7 +41,7 @@
     // spectrogram grid
     const sy0 = gy1, sy1 = H * 0.915, cols = 64, rows = 10;
     const chh = (sy1 - sy0) / rows, cww = cw / cols;
-    const ramp = (v) => (v < 0.35 ? U.mix('#17283a', '#22506a', v / 0.35) : v < 0.78 ? U.mix('#22506a', '#3c87a2', (v - 0.35) / 0.43) : U.mix('#3c87a2', opt.hot, Math.min(1, (v - 0.78) / 0.15)));
+    const ramp = (v) => (v < 0.4 ? U.mix('#182838', '#24485e', v / 0.4) : v < 0.84 ? U.mix('#24485e', '#3a7891', (v - 0.4) / 0.44) : U.mix('#3a7891', opt.hot, Math.min(1, (v - 0.84) / 0.1)));
     for (let c = 0; c < cols; c++) {
       const tt = S.clipStart + ((c + 0.5) / cols) * S.clipLen, b = A.bands12(tt);
       for (let r = 0; r < rows; r++) {
@@ -59,9 +59,6 @@
     g.fillStyle = gl; g.fillRect(0, 0, W, H);
     const tl = g.createLinearGradient(0, 0, 0, H * 0.25); tl.addColorStop(0, 'rgba(255,255,255,0.08)'); tl.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = tl; g.fillRect(0, 0, W, H * 0.25);
-    // fine scanlines
-    g.fillStyle = 'rgba(0,0,0,0.12)';
-    for (let y = 0; y < H; y += 3 * k) g.fillRect(0, y, W, Math.max(0.6, k * 0.8));
     return { cx0: cx0 / W, cx1: cx1 / W, py0: wy0 / H, py1: sy1 / H };
   }
 
