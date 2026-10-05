@@ -15,7 +15,8 @@
 //   t               absolute track time (s);  ct = t - clipStart;  clipLen;  prog = ct / clipLen (0..1)
 //   A               audio analysis (see analysis.js)
 //   parts           enabled parts (see midi.js), ordered bass, chords, lead, other
-//   hasMidi         true when parts come from MIDI (false = guessed from audio)
+//   hasMidi         true when parts come from MIDI (false = found in the audio)
+//   A.beatOffset    origin of the bar grid (MIDI offset, or the detected first beat); use it for bars
 //   meta            { title, bpm, key, handle }
 //   opt             merged option values for this look; accent = opt.accent
 //   frame, fps      frame index and frame rate (use frame for grain/flicker seeds)

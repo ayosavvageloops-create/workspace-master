@@ -65,7 +65,7 @@
       const phx = x0 + (x1 - x0) * ph;
       const tx = (t) => phx + ((t - S.t) / win) * (x1 - x0);
       const tA = S.t - win * ph, tB = S.t + win * (1 - ph);
-      const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
+      const origin = (S.A && S.A.beatOffset) || 0;
       const sub = S.spb / 4;
       for (let k = Math.ceil((tA - origin) / sub); k * sub + origin <= tB; k++) {
         const x = tx(origin + k * sub);

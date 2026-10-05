@@ -73,8 +73,13 @@
     return `${style} ${weight} ${Math.round(size)}px "${family}", ${family === FONT.MONO || family === FONT.PLEX ? 'monospace' : 'sans-serif'}`.trim();
   }
   // Draws text with optional letter spacing; returns its width.
+  // o.max: maximum width — the text first shrinks (down to 75%), then is cut with an ellipsis.
   function text(g, str, x, y, o = {}) {
     str = String(str ?? '');
+    if (o.max > 0 && str) {
+      const fitted = fit(g, str, o.max, o);
+      if (fitted.str !== str || fitted.size !== o.size) { o = { ...o, size: fitted.size, max: 0 }; str = fitted.str; }
+    }
     g.save();
     g.font = font(o.size || 24, o.font || FONT.SANS, o.weight || 400, o.style || '');
     g.fillStyle = o.color || '#000';
@@ -101,6 +106,28 @@
     }
     g.restore();
     return w;
+  }
+  // Width of `str` as text() would draw it (letter spacing included).
+  function textWidth(g, str, o = {}) {
+    g.save();
+    g.font = font(o.size || 24, o.font || FONT.SANS, o.weight || 400, o.style || '');
+    let w = g.measureText(str).width;
+    if (o.spacing) w += o.spacing * [...str].length;
+    g.restore();
+    return w;
+  }
+  // Fits `str` into `max` px: shrinks the size down to 75%, then truncates with an ellipsis.
+  function fit(g, str, max, o = {}) {
+    let size = o.size || 24;
+    let w = textWidth(g, str, { ...o, size });
+    if (w <= max) return { str, size, width: w };
+    size = Math.max(size * 0.75, size * (max / w));
+    w = textWidth(g, str, { ...o, size });
+    if (w <= max) return { str, size, width: w };
+    let cut = [...str];
+    while (cut.length > 1 && textWidth(g, cut.join('').trimEnd() + '…', { ...o, size }) > max) cut.pop();
+    const out = cut.join('').trimEnd() + '…';
+    return { str: out, size, width: textWidth(g, out, { ...o, size }) };
   }
   function measure(g, str, size, family = FONT.SANS, weight = 400) {
     g.save(); g.font = font(size, family, weight); const w = g.measureText(String(str)).width; g.restore(); return w;
@@ -192,7 +219,7 @@
     TAU, FONT, clamp, lerp, invLerp, smooth, fract, easeOut, easeInOut,
     rng, hash, strSeed, vnoise, fbm,
     hexToRgb, rgbToHex, rgba, mix, hsl,
-    font, text, measure, rrect, glowBlob, grain, layer,
+    font, text, textWidth, fit, measure, rrect, glowBlob, grain, layer,
     NOTE_NAMES, noteName, fmtTime, fmtTime2, parseFilename,
   };
 })();

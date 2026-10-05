@@ -16,6 +16,7 @@
     clipStart: 0, clipLen: 15,
     fps: 60, normalize: true, quality: store.get('quality', 0.5),
     playing: false, t: 0, version: 1,
+    midiParts: [], midiBpm: 0, audioParts: null, source: 'audio', midiOffset: 0, fileBpm: 0,
     cacheStore: {},
     filter: 'all',
   };
@@ -30,8 +31,10 @@
   const currentLook = () => Looks.get(state.look) || Looks.list[0];
 
   // ---------- audio playback ----------
-  let ac = null, src = null, startedAt = 0, startT = 0;
+  let ac = null, src = null, startedAt = 0, startT = 0, perfStart = 0;
   function audioCtx() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); return ac; }
+  // What the listener hears lags the scheduled audio by the output latency; the picture follows that.
+  const outLatency = () => (ac ? (ac.outputLatency || 0) + (ac.baseLatency || 0) : 0);
   function play() {
     if (!state.buffer) return;
     const a = audioCtx(); a.resume();
@@ -39,13 +42,23 @@
     if (state.t < state.clipStart || state.t >= state.clipStart + state.clipLen - 0.02) state.t = state.clipStart;
     src = a.createBufferSource(); src.buffer = state.buffer; src.connect(a.destination);
     startedAt = a.currentTime + 0.03; startT = state.t;
+    perfStart = performance.now() / 1000 + 0.03;
     src.start(startedAt, state.t, state.clipStart + state.clipLen - state.t);
     src.onended = () => { if (state.playing && nowT() >= state.clipStart + state.clipLen - 0.05) { state.t = state.clipStart; play(); } };
     state.playing = true; ui.play();
   }
   function stopSource() { if (src) { src.onended = null; try { src.stop(); } catch (e) { /* not started */ } src = null; } }
   function pause() { state.t = nowT(); stopSource(); state.playing = false; ui.play(); }
-  function nowT() { return state.playing && ac ? startT + Math.max(0, ac.currentTime - startedAt) : state.t; }
+  // Smooth clock: performance.now() drives the picture (the audio clock advances in coarse steps on
+  // some systems, which made motion judder); it is gently pulled back to the audio clock.
+  function nowT() {
+    if (!state.playing || !ac) return state.t;
+    const audioT = startT + Math.max(0, ac.currentTime - startedAt);
+    let t = startT + Math.max(0, performance.now() / 1000 - perfStart);
+    const drift = audioT - t;
+    if (Math.abs(drift) > 0.08) { perfStart -= drift; t = audioT; } else perfStart -= drift * 0.02;
+    return Math.max(startT, t - outLatency());
+  }
   function seek(t) {
     state.t = Math.max(state.clipStart, Math.min(state.clipStart + state.clipLen - 0.001, t));
     if (state.playing) play();
@@ -58,45 +71,71 @@
     const buffer = await audioCtx().decodeAudioData(arr);
     const meta = U.parseFilename(file.name);
     state.beatName = file.name;
-    state.parts = state.parts.filter((p) => p.source === 'midi');
+    dropDemoMidi();
     await setBeat(buffer, { title: meta.title, bpm: meta.bpm, key: meta.key || '' });
   }
+  // The demo's MIDI belongs to the demo beat only; it must never be drawn over the user's audio.
+  function dropDemoMidi() {
+    if (state.midiParts.some((p) => p.demo)) { state.midiParts = state.midiParts.filter((p) => !p.demo); state.midiBpm = 0; state.midiOffset = 0; }
+  }
   async function setBeat(buffer, meta) {
+    state.busy = true;
     pause();
     state.buffer = buffer;
     state.meta.title = meta.title; state.meta.key = meta.key || '';
-    const hasMidi = state.parts.some((p) => p.source === 'midi');
+    state.fileBpm = meta.bpm || 0;
     state.A = await Analysis.analyze(buffer, {
-      bpm: meta.bpm || state.parts.bpm || 0, beatOffset: hasMidi ? 0 : undefined,
+      bpm: state.fileBpm || state.midiBpm || 0,
       onProgress: (k) => { $('beatStatus').textContent = `Analysing… ${Math.round(k * 100)}%`; },
     });
-    state.meta.bpm = Math.round(state.A.bpm * 10) / 10;
-    if (!hasMidi) state.parts = Parts.fromAudio(state.A);
+    $('beatStatus').textContent = 'Finding notes in the audio…';
+    await new Promise((r) => setTimeout(r, 0));
+    state.audioParts = Parts.fromAudio(state.A);
+    if (state.midiParts.length) state.midiOffset = Parts.align(state.midiParts, state.A);
+    state.source = state.midiParts.length ? 'midi' : 'audio';
+    applyParts();
     state.clipStart = 0;
     state.clipLen = Math.min(Math.round(buffer.duration * 10) / 10, Math.max(15, Math.min(30, buffer.duration)), 210);
     state.t = 0;
-    bump();
     const L = state.A.lufs;
     $('beatStatus').textContent = `${state.beatName || meta.title} · ${U.fmtTime(buffer.duration)} · ${state.meta.bpm} BPM · ${L.integrated.toFixed(1)} LUFS`;
     ui.fields(); ui.parts(); ui.ready();
+    state.busy = false;
+  }
+  // Chooses what the looks draw: the MIDI parts (shifted by the offset) or parts found in the audio.
+  function applyParts() {
+    const A = state.A;
+    const useMidi = state.source === 'midi' && state.midiParts.length;
+    if (A) {
+      const bpm = state.fileBpm || (useMidi && state.midiBpm) || A.detectedBpm;
+      A.setTempo(bpm, useMidi ? state.midiOffset : A.detectedOffset);
+      state.meta.bpm = Math.round(A.bpm * 10) / 10;
+    }
+    state.parts = useMidi ? Parts.shift(state.midiParts, state.midiOffset) : (state.audioParts || []);
+    bump();
   }
   async function addMidi(files) {
-    let added = [];
+    let added = [], bpm = 0;
     for (const f of files) {
-      try { const ps = Parts.fromMidiFile(await f.arrayBuffer(), f.name); added = added.concat(ps); if (ps.bpm) state.parts.bpm = ps.bpm; }
+      try { const ps = Parts.fromMidiFile(await f.arrayBuffer(), f.name); added = added.concat(ps); if (ps.bpm) bpm = ps.bpm; }
       catch (e) { $('beatStatus').textContent = `${f.name}: ${e.message}`; }
     }
     if (!added.length) return;
-    const midi = state.parts.filter((p) => p.source === 'midi');
-    state.parts = midi.concat(added);
-    state.parts.bpm = added.bpm || state.parts.bpm;
-    if (state.A) state.A.setTempo(null, 0); // MIDI starts with the beat
-    bump(); ui.parts();
+    dropDemoMidi();
+    state.midiParts = state.midiParts.concat(added);
+    if (bpm) state.midiBpm = bpm;
+    state.source = 'midi';
+    if (state.A) {
+      if (!state.fileBpm && state.midiBpm) state.A.setTempo(state.midiBpm, 0);
+      state.midiOffset = Parts.align(state.midiParts, state.A);
+    }
+    applyParts(); ui.fields(); ui.parts();
   }
   async function loadDemo() {
     $('beatStatus').textContent = 'Rendering demo beat…';
     const d = await Demo.load();
-    state.parts = d.parts;
+    d.parts.forEach((p) => { p.demo = true; });
+    state.midiParts = d.parts; state.midiBpm = d.meta.bpm;
     state.beatName = d.meta.filename;
     await setBeat(d.buffer, d.meta);
     state.clipLen = Math.round(d.buffer.duration * 10) / 10 - 1;
@@ -164,7 +203,7 @@
     }
     const pk = `${state.version}|${state.format}|${state.quality}|${state.look}|${nowT()}|${state.meta.handle}|${JSON.stringify(state.opt[state.look] || {})}`;
     if (state.playing || pk !== lastPreviewKey) { drawPreview(); lastPreviewKey = pk; }
-    drawThumbs(state.playing ? 6 : 12);
+    if (!state.playing) drawThumbs(12);
     if (now - lastUi > 50) { ui.time(); lastUi = now; }
     requestAnimationFrame(loop);
   }
@@ -187,17 +226,22 @@
       $('title').value = state.meta.title; $('bpm').value = state.meta.bpm || ''; $('key').value = state.meta.key;
       $('handle').value = state.meta.handle; $('clipLen').value = state.clipLen; $('clipStart').value = state.clipStart;
       $('format').value = state.format; $('quality').value = String(state.quality);
+      $('source').value = state.midiParts.length ? state.source : 'audio';
+      $('source').options[0].disabled = !state.midiParts.length;
+      $('midiOffset').value = Math.round(state.midiOffset * 1000);
+      $('offsetField').classList.toggle('off', !(state.source === 'midi' && state.midiParts.length));
     },
     parts() {
       const box = $('partsList');
       box.innerHTML = '';
-      if (!state.parts.length) return;
-      const allAudio = state.parts.every((p) => p.source === 'audio');
+      const useMidi = state.source === 'midi' && state.midiParts.length;
+      const list = useMidi ? state.midiParts : (state.audioParts || []);
+      if (!list.length) return;
       const head = document.createElement('div');
       head.className = 'muted small';
-      head.textContent = allAudio ? 'Parts guessed from the audio — add MIDI for exact notes:' : `${state.parts.length} part(s) from MIDI:`;
+      head.textContent = useMidi ? `${list.length} part(s) from MIDI:` : 'Parts found in the audio' + (state.midiParts.length ? ' (MIDI loaded, switch above to use it):' : ' — add MIDI for exact notes:');
       box.appendChild(head);
-      for (const p of state.parts) {
+      for (const p of list) {
         const row = document.createElement('div');
         row.className = 'part';
         row.innerHTML = `<input type="checkbox" ${p.enabled ? 'checked' : ''} title="draw this part">
@@ -205,11 +249,15 @@
           <select>${['bass', 'chords', 'lead', 'drums', 'other'].map((r) => `<option ${r === p.role ? 'selected' : ''}>${r}</option>`).join('')}</select>
           <button class="x" title="remove">×</button>`;
         const [en, col, name, role, x] = row.querySelectorAll('input, select, button');
-        en.onchange = () => { p.enabled = en.checked; bump(); };
-        col.oninput = () => { p.color = col.value; bump(); };
-        name.onchange = () => { p.name = name.value; bump(); };
-        role.onchange = () => { p.role = role.value; bump(); };
-        x.onclick = () => { state.parts = state.parts.filter((q) => q !== p); if (!state.parts.length && state.A) state.parts = Parts.fromAudio(state.A); bump(); ui.parts(); };
+        en.onchange = () => { p.enabled = en.checked; applyParts(); };
+        col.oninput = () => { p.color = col.value; applyParts(); };
+        name.onchange = () => { p.name = name.value; applyParts(); };
+        role.onchange = () => { p.role = role.value; applyParts(); };
+        x.onclick = () => {
+          if (useMidi) { state.midiParts = state.midiParts.filter((q) => q !== p); if (!state.midiParts.length) state.source = 'audio'; }
+          else state.audioParts = state.audioParts.filter((q) => q !== p);
+          applyParts(); ui.fields(); ui.parts();
+        };
         box.appendChild(row);
       }
     },
@@ -292,9 +340,12 @@
   $('title').oninput = (e) => { state.meta.title = e.target.value; bump(); };
   $('key').oninput = (e) => { state.meta.key = e.target.value; bump(); };
   $('handle').oninput = (e) => { state.meta.handle = e.target.value; store.set('handle', e.target.value); };
-  $('bpm').onchange = (e) => { const v = parseFloat(e.target.value); if (v > 30 && state.A) { state.A.setTempo(v); state.meta.bpm = v; bump(); } };
+  $('bpm').onchange = (e) => { const v = parseFloat(e.target.value); if (v > 30 && state.A) { state.fileBpm = v; applyParts(); } };
   $('clipLen').onchange = (e) => { state.clipLen = Math.max(1, Math.min(210, parseFloat(e.target.value) || 15)); bump(); seek(state.t); };
   $('clipStart').onchange = (e) => { state.clipStart = Math.max(0, parseFloat(e.target.value) || 0); state.t = state.clipStart; bump(); if (state.playing) play(); };
+  $('source').onchange = (e) => { state.source = e.target.value; applyParts(); ui.fields(); ui.parts(); };
+  $('midiOffset').onchange = (e) => { state.midiOffset = (parseFloat(e.target.value) || 0) / 1000; applyParts(); };
+  $('alignBtn').onclick = () => { if (state.A && state.midiParts.length) { state.midiOffset = Parts.align(state.midiParts, state.A); applyParts(); ui.fields(); } };
   $('normalize').onchange = (e) => { state.normalize = e.target.checked; };
   $('fps').onchange = (e) => { state.fps = parseInt(e.target.value, 10); };
   document.querySelectorAll('#filters button').forEach((b) => (b.onclick = () => { state.filter = b.dataset.f; ui.filter(); }));
@@ -377,7 +428,7 @@
   const fontsReady = Promise.all([...document.fonts].map((f) => f.load().catch(() => null))).then(() => document.fonts.ready);
   // Open in a working state: the demo beat loads unless a beat was already dropped.
   const ready = fontsReady.then(() => (state.buffer ? null : loadDemo())).then(() => {
-    if (params.get('nomidi')) { state.parts = Parts.fromAudio(state.A); bump(); }
+    if (params.get('nomidi')) { state.source = 'audio'; applyParts(); ui.fields(); ui.parts(); }
   });
   window.__app = {
     state, ready, ctx, Looks,

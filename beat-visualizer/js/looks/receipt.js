@@ -2,7 +2,7 @@
 // the current line highlighted and the roll scrolling to keep it in view, then subtotal,
 // total and a barcode. Chords print as one line (qty = voices, note = chord symbol).
 (function () {
-  const gridOff = (S) => (!S.hasMidi && S.A && S.A.beatOffset) || 0;
+  const gridOff = (S) => (S.A && S.A.beatOffset) || 0; // beat grid origin (MIDI offset or detected downbeat)
 
   // build the item list from the chosen parts (stable for a given parts/options set)
   function items(S) {

@@ -269,6 +269,9 @@
 
     const A = {
       sr, dur, L, R, M, FPS, bpm, beatOffset, onsets,
+      detectedBpm: bpm, detectedOffset: beatOffset,
+      // Linear magnitude spectrum (copy) of the mono mix centred at t; bin k = k * sr / size Hz.
+      fft: (t, size = 4096) => Float32Array.from(magnitudes(M, t * sr, size)),
       level: (t) => interp(level, 1, 0, t),
       band: (t, name) => interp(b6, 6, Math.max(0, BAND_NAMES.indexOf(name)), t),
       bands12(t) { for (let i = 0; i < 12; i++) tmp12[i] = interp(b12, 12, i, t); return tmp12; },

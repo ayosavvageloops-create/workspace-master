@@ -6,7 +6,7 @@
   const ROW_BG = '#e2e1d9', INK = '#1b1b1b';
 
   // bar grid origin: MIDI time 0 is the downbeat; guessed parts follow the audio grid
-  const gridOff = (S) => (!S.hasMidi && S.A && S.A.beatOffset) || 0;
+  const gridOff = (S) => (S.A && S.A.beatOffset) || 0; // beat grid origin (MIDI offset or detected downbeat)
 
   // how busy a part is right now: velocity-weighted coverage of the last two beats, 0..1
   function activity(part, t, spb) {

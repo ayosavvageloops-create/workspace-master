@@ -3,6 +3,7 @@
 // sheets (4 frames at clip time 2, 4, 6, 8 s) for visual review.
 //
 //   node tools/snap.cjs <lookId|all> [--out dir] [--format 9:16] [--nomidi] [--times 2,4,6,8] [--scale 0.28]
+//        [--beat file.wav] [--midi a.mid,b.mid] [--source midi|audio] [--title "a long title"] [--key F#m] [--handle @name] [--tag name]
 //
 // Prints per-look render time and any console errors. Requires Playwright
 // (set PLAYWRIGHT_PATH if it is not resolvable from here).
@@ -36,6 +37,19 @@ fs.mkdirSync(out, { recursive: true });
   await page.goto(url);
   await page.waitForFunction(() => window.__app, null, { timeout: 20000 });
   await page.evaluate(() => window.__app.ready);
+  if (opt('midi')) await page.setInputFiles('#midiFile', opt('midi').split(','));
+  if (opt('beat')) {
+    const name = path.basename(opt('beat'));
+    await page.setInputFiles('#beatFile', opt('beat'));
+    await page.waitForFunction((n) => window.__app.state.beatName === n && window.__app.state.busy === false, name, { timeout: 60000 });
+  }
+  if (opt('source')) { await page.selectOption('#source', opt('source')); }
+  if (opt('title')) { await page.fill('#title', opt('title')); }
+  if (opt('key')) { await page.fill('#key', opt('key')); }
+  if (opt('handle')) { await page.fill('#handle', opt('handle')); }
+  const info = await page.evaluate(() => { const s = window.__app.state; return { title: s.meta.title, bpm: s.meta.bpm, key: s.meta.key, source: s.source, midiOffsetMs: Math.round(s.midiOffset * 1000),
+    parts: s.parts.map((p) => `${p.name}:${p.notes.length}`).join(' ') }; });
+  console.log('scene:', JSON.stringify(info));
   const ids = which === 'all' ? await page.evaluate(() => window.__app.Looks.list.map((l) => l.id)) : which.split(',');
   for (const id of ids) {
     const before = errors.length;
@@ -56,7 +70,7 @@ fs.mkdirSync(out, { recursive: true });
       return { url: c.toDataURL('image/png'), ms, full };
     }, { id, times, scale });
     if (res.missing) { console.log(`${id}: not registered`); continue; }
-    const file = path.join(out, `${id}${format === '9:16' ? '' : '-' + format.replace(':', 'x')}${flag('nomidi') ? '-nomidi' : ''}.png`);
+    const file = path.join(out, `${id}${format === '9:16' ? '' : '-' + format.replace(':', 'x')}${flag('nomidi') ? '-nomidi' : ''}${opt('tag') ? '-' + opt('tag') : ''}.png`);
     fs.writeFileSync(file, Buffer.from(res.url.split(',')[1], 'base64'));
     console.log(`${id}: ${file}  render ${res.full.toFixed(1)} ms/frame at full res`);
     for (const e of errors.slice(before)) console.log(`  ! ${e}`);

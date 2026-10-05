@@ -127,58 +127,159 @@
   }
 
   // ---------- guessing parts from audio ----------
-  function fromAudio(A) {
-    const spb = 60 / A.bpm, size = 8192, hz = A.sr / size;
-    const peakPitch = (t, lo, hi) => {
-      const sp = magAt(A, t, size);
-      let best = 0, bk = 0;
-      for (let k = Math.floor(lo / hz); k < Math.min(sp.length, hi / hz); k++) if (sp[k] > best) { best = sp[k]; bk = k; }
-      if (!bk) return null;
-      return Math.round(69 + 12 * Math.log2((bk * hz) / 440));
-    };
-    // bass: one note per bass onset, held until the next one (max 1 beat)
-    const bassOn = A.onsets.bass.filter((o) => o.s > 0.15);
-    const bass = [];
-    for (let i = 0; i < bassOn.length; i++) {
-      const s = bassOn[i].t, nx = i + 1 < bassOn.length ? bassOn[i + 1].t : s + spb;
-      const p = peakPitch(s + 0.04, 35, 220);
-      if (p != null) bass.push({ p, v: 0.5 + bassOn[i].s * 0.5, s, e: Math.min(nx, s + spb) - 0.01 });
+  // Builds bass, chords and lead parts from the mix alone, snapped to the beat grid, so
+  // every MIDI look has something musical to draw when no MIDI is loaded.
+  const hzToMidi = (f) => 69 + 12 * Math.log2(f / 440);
+
+  // Harmonic-sum pitch estimate within [lo, hi] Hz on a linear spectrum. Returns { midi, salience }.
+  function pitchOf(mag, sr, size, lo, hi, harmonics = 4) {
+    const hz = sr / size;
+    let best = 0, bf = 0;
+    for (let k = Math.max(1, Math.floor(lo / hz)); k <= Math.ceil(hi / hz) && k < mag.length; k++) {
+      let s = 0;
+      for (let h = 1; h <= harmonics; h++) {
+        const j = Math.round(k * h);
+        if (j >= mag.length) break;
+        s += Math.max(mag[j - 1] || 0, mag[j], mag[j + 1] || 0) / h;
+      }
+      if (s > best) { best = s; bf = k; }
     }
-    // chords: chroma per bar, top 3-4 pitch classes voiced around C4
-    const chords = [], barDur = spb * 4;
-    for (let b = 0; b * barDur + A.beatOffset < A.dur; b++) {
-      const s = b * barDur + A.beatOffset, chroma = new Float32Array(12);
-      for (let k = 0; k < 4; k++) {
-        const sp = magAt(A, s + (k + 0.5) * spb, size);
-        for (let i = Math.floor(130 / hz); i < Math.min(sp.length, 1000 / hz); i++) {
-          const pc = ((Math.round(69 + 12 * Math.log2((i * hz) / 440)) % 12) + 12) % 12;
-          chroma[pc] += sp[i] * sp[i];
+    if (!bf) return null;
+    // parabolic refinement of the fundamental bin
+    const a = mag[bf - 1] || 0, b = mag[bf], c = mag[bf + 1] || 0, d = a - 2 * b + c;
+    const off = d ? 0.5 * (a - c) / d : 0;
+    return { midi: hzToMidi((bf + Math.max(-0.5, Math.min(0.5, off))) * hz), salience: best };
+  }
+
+  const CHORD_SHAPES = [
+    ['', [0, 4, 7]], ['m', [0, 3, 7]], ['7', [0, 4, 7, 10]], ['maj7', [0, 4, 7, 11]], ['m7', [0, 3, 7, 10]],
+  ];
+
+  function fromAudio(A) {
+    const spb = 60 / A.bpm, six = spb / 4, off = A.detectedOffset != null ? A.detectedOffset : A.beatOffset;
+    const q = (t) => off + Math.round((t - off) / six) * six;
+    const dur = A.dur, sr = A.sr;
+
+    // ---- bass: one note per low-end onset, pitch from a harmonic sum over 30–250 Hz ----
+    const bass = [];
+    const bassOn = A.onsets.bass.filter((o) => o.s > 0.1);
+    for (let i = 0; i < bassOn.length; i++) {
+      const s = q(bassOn[i].t);
+      if (bass.length && s - bass[bass.length - 1].s < six * 0.5) continue;
+      const mag = A.fft(bassOn[i].t + 0.07, 8192);
+      const pt = pitchOf(mag, sr, 8192, 30, 130, 4);
+      if (!pt) continue;
+      let p = Math.round(pt.midi);
+      while (p < 28) p += 12;
+      while (p > 52) p -= 12;
+      // the note lasts while the low band holds (at most until the next onset or 2 beats)
+      const lvl0 = A.band(bassOn[i].t + 0.03, 'bass') + A.band(bassOn[i].t + 0.03, 'sub');
+      const next = i + 1 < bassOn.length ? q(bassOn[i + 1].t) : s + spb * 2;
+      let e = s + six;
+      while (e < Math.min(next, s + spb * 2) && A.band(e, 'bass') + A.band(e, 'sub') > lvl0 * 0.45) e += six / 2;
+      e = Math.max(s + six, Math.min(q(e), next));
+      bass.push({ p, v: Math.min(1, 0.45 + bassOn[i].s * 0.6), s, e: e - 0.01 });
+    }
+
+    // ---- chords: chroma per beat, smoothed over half bars, matched to chord templates ----
+    const chords = [];
+    const nBeats = Math.floor((dur - off) / spb);
+    const chromaAt = (t) => {
+      const mag = A.fft(t, 8192), hz = sr / 8192, ch = new Float32Array(12);
+      for (let k = Math.floor(110 / hz); k < Math.min(mag.length, 1800 / hz); k++) {
+        const m = Math.round(hzToMidi(k * hz));
+        ch[((m % 12) + 12) % 12] += mag[k] * mag[k];
+      }
+      return ch;
+    };
+    const beatChroma = [];
+    for (let b = 0; b < nBeats; b++) beatChroma.push(chromaAt(off + (b + 0.5) * spb));
+    const seg = [];
+    for (let b = 0; b + 1 < nBeats; b += 2) {
+      const ch = new Float32Array(12);
+      for (let k = 0; k < 12; k++) ch[k] = beatChroma[b][k] + beatChroma[b + 1][k];
+      let norm = Math.hypot(...ch);
+      if (norm < 1e-9) { seg.push(null); continue; }
+      let best = null;
+      for (let root = 0; root < 12; root++) {
+        for (const [name, iv] of CHORD_SHAPES) {
+          const tpl = new Float32Array(12);
+          iv.forEach((x, i) => { tpl[(root + x) % 12] = i === 0 ? 1 : i === 3 ? 0.55 : 0.8; });
+          let dot = 0; for (let k = 0; k < 12; k++) dot += ch[k] * tpl[k];
+          const score = dot / (norm * Math.hypot(...tpl)) - (iv.length === 4 ? 0.02 : 0);
+          if (!best || score > best.score) best = { score, root, iv, name };
         }
       }
-      const order = [...chroma.keys()].sort((a, c) => chroma[c] - chroma[a]);
-      const top = order.slice(0, 4).filter((pc) => chroma[pc] > chroma[order[0]] * 0.25);
-      for (const pc of top) chords.push({ p: 60 + pc - (pc > 7 ? 12 : 0), v: 0.7, s, e: s + barDur - 0.02 });
+      seg.push(best && best.score > 0.55 ? best : null);
     }
-    // lead: mid-band onsets with the strongest 300–2000 Hz partial
+    // merge equal neighbours, then voice each chord close above C3
+    for (let i = 0; i < seg.length; i++) {
+      const c = seg[i];
+      if (!c) continue;
+      let j = i;
+      while (j + 1 < seg.length && seg[j + 1] && seg[j + 1].root === c.root && seg[j + 1].name === c.name) j++;
+      const s = off + i * 2 * spb, e = off + (j + 1) * 2 * spb - 0.02;
+      const root = 48 + c.root;
+      for (const x of c.iv) chords.push({ p: root + x, v: 0.7, s, e });
+      i = j;
+    }
+
+    // ---- lead: predominant 250–1400 Hz pitch on the 16th grid, merged into notes ----
     const lead = [];
-    const hits = A.onsets.hit.filter((o) => o.s > 0.2);
-    for (let i = 0; i < hits.length; i++) {
-      const s = hits[i].t, nx = i + 1 < hits.length ? hits[i + 1].t : s + spb / 2;
-      const p = peakPitch(s + 0.03, 300, 2000);
-      if (p != null) lead.push({ p, v: hits[i].s, s, e: Math.min(nx, s + spb) - 0.01 });
+    const steps = Math.floor((dur - off) / six);
+    const track = [];
+    for (let i = 0; i < steps; i++) {
+      const t = off + (i + 0.5) * six;
+      const mag = A.fft(t, 4096);
+      const pt = pitchOf(mag, sr, 4096, 250, 1400, 3);
+      track.push(pt ? { m: pt.midi, s: pt.salience } : null);
     }
-    return [makePart(bass, 'bass', 'bass', 'audio'), makePart(chords, 'chords', 'chords', 'audio'), makePart(lead, 'lead', 'lead', 'audio')]
+    const sal = track.filter(Boolean).map((x) => x.s).sort((a, b) => a - b);
+    const thr = sal.length ? sal[Math.floor(sal.length * 0.6)] : Infinity;
+    const hitSet = new Set(A.onsets.hit.map((o) => Math.round((o.t - off) / six)));
+    let cur = null;
+    for (let i = 0; i < steps; i++) {
+      const x = track[i];
+      const voiced = x && x.s >= thr && Math.abs(x.m - Math.round(x.m)) < 0.35;
+      const p = voiced ? Math.round(x.m) : null;
+      const t = off + i * six;
+      if (cur && (p === null || p !== cur.p || hitSet.has(i))) { cur.e = t - 0.01; if (cur.e - cur.s >= six * 0.9) lead.push(cur); cur = null; }
+      if (p !== null && !cur) cur = { p, v: 0.75, s: t, e: t + six };
+    }
+    if (cur) { cur.e = off + steps * six; lead.push(cur); }
+    // keep the lead in a melodic range and drop isolated one-step blips between longer notes
+    const leadClean = lead.filter((n, i) => n.p >= 55 && n.p <= 90 && !(n.e - n.s < six * 1.2 && lead[i - 1] && lead[i + 1] && lead[i - 1].p === lead[i + 1].p));
+
+    return [makePart(bass, 'bass', 'bass', 'audio'), makePart(chords, 'chords', 'chords', 'audio'), makePart(leadClean, 'lead', 'lead', 'audio')]
       .filter((p) => p.notes.length);
   }
-  function magAt(A, t, size) {
-    // Reuse the analysis log spectrum and spread it back onto linear bins.
-    const n = size / 2, out = new Float32Array(n);
-    const bins = 512, sp = A.spectrum(t, bins, { min: 30, max: 4000, size, smooth: false });
-    for (let i = 0; i < bins; i++) {
-      const f = 30 * Math.pow(4000 / 30, (i + 0.5) / bins), k = Math.round(f / (A.sr / size));
-      if (k < n) out[k] = Math.max(out[k], sp[i]);
+
+  // Finds how far MIDI notes must shift to line up with the audio's attacks. Searches ±1 beat
+  // (the pattern repeats, so larger shifts are ambiguous) and slightly prefers no shift.
+  function align(parts, A) {
+    const onsets = A.onsets.hit.concat(A.onsets.bass).map((o) => o.t).sort((a, b) => a - b);
+    const starts = [];
+    for (const p of parts) for (const n of p.notes) if (n.s < A.dur) starts.push({ t: n.s, w: p.role === 'bass' || p.role === 'drums' ? 1.5 : 1 });
+    if (!onsets.length || !starts.length) return 0;
+    const near = (t) => {
+      let lo = 0, hi = onsets.length - 1;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (onsets[m] < t) lo = m + 1; else hi = m; }
+      return Math.min(Math.abs(onsets[lo] - t), lo ? Math.abs(onsets[lo - 1] - t) : Infinity);
+    };
+    const spb = 60 / A.bpm, sig = 0.025;
+    let best = 0, bestScore = -Infinity;
+    for (let o = -spb; o <= spb; o += 0.005) {
+      let s = 0;
+      for (const n of starts) { const d = near(n.t + o); s += n.w * Math.exp(-(d * d) / (2 * sig * sig)); }
+      s -= Math.abs(o) * starts.length * 0.15;
+      if (s > bestScore) { bestScore = s; best = o; }
     }
-    return out;
+    return Math.round(best * 1000) / 1000;
+  }
+
+  // Returns copies of parts with every note moved by `dt` seconds.
+  function shift(parts, dt) {
+    return parts.map((p) => ({ ...p, _maxLen: undefined, notes: p.notes.map((n) => ({ ...n, s: n.s + dt, e: n.e + dt })) }));
   }
 
   // ---------- queries ----------
@@ -223,5 +324,5 @@
   }
 
   window.Midi = { parseSMF };
-  window.Parts = { fromMidiFile, fromAudio, makePart, inRange, active, chordAt, chordName, guessRole, ROLE_COLORS };
+  window.Parts = { fromMidiFile, fromAudio, align, shift, makePart, inRange, active, chordAt, chordName, guessRole, ROLE_COLORS };
 })();

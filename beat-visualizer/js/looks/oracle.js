@@ -4,7 +4,7 @@
 (function () {
   const ROLE_COL = { bass: '#7a5ce0', chords: '#24a596', lead: '#e5553c', drums: '#e0b24a', other: '#5a9fe0' };
   const colOf = (p) => ROLE_COL[p.role] || p.color || ROLE_COL.other;
-  const gridOff = (S) => (!S.hasMidi && S.A && S.A.beatOffset) || 0;
+  const gridOff = (S) => (S.A && S.A.beatOffset) || 0; // beat grid origin (MIDI offset or detected downbeat)
 
   Looks.register({
     id: 'oracle',

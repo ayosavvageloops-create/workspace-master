@@ -62,7 +62,7 @@
       // page geometry
       const x0 = S.pad * 1.1, x1 = w - S.pad * 1.1;
       const y0 = S.portrait ? h * 0.2 : h * 0.14, y1 = S.portrait ? h * 0.83 : h * 0.86;
-      const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
+      const origin = (S.A && S.A.beatOffset) || 0;
       const pageLen = S.bar * (+opt.page || 4);
       const pageIdx = Math.floor((S.t - origin) / pageLen);
       const pS = origin + pageIdx * pageLen, pE = pS + pageLen;

@@ -130,7 +130,7 @@
       windowChrome(g, S, M, 'MIDI', th);
       const hy = M.y + th + unit * 0.06;
       U.text(g, `${parts.length} layer${parts.length === 1 ? '' : 's'}`, M.box.x, hy, { size: unit * 0.04, font: U.FONT.MONO, weight: 700, color: opt.accent });
-      const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
+      const origin = (S.A && S.A.beatOffset) || 0;
       let lastEnd = 0;
       for (const p of parts) if (p.notes.length) lastEnd = Math.max(lastEnd, p.notes[p.notes.length - 1].e);
       const nBars = Math.max(1, S.hasMidi && lastEnd ? Math.ceil((lastEnd - origin) / S.bar - 0.05) : Math.floor((S.A.dur - origin) / S.bar + 0.25));

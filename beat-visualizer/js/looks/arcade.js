@@ -123,7 +123,7 @@
       const scaleAt = (y) => (y - G.yV) / (G.yHit - G.yV);
 
       // ---- beat lines ----
-      const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
+      const origin = (S.A && S.A.beatOffset) || 0;
       const b0 = Math.ceil((S.t - below - origin) / S.spb), b1 = Math.floor((S.t + look - origin) / S.spb);
       g.lineWidth = Math.max(1, unit * 0.0011);
       for (let b = b0; b <= b1; b++) {

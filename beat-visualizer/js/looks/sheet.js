@@ -150,7 +150,7 @@
         }
       }
 
-      const origin = S.hasMidi ? 0 : (S.A.beatOffset || 0);
+      const origin = (S.A && S.A.beatOffset) || 0;
       let lastEnd = 0;
       for (const p of S.parts) if (p.notes.length) lastEnd = Math.max(lastEnd, p.notes[p.notes.length - 1].e);
       const nBars = Math.max(1, S.hasMidi && lastEnd ? Math.ceil((lastEnd - origin) / S.bar - 0.05) : Math.floor((S.A.dur - origin) / S.bar + 0.25));

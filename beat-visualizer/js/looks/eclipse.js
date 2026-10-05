@@ -87,7 +87,7 @@
       g.restore();
 
       // ---- moon position ----
-      const origin = S.hasMidi ? 0 : (A.beatOffset || 0);
+      const origin = (A && A.beatOffset) || 0;
       let k;
       if (opt.motion === 'loop') k = U.fract((S.t - origin) / (S.bar * 8));
       else if (opt.motion === 'bar') k = U.fract((S.t - origin) / S.bar);

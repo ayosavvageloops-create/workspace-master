@@ -5,7 +5,7 @@
   const ROLE_COL = { bass: '#8f7dff', chords: '#45d4bd', lead: '#ff8b78', drums: '#f2cf63', other: '#7fb2ff' };
   const colOf = (p) => ROLE_COL[p.role] || ROLE_COL.other;
   const WORDS = ['NO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'];
-  const gridOff = (S) => (!S.hasMidi && S.A && S.A.beatOffset) || 0;
+  const gridOff = (S) => (S.A && S.A.beatOffset) || 0; // beat grid origin (MIDI offset or detected downbeat)
 
   Looks.register({
     id: 'stars',
