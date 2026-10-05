@@ -164,8 +164,9 @@
       const hs = { size: unit * 0.0165, font: U.FONT.MONO, color: 'rgba(60,60,55,0.55)', spacing: unit * 0.004 };
       const rest = ' · ' + [`${Math.round(S.bpm)} BPM`, S.meta.key, `${nBars} BARS`, `PAGE ${page + 1}/${pages}`].filter(Boolean).join(' · ');
       const restW = U.textWidth(g, rest, hs);
-      const tw = U.text(g, String(S.meta.title || 'untitled').toUpperCase(), L.x0, hy, { ...hs, max: Math.max(unit * 0.1, L.x1 - L.x0 - restW) });
-      U.text(g, rest, L.x0 + tw, hy, { ...hs, max: L.x1 - L.x0 - tw });
+      const ft = U.fit(g, String(S.meta.title || 'untitled').toUpperCase(), Math.max(unit * 0.1, L.x1 - L.x0 - restW), hs);
+      const tw = U.text(g, ft.str, L.x0, hy, { ...hs, size: ft.size });
+      U.text(g, rest, L.x0 + tw, hy, { ...hs, size: ft.size, max: L.x1 - L.x0 - tw });
 
       const chordPart = S.parts.find((p) => p.role === 'chords');
       const progression = [];

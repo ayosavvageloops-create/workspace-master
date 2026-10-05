@@ -37,7 +37,7 @@ Looks.register({
     U.text(g, S.sub.toUpperCase(), x0, pad + unit * 0.075, { ...tiny, size: unit * 0.0135, max: x1 - x0 });
 
     // layout: everything sits between the header and the handle-safe strip
-    const top = pad + unit * 0.11, bot = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.045, Hb = bot - top, W = x1 - x0;
+    const top = pad + unit * 0.11, bot = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.06, Hb = bot - top, W = x1 - x0;
     let big, meters, chart;
     if (Hb / W >= 0.95) {
       big = { x: x0, y: top + Hb * 0.19, size: Math.min(unit * 0.18, Hb * 0.125, W * 0.3) };

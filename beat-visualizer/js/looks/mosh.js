@@ -218,7 +218,7 @@ Looks.register({
 function mosh_box(S) {
   const { w, h } = S;
   if (!S.opt.letterbox) return { x: 0, y: 0, w, h };
-  if (S.portrait) return { x: 0, y: Math.round(h * 0.125), w, h: Math.round(h * 0.75) };
+  if (S.portrait) { const y = Math.round(h * 0.125); return { x: 0, y, w, h: Math.round(Math.min(h * 0.875, h - S.unit * 0.2) - y) }; }
   return { x: 0, y: Math.round(h * 0.07), w, h: Math.round(h * 0.86) };
 }
 

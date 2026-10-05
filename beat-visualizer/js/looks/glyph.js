@@ -18,8 +18,9 @@ Looks.register({
   prepare(S) {
     const { w, h, opt, seed, unit } = S;
     const box = S.portrait
-      ? { x: Math.round(w * 0.03), y: Math.round(h * 0.142), w: Math.round(w * 0.94), h: Math.round(h * 0.716) }
-      : { x: Math.round(w * 0.2), y: Math.round(h * 0.07), w: Math.round(w * 0.6), h: Math.round(h * 0.86) };
+      ? { x: Math.round(w * 0.03), y: Math.round(h * 0.142), w: Math.round(w * 0.94), h: Math.round(Math.min(h * 0.716, h - unit * 0.2 - h * 0.142)) }
+      : { x: Math.round(w * 0.2), y: Math.round(h * 0.07), w: Math.round(w * 0.6), h: Math.round(h - S.pad * 0.9 - unit * 0.05 - h * 0.07) };
+    // (both keep the frame clear of the core's handle watermark strip)
     const r = U.rng(seed);
 
     // the picture, painted small and blurred up: layered greens, a bright patch, a blossom

@@ -7,8 +7,9 @@
     const avail = x1 - x0 - rw - S.unit * 0.04;
     const rest = ` · ${Math.round(S.bpm)} ${bpmWord}${S.meta.key ? ' · ' + S.meta.key : ''}`;
     const restW = U.textWidth(g, rest, o);
-    const tw = U.text(g, String(S.meta.title || 'untitled'), x0, y, { ...o, max: Math.max(S.unit * 0.08, avail - restW) });
-    U.text(g, rest, x0 + tw, y, { ...o, max: Math.max(1, avail - tw) });
+    const f = U.fit(g, String(S.meta.title || 'untitled'), Math.max(S.unit * 0.08, avail - restW), o);
+    const tw = U.text(g, f.str, x0, y, { ...o, size: f.size });
+    U.text(g, rest, x0 + tw, y, { ...o, size: f.size, max: Math.max(1, avail - tw) });
   }
 
   Looks.register({
@@ -56,7 +57,7 @@
       }
 
       // roll area
-      const x0 = pad, x1 = w - pad, y0 = S.portrait ? h * 0.11 : h * 0.18, y1 = S.portrait ? Math.min(h * 0.9, h - S.unit * 0.2) : Math.min(h * 0.9, h - pad * 0.9 - S.unit * 0.05);
+      const x0 = pad, x1 = w - pad, y0 = S.portrait ? h * 0.11 : h * 0.18, y1 = S.portrait ? Math.min(h * 0.9, h - S.unit * 0.225) : Math.min(h * 0.9, h - pad * 0.9 - S.unit * 0.05);
       let lo = 127, hi = 0;
       for (const p of parts) { lo = Math.min(lo, p.lo); hi = Math.max(hi, p.hi); }
       if (lo > hi) { lo = 36; hi = 84; }

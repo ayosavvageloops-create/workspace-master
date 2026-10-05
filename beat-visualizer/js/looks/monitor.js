@@ -28,11 +28,11 @@
       let p = 0; for (let j = Math.max(0, a); j < Math.min(src.length, b); j += 4) { const v = Math.abs(src[j]); if (v > p) p = v; }
       vals[i] = p; top = Math.max(top, p);
     }
-    g.fillStyle = U.rgba(opt.accent, 0.9);
-    const bw = cw / N;
+    // bars are drawn live in screen space (projected), so the tilted resample never aliases them
+    const bars = [];
     for (let i = 0; i < N; i++) {
       const v = Math.pow(vals[i] / (top || 1), 0.6) * (0.75 + 0.25 * U.hash(i, 9)), hh = Math.max(1, v * wamp);
-      g.fillRect(Math.round(cx0 + i * bw), wcy - hh, Math.max(1, Math.round(bw * 0.4)), hh * 2);
+      bars.push([(cx0 + (i + 0.5) * (cw / N)) / W, (wcy - hh) / H, (wcy + hh) / H]);
     }
     // gap lane
     const gy0 = wy1, gy1 = H * 0.6;
@@ -59,7 +59,7 @@
     g.fillStyle = gl; g.fillRect(0, 0, W, H);
     const tl = g.createLinearGradient(0, 0, 0, H * 0.25); tl.addColorStop(0, 'rgba(255,255,255,0.08)'); tl.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = tl; g.fillRect(0, 0, W, H * 0.25);
-    return { cx0: cx0 / W, cx1: cx1 / W, py0: wy0 / H, py1: sy1 / H };
+    return { cx0: cx0 / W, cx1: cx1 / W, py0: wy0 / H, py1: sy1 / H, bars, barW: (cw / N) * 0.42 };
   }
 
   Looks.register({
@@ -142,6 +142,17 @@
       g.translate(ox, oy); g.scale(sc, sc);
       g.drawImage(C.win, -C.BW / 2, -C.BH / 2);
       const G = C.geo, u = G.cx0 + (G.cx1 - G.cx0) * S.prog;
+      // waveform bars: played part bright, the rest dimmer
+      g.lineWidth = Math.max(1, G.barW);
+      for (const past of [true, false]) {
+        g.beginPath();
+        for (const [bu, v0, v1] of G.bars) {
+          if ((bu <= u) !== past) continue;
+          const a0 = C.proj(bu, v0), a1 = C.proj(bu, v1);
+          g.moveTo(a0[0], a0[1]); g.lineTo(a1[0], a1[1]);
+        }
+        g.strokeStyle = U.rgba(opt.accent, past ? 0.95 : 0.62); g.stroke();
+      }
       const p0 = C.proj(u, G.py0), p1 = C.proj(u, G.py1);
       const lv = A.level(S.t);
       g.strokeStyle = U.rgba(opt.accent, 0.1 + 0.2 * lv); g.lineWidth = S.unit * 0.012;

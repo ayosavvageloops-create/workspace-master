@@ -26,7 +26,7 @@
       const handleTop = (portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.036;
       const fy = wide ? h - pad * 0.9 - unit * 0.012 : handleTop - unit * 0.004;
       const headBot = pad * 0.9 + unit * 0.11, footTop = wide ? h - pad * 0.6 : fy - unit * 0.13;
-      const cx = w / 2, cy = wide ? h * 0.52 : (headBot + footTop) / 2;
+      const cx = w / 2, cy = (headBot + footTop) / 2;
       const R = Math.min(portrait ? unit * 0.33 : unit * 0.36, (footTop - headBot) / 2 / 1.27);
       const bg = U.layer(w, h, (c) => {
         c.fillStyle = S.opt.bg; c.fillRect(0, 0, w, h);
@@ -137,7 +137,7 @@
 
       // header
       const top = pad * 0.9 + unit * 0.05, wide = S.cache.wide;
-      const tMax = wide ? cx - R * 1.3 - pad * 0.9 : w - pad * 1.8;
+      const tMax = w - pad * 1.8;
       U.text(g, S.meta.title || 'untitled', pad * 0.9, top, { size: unit * 0.06, font: U.FONT.PLEX, color: '#f2f2f4', max: tMax });
       U.text(g, `ORACLE · ONE TURN = ${+opt.loop || 4} BARS`, pad * 0.9, top + unit * 0.036, { size: unit * 0.016, font: U.FONT.MONO, color: 'rgba(220,220,230,0.45)', spacing: 1.5, max: tMax });
 

@@ -46,7 +46,9 @@
     const x = portrait ? w * 0.055 : S.pad, ww = w - x * 2;
     const a = { x, y: portrait ? h * 0.03 : S.pad * 0.8, w: ww, h: portrait ? h * 0.092 : h * 0.15 };
     const by = a.y + a.h + unit * 0.016;
-    const b = { x, y: by, w: ww, h: (portrait ? h * 0.8 : h - S.pad * 0.8) - by };
+    // bottom stays clear of the core's handle watermark strip
+    const markTop = (portrait ? h - unit * 0.16 : h - S.pad * 0.9) - unit * 0.035;
+    const b = { x, y: by, w: ww, h: Math.min(portrait ? h * 0.8 : h, markTop - unit * 0.015) - by };
     return { a, b };
   }
 
@@ -110,8 +112,14 @@
 
       // listen bar
       const ty = L.a.y + C.tb + (C.strip.y - L.a.y - C.tb) * 0.68;
-      U.text(g, S.meta.title || 'untitled', L.a.x + u * 0.03, ty, { size: u * 0.036, font: mono, weight: 700, color: ochre });
-      U.text(g, `${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`, L.a.x + L.a.w - u * 0.03, ty, { size: u * 0.019, font: mono, color: '#6d6b66', align: 'right' });
+      // the title shrinks (to 60%) to fit the bar, then is cut with an ellipsis
+      // bpm/key sit in the title bar so the title gets the full width of the bar
+      U.text(g, `${Math.round(S.bpm)} bpm${S.meta.key ? ' · ' + S.meta.key : ''}`, L.a.x + L.a.w - u * 0.03, L.a.y + C.tb * 0.64, { size: u * 0.019, font: mono, color: '#6d6b66', align: 'right', max: L.a.w * 0.4 });
+      const title = S.meta.title || 'untitled', room = L.a.w - u * 0.06;
+      const tOpt = { size: u * 0.036, font: mono, weight: 700, color: ochre };
+      const tw = U.textWidth(g, title, tOpt);
+      if (tw > room) tOpt.size *= Math.max(0.6, room / tw);
+      U.text(g, title, L.a.x + u * 0.03, ty, { ...tOpt, max: room });
       const st = C.strip, pk = C.peaks, N = pk.length;
       const sx = st.x + st.h * 0.6, sw = st.w - st.h * 1.2, cy = st.y + st.h / 2, amp = st.h * 0.36, bw = sw / N, cut = S.prog * N;
       for (let i = 0; i < N; i++) {

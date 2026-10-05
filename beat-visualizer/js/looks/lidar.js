@@ -65,7 +65,12 @@ Looks.register({
     g.drawImage(C.back, 0, 0);
     // ridge positions for now and the recent past (pure function of time)
     const T = Math.round(opt.trail), hist = [];
-    for (let k = 0; k <= T; k++) hist.push(Float32Array.from(A.bands12(S.t - k * 0.09)));
+    // each history slice is a short average (3 samples over 50 ms) so the ridge glides instead of shimmering
+    for (let k = 0; k <= T; k++) {
+      const acc = new Float32Array(12);
+      for (let j = 0; j < 3; j++) { const b = A.bands12(S.t - k * 0.09 - j * 0.025); for (let i = 0; i < 12; i++) acc[i] += b[i] / 3; }
+      hist.push(acc);
+    }
     const bandAt = (arr, u) => { const x = U.clamp(u) * 11, i = Math.floor(x), f = x - i; return arr[i] * (1 - f) + arr[Math.min(11, i + 1)] * f; };
     const sweep = opt.sweep ? U.fract(S.t / (S.spb * 2)) : -1;
     const NB = 8, dim = Array.from({ length: NB }, () => []), lit = Array.from({ length: NB }, () => []), cy = Array.from({ length: NB }, () => []);

@@ -1,6 +1,14 @@
 // eclipse — a black sun with a rippling, spectrum-driven rim on pale paper; a white moon
 // slides across it as the clip (or loop) plays, stepping on chord changes.
 (function () {
+  // "TITLE · 140 BPM · KEY": only the title shrinks / truncates, both parts share one size
+  function footLine(g, S, x, y, max, o) {
+    const rest = ' · ' + [`${Math.round(S.bpm)} BPM`, S.meta.key].filter(Boolean).join(' · ');
+    const f = U.fit(g, String(S.meta.title || '').toUpperCase(), Math.max(S.unit * 0.06, max - U.textWidth(g, rest, o)), o);
+    const tw = U.text(g, f.str, x, y, { ...o, size: f.size });
+    U.text(g, rest, x + tw, y, { ...o, size: f.size, max: Math.max(1, max - tw) });
+  }
+
   Looks.register({
     id: 'eclipse',
     name: 'eclipse',
@@ -143,10 +151,9 @@
       // below the handle strip in portrait; beside it (same baseline) otherwise
       const fy = S.portrait ? h - unit * 0.085 : h - S.pad * 0.9;
       const fs = { size: unit * 0.0165, font: U.FONT.MONO, spacing: unit * 0.004 };
-      const foot = [String(S.meta.title || '').toUpperCase(), `${Math.round(S.bpm)} BPM`, S.meta.key].filter(Boolean).join(' · ');
       const chord = Parts.chordAt(S.parts, S.t).name;
       const cw = chord ? U.text(g, chord, w - S.pad, fy, { ...fs, color: 'rgba(40,42,48,0.45)', align: 'right' }) + unit * 0.04 : 0;
-      U.text(g, foot, S.pad, fy, { ...fs, color: 'rgba(40,42,48,0.55)', max: S.portrait ? w - S.pad * 2 - cw : w / 2 - S.pad - unit * 0.2 });
+      footLine(g, S, S.pad, fy, S.portrait ? w - S.pad * 2 - cw : w / 2 - S.pad - unit * 0.2, { ...fs, color: 'rgba(40,42,48,0.55)' });
     },
   });
 })();

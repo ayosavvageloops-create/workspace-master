@@ -15,6 +15,14 @@
     return out;
   }
 
+  // "TITLE · 140 BPM · KEY": only the title shrinks / truncates, both parts share one size
+  function footLine(g, S, x, y, max, o) {
+    const rest = ' · ' + [`${Math.round(S.bpm)} BPM`, S.meta.key].filter(Boolean).join(' · ');
+    const f = U.fit(g, String(S.meta.title || '').toUpperCase(), Math.max(S.unit * 0.06, max - U.textWidth(g, rest, o)), o);
+    const tw = U.text(g, f.str, x, y, { ...o, size: f.size });
+    U.text(g, rest, x + tw, y, { ...o, size: f.size, max: Math.max(1, max - tw) });
+  }
+
   Looks.register({
     id: 'chart',
     name: 'chart',
@@ -174,11 +182,9 @@
       // footer: below the handle strip in portrait; beside it (same baseline) otherwise
       const fy = S.portrait ? h - unit * 0.085 : h - S.pad * 0.9;
       const fmax = S.portrait ? w - S.pad * 2 : w / 2 - S.pad - unit * 0.2;
-      const foot = [String(S.meta.title || '').toUpperCase(), `${Math.round(S.bpm)} BPM`, S.meta.key].filter(Boolean).join(' · ');
       const fs = { size: unit * 0.0165, font: U.FONT.MONO, spacing: unit * 0.004 };
-      if (S.portrait) U.text(g, foot, S.pad, fy, { ...fs, color: 'rgba(170,185,220,0.6)', max: fmax });
-      else {
-        U.text(g, foot, S.pad, fy, { ...fs, color: 'rgba(170,185,220,0.6)', max: fmax });
+      footLine(g, S, S.pad, fy, fmax, { ...fs, color: 'rgba(170,185,220,0.6)' });
+      if (!S.portrait) {
         U.text(g, S.timeLabel(2), w - S.pad, fy, { ...fs, color: 'rgba(170,185,220,0.45)', align: 'right', max: fmax });
       }
 

@@ -133,7 +133,7 @@ Looks.register({
       const sz = unit * (k === 1 ? 0.0028 : 0.0032) * near * (inBand ? 1.4 : 1);
       let b = k === 2 ? 3 : k === 3 ? 4 : k === 1 ? 1 : k === 4 ? 2 : 0;
       if (inBand) b = 5;
-      if (sz < 2.4) paths[b].rect(sx - sz, sy - sz, sz * 2, sz * 2);
+      if (sz < 3.2) paths[b].rect(sx - sz, sy - sz, sz * 2, sz * 2);
       else { paths[b].moveTo(sx + sz, sy); paths[b].arc(sx, sy, sz, 0, U.TAU); }
     }
     const fills = ['rgba(88,96,86,0.85)', 'rgba(98,98,96,0.9)', 'rgba(150,150,146,0.85)', U.rgba(opt.accent, 0.88), 'rgba(80,90,78,0.9)', U.rgba(opt.accent, 0.95)];
@@ -174,7 +174,7 @@ Looks.register({
 
 function scan_geom(S) {
   const { w, h } = S;
-  const f = S.portrait ? w * 1.5 : h * 1.15;
+  const f = S.portrait ? Math.min(w * 1.5, h * 0.85) : h * 1.15;
   const cy = S.portrait ? h * 0.46 : h * 0.4;
   return { f, cx: w / 2, cy, shadowY: cy + f * 0.41, shadowR: f * 0.3 };
 }

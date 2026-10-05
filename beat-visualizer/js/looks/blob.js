@@ -55,8 +55,9 @@ Looks.register({
     const { w, h, A, opt, unit, cache: C } = S;
     g.drawImage(C.bg, 0, 0, w, h);
     const t = S.t;
-    const cx0 = w / 2, cy0 = S.portrait ? h * 0.5 : h * 0.5;
-    const U2 = S.portrait ? unit * 1.25 : unit * 1.05;
+    const cx0 = w / 2, cy0 = S.portrait ? Math.min(h * 0.5, h - unit * 0.62) : h * 0.47;
+    const U2 = S.portrait ? Math.min(unit * 1.25, h * 0.68) : unit * 1.05;
+    const yMax = S.portrait ? h - unit * 0.2 : h - S.pad * 0.9 - unit * 0.045; // above the handle strip
     const n = Math.round(opt.count);
 
     // balls at time t (pure function of t: drift on slow noise, size from bands)
@@ -70,7 +71,7 @@ Looks.register({
       balls.push({
         // drift on slow noise, kept inside the frame (reticles included)
         x: U.clamp(cx0 + U2 * (b.x * 1.15 + b.ax * U.vnoise(b.ph, t * 0.16)), m, w - m),
-        y: U.clamp(cy0 + U2 * (b.y + b.ay * U.vnoise(b.ph + 31, t * 0.14)), m, h - m),
+        y: U.clamp(cy0 + U2 * (b.y + b.ay * U.vnoise(b.ph + 31, t * 0.14)), m, yMax - br * 1.3),
         r: br,
         // wobble harmonics (2nd, 3rd, 4th), animated and pushed by level
         a2: opt.wobble * (0.06 + 0.1 * e) * U.vnoise(b.ph + 7, t * 0.5),
@@ -80,7 +81,7 @@ Looks.register({
       });
     }
     // satellite: a tiny drop below the cluster
-    const sat = { x: cx0 + U2 * (0.03 + 0.03 * U.vnoise(5.5, t * 0.2)), y: cy0 + U2 * (0.36 + 0.02 * U.vnoise(8.5, t * 0.2)),
+    const sat = { x: cx0 + U2 * (0.03 + 0.03 * U.vnoise(5.5, t * 0.2)), y: Math.min(yMax - unit * 0.03, cy0 + U2 * (0.36 + 0.02 * U.vnoise(8.5, t * 0.2))),
       r: U2 * 0.02 * (0.8 + 0.4 * (0.5 * A.pulse(t, 'high', 0.25) + 0.5 * A.pulse(t - 0.05, 'high', 0.25))), a2: 0.1, a3: 0, a4: 0, p2: t, p3: 0, p4: 0 };
     balls.push(sat);
     for (const b of balls) {

@@ -14,14 +14,28 @@ Looks.register({
     { key: 'ch2', label: 'CH2 (rest of mix)', type: 'toggle' },
     { key: 'persistence', label: 'Persistence', type: 'range', min: 0, max: 8, step: 1 },
   ],
+  prepare(S) {
+    // smooth peak envelopes (20 Hz) for the auto-gain, so the trace height never jumps between frames
+    const A = S.A, RATE = 20;
+    const env = (src) => {
+      const n = Math.ceil(A.dur * RATE) + 1, hop = A.sr / RATE, blk = new Float32Array(n), mx = new Float32Array(n), out = new Float32Array(n);
+      for (let f = 0; f < n; f++) { let p = 0; const e = Math.min(src.length, (f + 1) * hop); for (let i = Math.floor(f * hop); i < e; i += 4) { const v = Math.abs(src[i]); if (v > p) p = v; } blk[f] = p; }
+      for (let f = 0; f < n; f++) { let m = 0; for (let j = Math.max(0, f - 8); j <= Math.min(n - 1, f + 8); j++) m = Math.max(m, blk[j]); mx[f] = m; }
+      for (let f = 0; f < n; f++) { let sm = 0, c = 0; for (let j = Math.max(0, f - 6); j <= Math.min(n - 1, f + 6); j++) { sm += mx[j]; c++; } out[f] = sm / c; }
+      return out;
+    };
+    return { RATE, lp: env(A.lowpassed()), m: env(A.M) };
+  },
   draw(g, S) {
     const { w, h, pad, A, opt } = S;
+    const C = S.cache;
+    const envAt = (arr, t) => { const f = U.clamp(t * C.RATE, 0, arr.length - 1), i = Math.floor(f), j = Math.min(arr.length - 1, i + 1); return arr[i] + (arr[j] - arr[i]) * (f - i); };
     const ink = opt.accent;
     g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
 
     // header
-    U.text(g, S.meta.title, pad, pad + S.unit * 0.04, { size: S.unit * 0.042, font: U.FONT.SANS, weight: 500, color: '#f2f2ee' });
-    U.text(g, S.sub, pad, pad + S.unit * 0.075, { size: S.unit * 0.017, font: U.FONT.MONO, color: 'rgba(255,255,255,0.32)', spacing: 3 });
+    U.text(g, S.meta.title, pad, pad + S.unit * 0.04, { size: S.unit * 0.042, font: U.FONT.SANS, weight: 500, color: '#f2f2ee', max: w - pad * 2 });
+    U.text(g, S.sub, pad, pad + S.unit * 0.075, { size: S.unit * 0.017, font: U.FONT.MONO, color: 'rgba(255,255,255,0.32)', spacing: 3, max: w - pad * 2 });
 
     // screen
     const sx = pad * 0.35, sw = w - sx * 2;
@@ -48,11 +62,13 @@ Looks.register({
     const lp = A.lowpassed(), sr = A.sr, M = A.M, cy = sy + sh / 2, amp = sh * 0.42 * opt.gain;
     const N = 700, span = (opt.span / 1000) * sr;
     const trace = (tt, src, scale, color, alpha, width) => {
-      let i0 = Math.floor(tt * sr);
-      for (let k = 0; k < sr * 0.05 && i0 > 1; k++, i0--) if (lp[i0 - 1] < 0 && lp[i0] >= 0) break;
-      // auto-gain: fit the window's peak, but never amplify near-silence past 4x
-      let pk = 0;
-      for (let i = 0; i < N; i += 3) { const j = Math.floor(i0 + (i / (N - 1)) * span); if (j < src.length) pk = Math.max(pk, Math.abs(src[j])); }
+      // trigger: rising edge of the low end through a small positive level (ignores noise in quiet parts)
+      const lvl = 0.06 * envAt(C.lp, tt), start = Math.floor(tt * sr);
+      let i0 = start;
+      for (let k = 0; k < sr * 0.05 && i0 > 1; k++, i0--) if (lp[i0 - 1] < lvl && lp[i0] >= lvl) break;
+      if (start - i0 >= sr * 0.05 - 1) i0 = start; // no edge found: free-run
+      // auto-gain from a pre-smoothed envelope; never amplify near-silence past 4x
+      const pk = envAt(src === lp ? C.lp : C.m, tt);
       scale *= 0.8 / Math.max(pk, 0.2);
       g.beginPath();
       for (let i = 0; i < N; i++) {

@@ -1,13 +1,14 @@
 (function () {
 // content column is laid out in local units 1000 wide; this maps it onto the canvas
 function layout(S) {
-  const { w, h, pad } = S, gap = 70;
-  if (S.portrait) {
-    const cw = Math.min(w * 0.72, (h * 0.86) / 1.6);
-    return { cw, gap, ox: (w - cw) / 2, oy: h * 0.455 - (cw * 1.58) / 2, cardDx: 0, cardDy: 0 };
-  }
-  const cw = Math.min((h * 0.84) / 0.92, (w - pad * 2 - gap * 0.5) / 2.07);
-  return { cw, gap, ox: (w - cw * (2 + gap / 1000)) / 2, oy: h / 2 - (cw * 0.92) / 2, cardDx: 1000 + gap, cardDy: 72 - 921 };
+  // fit either the stacked print layout (1000 × 1600 local units) or the two-column one
+  // (2070 × 920) into the area above the handle-safe strip, whichever ends up larger
+  const { w, h, pad, unit } = S, gap = 70;
+  const top = pad * 0.8, bot = (S.portrait ? h - unit * 0.16 : h - pad * 0.9) - unit * 0.045;
+  const avW = w - pad * 2, avH = bot - top;
+  const cwP = Math.min(w * 0.72, avH / 1.6, avW), cwL = Math.min(avH / 0.92, avW / 2.07);
+  if (cwP >= cwL * 0.95) return { cw: cwP, gap, ox: (w - cwP) / 2, oy: top + (avH - cwP * 1.58) / 2 + cwP * 0.02, cardDx: 0, cardDy: 0 };
+  return { cw: cwL, gap, ox: (w - cwL * (2 + gap / 1000)) / 2, oy: top + (avH - cwL * 0.9) / 2 + cwL * 0.03, cardDx: 1000 + gap, cardDy: 72 - 921 };
 }
 // campaign — the beat presented as a release: a print layout with a 12" sleeve, a spinning
 // record, three crops (spectrum / flat / halftone), the inner tracklist and the back credits.
@@ -55,7 +56,7 @@ Looks.register({
       g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = gs; g.beginPath(); g.arc(0, 0, R - 3, 0, U.TAU); g.stroke();
       g.fillStyle = opt.label; g.beginPath(); g.arc(0, 0, R * 0.48, 0, U.TAU); g.fill();
       g.fillStyle = '#111'; g.beginPath(); g.arc(0, 0, R * 0.035, 0, U.TAU); g.fill();
-      U.text(g, `${cat} · A`, 0, R * 0.2, { size: R * 0.15, font: U.FONT.SANS, weight: 500, color: '#1a0d0a', align: 'center' });
+      U.text(g, `${cat} · A`, 0, R * 0.2, { size: R * 0.15, font: U.FONT.SANS, weight: 500, color: '#1a0d0a', align: 'center', max: R * 0.8 });
       U.text(g, 'SIDE A · 33⅓', 0, -R * 0.24, { size: R * 0.055, font: U.FONT.SANS, weight: 600, color: 'rgba(26,13,10,0.6)', align: 'center', spacing: R * 0.006 });
     });
     // static sheen over the grooves
@@ -86,9 +87,9 @@ Looks.register({
     const cap = (str, x, y) => U.text(g, str, x, y, { size: 15, font: U.FONT.SANS, weight: 500, color: grey, spacing: 2.2 });
 
     // header
-    U.text(g, `"${title.toUpperCase()}"`, 0, 30, { size: 36, font: U.FONT.SANS, weight: 700, color: ink, spacing: 2 });
-    const hx = S.portrait ? 1000 : 2000 + gap;
-    U.text(g, S.sub, hx, 30, { size: 30, font: U.FONT.SANS, color: grey, align: 'right' });
+    const hx = cardDx ? 2000 + gap : 1000;
+    const subW = U.text(g, S.sub, hx, 30, { size: 30, font: U.FONT.SANS, color: grey, align: 'right', max: hx * 0.4 });
+    U.text(g, `"${title.toUpperCase()}"`, 0, 30, { size: 36, font: U.FONT.SANS, weight: 700, color: ink, spacing: 2, max: hx - subW - 40 });
     g.fillStyle = 'rgba(20,20,20,0.35)'; g.fillRect(0, 54, hx, px);
 
     // ---- sleeve ----
@@ -102,7 +103,7 @@ Looks.register({
     const phx = sx + ss * (0.04 + 0.92 * S.prog);
     g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(phx - 10, sy, 1.5 * px, ss);
     g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(phx, sy, 2 * px, ss);
-    U.text(g, opt.album || 'untitled', sx + 34, sy + ss * 0.84, { size: 104, font: U.FONT.SERIF, color: '#fff', spacing: -3 });
+    U.text(g, opt.album || 'untitled', sx + 34, sy + ss * 0.84, { size: 104, font: U.FONT.SERIF, color: '#fff', spacing: -3, max: ss - 70 });
     U.text(g, 'SIDE A', sx + 36, sy + ss * 0.95, { size: 17, font: U.FONT.SANS, weight: 700, color: '#fff', spacing: 2 });
     g.restore();
     cap('12" SLEEVE · 1/1', 0, 643);
@@ -140,7 +141,7 @@ Looks.register({
     {
       const x0 = 340, x1 = 656;
       g.fillStyle = opt.label; g.fillRect(x0, cy0, x1 - x0, ch);
-      U.text(g, title, (x0 + x1) / 2, cy0 + ch * 0.6, { size: 64, font: U.FONT.SERIF, color: '#2a0c06', align: 'center' });
+      U.text(g, title, (x0 + x1) / 2, cy0 + ch * 0.6, { size: 64, font: U.FONT.SERIF, color: '#2a0c06', align: 'center', max: x1 - x0 - 36 });
     }
     // halftone: diagonal bands of dot sizes, slowly drifting with the beat
     {
@@ -170,32 +171,31 @@ Looks.register({
     {
       const x0 = 0, x1 = 495;
       g.fillStyle = '#f0f0ec'; g.fillRect(x0, ky, x1 - x0, kh);
-      U.text(g, `SIDE A · ${(opt.album || '').toUpperCase()}`, x0 + 30, ky + 46, { size: 17, font: U.FONT.SANS, weight: 700, color: ink, spacing: 2 });
+      U.text(g, `SIDE A · ${(opt.album || '').toUpperCase()}`, x0 + 30, ky + 46, { size: 17, font: U.FONT.SANS, weight: 700, color: ink, spacing: 2, max: x1 - x0 - 60 });
       const n = C.tracks.length, lh = Math.min(44, 470 / Math.max(1, n));
       C.tracks.forEach((name, i) => {
         const y = ky + 100 + i * lh, on = i === C.cur;
         const txt = `A${i + 1}.  ${name}`;
-        U.text(g, txt, x0 + 30, y, { size: Math.min(33, lh * 0.8), font: U.FONT.SANS, weight: on ? 700 : 400, color: ink });
+        const tw = U.text(g, txt, x0 + 30, y, { size: Math.min(33, lh * 0.8), font: U.FONT.SANS, weight: on ? 700 : 400, color: ink, max: x1 - x0 - 50 });
         if (on) {
           g.fillStyle = opt.label; g.beginPath(); g.arc(x0 + 16, y - 10, 5, 0, U.TAU); g.fill();
-          const tw = U.measure(g, txt, Math.min(31, lh * 0.84), U.FONT.SANS, 700);
           // the underline fills with the clip's progress
           g.fillStyle = 'rgba(20,20,20,0.25)'; g.fillRect(x0 + 30, y + 9, x1 - 70, px * 1.2);
           g.fillStyle = opt.label; g.fillRect(x0 + 30, y + 8, Math.max(tw * 0.4, (x1 - 70) * S.prog), 3);
         }
       });
-      U.text(g, `${C.cat}-A  ·  MATRIX`, x0 + 30, ky + kh - 22, { size: 14, font: U.FONT.SANS, weight: 500, color: grey, spacing: 2 });
+      U.text(g, `${C.cat}-A  ·  MATRIX`, x0 + 30, ky + kh - 22, { size: 14, font: U.FONT.SANS, weight: 500, color: grey, spacing: 2, max: x1 - x0 - 60 });
     }
     // back: credits
     {
       const x0 = 515, x1 = 1000;
       g.fillStyle = '#141416'; g.fillRect(x0, ky, x1 - x0, kh);
       const L = A.lufs, gain = -14 - L.integrated, tp = Math.min(-1, L.truePeak + gain);
-      const ln = { size: 21, font: U.FONT.SANS, color: '#c9c9c6' };
+      const ln = { size: 21, font: U.FONT.SANS, color: '#c9c9c6', max: x1 - x0 - 52 };
       U.text(g, S.sub, x0 + 26, ky + 40, ln);
       U.text(g, 'Loudness −14.0 LUFS', x0 + 26, ky + 72, ln);
       U.text(g, `True peak ${tp.toFixed(1).replace('-', '−')} dBTP`, x0 + 26, ky + 104, ln);
-      U.text(g, C.cat, x0 + 26, ky + 152, { size: 38, font: U.FONT.SANS, color: '#9b9b98' });
+      U.text(g, C.cat, x0 + 26, ky + 152, { size: 38, font: U.FONT.SANS, color: '#9b9b98', max: x1 - x0 - 52 });
       let bx = x0 + 26;
       g.fillStyle = '#e8e8e4';
       for (let i = 0; i < C.bars.length; i += 2) {
