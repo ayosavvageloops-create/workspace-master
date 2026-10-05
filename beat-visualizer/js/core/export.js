@@ -78,7 +78,15 @@
     }
   }
 
+  // Hosted as a claude.ai artifact the page cannot download directly; it asks the
+  // viewer through the `downloads` capability instead (null when not available).
+  async function hostDownloads() {
+    if (!window.claude || !window.claude.use) return null;
+    try { return await window.claude.use('downloads'); } catch (e) { return null; }
+  }
+
   async function saveTarget(filename) {
+    if (window.claude) return null; // inside an artifact frame the file picker is refused
     if (window.showSaveFilePicker) {
       try {
         return await window.showSaveFilePicker({ suggestedName: filename, types: [{ description: 'Video', accept: { 'video/mp4': ['.mp4'] } }] });
@@ -91,6 +99,12 @@
   async function save(handle, blob, filename) {
     if (handle && handle !== 'cancel') {
       const ws = await handle.createWritable(); await ws.write(blob); await ws.close();
+      return;
+    }
+    const dl = await hostDownloads();
+    if (dl) {
+      try { await dl.save({ filename, data: blob }); }
+      catch (e) { if (e && e.code === 'declined') return; throw new Error(e && e.message ? e.message : 'The download was refused.'); }
       return;
     }
     const a = document.createElement('a');

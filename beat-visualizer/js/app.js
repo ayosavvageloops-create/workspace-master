@@ -84,7 +84,7 @@
     let added = [];
     for (const f of files) {
       try { const ps = Parts.fromMidiFile(await f.arrayBuffer(), f.name); added = added.concat(ps); if (ps.bpm) state.parts.bpm = ps.bpm; }
-      catch (e) { alert(`${f.name}: ${e.message}`); }
+      catch (e) { $('beatStatus').textContent = `${f.name}: ${e.message}`; }
     }
     if (!added.length) return;
     const midi = state.parts.filter((p) => p.source === 'midi');
@@ -375,9 +375,10 @@
   if (params.get('look')) state.look = params.get('look');
   // Canvas text never triggers webfont loading, so load every face up front.
   const fontsReady = Promise.all([...document.fonts].map((f) => f.load().catch(() => null))).then(() => document.fonts.ready);
-  const ready = params.get('demo') ? fontsReady.then(loadDemo).then(() => {
+  // Open in a working state: the demo beat loads unless a beat was already dropped.
+  const ready = fontsReady.then(() => (state.buffer ? null : loadDemo())).then(() => {
     if (params.get('nomidi')) { state.parts = Parts.fromAudio(state.A); bump(); }
-  }) : Promise.resolve();
+  });
   window.__app = {
     state, ready, ctx, Looks,
     // Renders `look` at clip time `ct` at full resolution, returns a PNG data URL.
