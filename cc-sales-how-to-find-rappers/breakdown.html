@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>CC Sales — How to Find Rappers: разбор звонка</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  :root {
+    --ink: #1b1f24; --muted: #5b6470; --line: #d9dee5; --accent: #3a5bd9;
+    --accent-soft: #eef2ff; --warn: #b4540a; --warn-soft: #fff5e8; --ok: #1f7a4d; --ok-soft: #eaf7ef;
+    --code-bg: #f5f6f8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "DejaVu Sans", "Liberation Sans", sans-serif; color: var(--ink); background: #fff;
+         font-size: 10pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 22pt; line-height: 1.2; margin: 0 0 6pt; }
+  h2 { font-size: 15pt; margin: 22pt 0 8pt; padding-bottom: 4pt; border-bottom: 2px solid var(--accent); break-after: avoid; }
+  h3 { font-size: 12pt; margin: 16pt 0 6pt; break-after: avoid; }
+  h4 { font-size: 10.5pt; margin: 12pt 0 4pt; break-after: avoid; color: var(--accent); }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 18pt; }
+  li { margin: 0 0 3pt; }
+  .ts { display: inline-block; font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; color: var(--accent);
+        background: var(--accent-soft); border-radius: 3px; padding: 0 4px; margin-right: 4px; }
+  .who { font-weight: bold; }
+  .muted { color: var(--muted); }
+  .cover { page-break-after: always; padding-top: 30mm; }
+  .cover .sub { font-size: 12pt; color: var(--muted); margin-bottom: 18pt; }
+  .meta { border: 1px solid var(--line); border-radius: 6px; padding: 10pt 12pt; margin: 14pt 0; }
+  .meta table td { padding: 2pt 10pt 2pt 0; vertical-align: top; }
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0 10pt; font-size: 9pt; }
+  th, td { border: 1px solid var(--line); padding: 4pt 6pt; text-align: left; vertical-align: top; }
+  th { background: #f2f4f7; }
+  .meta table td, .meta table { border: none; font-size: 10pt; }
+  pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8pt; line-height: 1.42; background: var(--code-bg);
+        border: 1px solid var(--line); border-radius: 5px; padding: 8pt 10pt; white-space: pre-wrap; word-break: break-word;
+        margin: 4pt 0 10pt; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; background: var(--code-bg); padding: 0 3px; border-radius: 3px; }
+  .box { border-radius: 6px; padding: 8pt 11pt; margin: 8pt 0 10pt; break-inside: avoid; }
+  .box.key { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+  .box.warn { background: var(--warn-soft); border-left: 4px solid var(--warn); }
+  .box.ok { background: var(--ok-soft); border-left: 4px solid var(--ok); }
+  .box p:last-child, .box ul:last-child, .box ol:last-child { margin-bottom: 0; }
+  .label { font-weight: bold; text-transform: uppercase; font-size: 8pt; letter-spacing: .04em; display: block; margin-bottom: 3pt; }
+  figure { margin: 6pt 0 12pt; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid var(--line); border-radius: 4px; display: block; }
+  figure.half img { width: 70%; margin: 0 auto; }
+  figcaption { font-size: 8.5pt; color: var(--muted); margin-top: 3pt; }
+  .toc ol { padding-left: 16pt; }
+  .toc li { margin-bottom: 2pt; }
+  .prompt-title { font-weight: bold; margin: 10pt 0 2pt; }
+  .steps > li { margin-bottom: 6pt; }
+  .pb { page-break-before: always; }
+  .two { display: flex; gap: 10pt; }
+  .two > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <h1>CC SALES — How to Find Rappers</h1>
+  <div class="sub">Полный пошаговый разбор группового звонка Chart Chasers: кто что показывал, зачем, все методы и все промпты</div>
+
+  <div class="meta">
+    <table>
+      <tr><td class="muted">Запись</td><td>Fathom, 25 октября 2025, ~78 минут</td></tr>
+      <tr><td class="muted">Ведущий</td><td><b>wayvbeats</b> (Aaron) — ментор программы, продаёт биты на созвонах</td></tr>
+      <tr><td class="muted">Главный гость</td><td><b>Joe</b> — ведёт продакшн-сервис <i>Silverline</i> (2 продюсера, работают в основном с певцами), отвечает за лидогенерацию</td></tr>
+      <tr><td class="muted">Активные участники</td><td>JR Valenti Crane, Nate, Segway, maxmc (Max), Ekow Aggrey (KO), Evan Figueroa, Yannis, Vanity и др. (всего 16 человек)</td></tr>
+      <tr><td class="muted">Тема</td><td>Как находить рэперов/артистов, которым реально продать биты, и как с ними начинать диалог</td></tr>
+    </table>
+  </div>
+
+  <div class="box key">
+    <span class="label">Как собран документ</span>
+    <p>Взят автоматический транскрипт Fathom, а всё, что показывали на экране (сайты, таблицы, поисковые запросы, промпты), вручную считано с кадров видео. Демонстрация Joe (24:12–41:00) на записи почти не слышна из-за связи, поэтому этот блок восстановлен <b>с экрана</b>: промпты приведены дословно, в оригинале на английском, с переводом.</p>
+    <p>Пометка <span class="ts">≈12:30</span> — примерный тайм-код в записи.</p>
+  </div>
+
+  <div class="toc">
+    <h3>Содержание</h3>
+    <ol>
+      <li>Коротко: главное из звонка</li>
+      <li>Хронология звонка</li>
+      <li>Блок wayvbeats: кого искать и 5 способов найти артистов</li>
+      <li>Q&amp;A: как монтировать reels</li>
+      <li>Блок Joe: автоматическая лидогенерация (Google → Apify → ChatGPT → Grok → авто-DM)</li>
+      <li>Все промпты дословно (с переводом)</li>
+      <li>Вопросы участников и советы по контенту</li>
+      <li>Организационное и новости группы</li>
+      <li>Пошаговый план «сделать после звонка»</li>
+      <li>Глоссарий</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ 1. TL;DR ============ -->
+<h2>1. Коротко: главное из звонка</h2>
+<ol>
+  <li><b>Продажа решается выбором человека, а не качеством битов.</b> Ищи артистов, у которых есть деньги, которые делают музыку в твоём стиле и регулярно выпускают треки (значит, постоянно покупают биты).</li>
+  <li><b>Лучший клиент — артист с деньгами, но слабой музыкой.</b> Ему сразу видна разница от твоих битов и сведения, поэтому ему можно продавать пакет за $1–2K, а не лизинг за $30.</li>
+  <li><b>Методы wayvbeats:</b> Spotify-плейлист как генератор похожих артистов; «увод» клиентов из комментариев под чужими type beat’ами; reels с CTA + ManyChat; опросы в сторис; учёт лидов в Google-таблице.</li>
+  <li><b>Аутрич должен быть «экстра»:</b> 2–3 минуты на изучение артиста, конкретный комплимент + вопрос. Фирменный вопрос: <i>«Why don’t you have more monthly listeners, bro?»</i></li>
+  <li><b>Система Joe:</b> Google-поиск с операторами <code>site:instagram.com … -inurl:/p/ -inurl:/explore/</code> → прогон через Apify (Google Search Results Scraper) → CSV → чистка в ChatGPT по промпту → Grok пишет персональный комплимент каждому → авто-рассылка в Instagram (AutoIGDM) → ассистентка бронирует discovery-звонки. Результат у Joe: 9–12 discovery-сессий в неделю, «99% стратегии».</li>
+  <li><b>Фильтр по деньгам через географию:</b> ищи артистов в богатых районах (пример: Greenwich, Connecticut; Beverly Hills; Monaco). Список богатых районов можно спросить у ChatGPT.</li>
+  <li><b>Тёплые лиды лучше холодных:</b> люди, которые уже подписаны на тебя, конвертируются легче. Контент «нетворкает за тебя на автопилоте».</li>
+</ol>
+
+<!-- ============ 2. TIMELINE ============ -->
+<h2>2. Хронология звонка</h2>
+<table>
+  <tr><th style="width:16%">Время</th><th style="width:18%">Кто</th><th>Что происходит</th></tr>
+  <tr><td>0:00–3:04</td><td>все</td><td>Сбор, разговоры (Thai Red Bull и т.п.). Можно пропустить.</td></tr>
+  <tr><td>3:04</td><td>wayvbeats</td><td>Почему важно, <i>кому</i> продаёшь. Кейс Fanny 808.</td></tr>
+  <tr><td>≈4:50</td><td>wayvbeats</td><td>Экран: <b>Spotify-метод</b> (артист LEE., плейлист BLUETOOTH, рекомендации).</td></tr>
+  <tr><td>≈8:45</td><td>wayvbeats</td><td>Экран: Google-таблица <b>GREAT ARTIST LEADS</b>, пример «богатого, но слабого» артиста.</td></tr>
+  <tr><td>≈11:00</td><td>wayvbeats</td><td>Метод «украсть клиентов» из комментариев под type beat’ами.</td></tr>
+  <tr><td>≈12:30</td><td>wayvbeats</td><td>Живой пример аутрича артисту <i>kampaign.wo</i>.</td></tr>
+  <tr><td>≈16:30</td><td>wayvbeats</td><td>Inbound: reels с CTA + ManyChat, пример переписки.</td></tr>
+  <tr><td>≈17:45</td><td>wayvbeats</td><td>Опросы в Instagram-сторис для сбора лидов.</td></tr>
+  <tr><td>19:15</td><td>JR → wayvbeats</td><td>Q&amp;A: как монтировать «journey»-reels (экран: CapCut).</td></tr>
+  <tr><td>24:12</td><td>Joe</td><td>Старт блока Joe. Экран: доска Miro «How to leadsource artist’s like a pro producer».</td></tr>
+  <tr><td>27:39</td><td>Joe</td><td>Apify → Google Search Results Scraper, запуск поиска.</td></tr>
+  <tr><td>29:45</td><td>Joe</td><td>Календарь: загрузка discovery-звонками.</td></tr>
+  <tr><td>30:28</td><td>wayvbeats, Joe</td><td>Фильтр по богатым районам (геолокация).</td></tr>
+  <tr><td>32:58</td><td>wayvbeats</td><td>Идея: голосовые в Instagram без записи (из платного шаблона агентства).</td></tr>
+  <tr><td>≈33:40</td><td>Joe</td><td>Экспорт CSV, промпт очистки в ChatGPT (проект «Silverline production project»), AutoIGDM.</td></tr>
+  <tr><td>35:52</td><td>Joe</td><td>Grok + промпт-SOP персональных комплиментов.</td></tr>
+  <tr><td>37:18</td><td>Joe</td><td>Клиентка из этой системы: $1 400.</td></tr>
+  <tr><td>39:31–42:00</td><td>wayvbeats, Nate</td><td>Призыв внедрить сразу; идея с Suno под каждого артиста.</td></tr>
+  <tr><td>42:07</td><td>wayvbeats, JR</td><td>ICP: христианские рэперы (опыт JR).</td></tr>
+  <tr><td>44:49</td><td>JR</td><td>Контент под плейсменты: продюсерам — семплы.</td></tr>
+  <tr><td>48:21</td><td>Segway, Max</td><td>Email-база с YouTube → лид-магнит → DM.</td></tr>
+  <tr><td>52:01</td><td>Max</td><td>Как применить к продаже лупов; YouTube Shorts vs Instagram.</td></tr>
+  <tr><td>1:01:31–1:17:40</td><td>все</td><td>Dropbox Chart Chasers, ежемесячные «wins», менеджмент, Apple Music, лупы под Gunna.</td></tr>
+</table>
+
+<!-- ============ 3. WAYV ============ -->
+<h2 class="pb">3. Блок wayvbeats: кого искать и 5 способов найти артистов</h2>
+
+<h3>3.1. Принцип: правильный человек важнее битов <span class="ts">3:04</span></h3>
+<p>«Если ты целишься не в того человека, ты толкаешь в гору. Даже с лучшими битами, если им это не нужно, продажи не будет».</p>
+<div class="box key">
+  <span class="label">Кейс Fanny 808</span>
+  <p>Делал 95% правильно, но не продавал: созванивался с «худовыми» рэперами из Атланты, которые не готовы платить за биты. Переключился на <b>R&amp;B-артистов</b> и специально искал <b>богатых</b>: профили с дорогими ужинами, хорошей одеждой, часами. Один такой артист прислал <b>$1 000 за эксклюзив</b>, даже без созвона. Стиль битов он не менял (те же Huncho-style R&amp;B биты), поменял только аудиторию.</p>
+</div>
+<p><b>Идеальный клиент (ICP):</b></p>
+<ul>
+  <li>есть деньги (профессиональные фото, клипы, выступления → значит, есть деньги и на биты);</li>
+  <li>делает музыку в <b>твоём</b> стиле;</li>
+  <li>активно выпускает треки (постоянно тратится на биты);</li>
+  <li>немного слушателей / подписчиков, до него можно достучаться;</li>
+  <li>бонус: <b>есть деньги, относится к карьере серьёзно, считает себя сильным, но звучит слабо</b>. Ему твои биты и сведение сразу дают заметный прирост качества.</li>
+</ul>
+
+<h3>3.2. Метод 1: Spotify-метод <span class="ts">≈4:50</span></h3>
+<ol class="steps">
+  <li>Найди в Spotify артиста в своём стиле с <b>низким числом слушателей</b> и признаками денег. В примере: <i>LEE.</i> (Австралия), 826 monthly listeners, подписан на лейбл, выступает, профессиональные фото.</li>
+  <li>Добавь его трек в <b>новый плейлист</b> (в примере плейлист «BLUETOOTH»).</li>
+  <li>Внизу плейлиста Spotify выдаёт блок <b>Recommended</b>: похожие артисты с похожими цифрами. Это и есть готовый список квалифицированных лидов.</li>
+  <li>Открываешь артиста (пример: Tommy Tang, ~12.5K monthly listeners), смотришь фото: похоже ли, что есть деньги.</li>
+  <li>Переходишь в его Instagram (ссылка в профиле Spotify или поиск). В примере ~11K подписчиков, вполне досягаемо.</li>
+  <li>Кнопка <b>Refresh</b> под рекомендациями даёт новую порцию. Повторяешь.</li>
+</ol>
+<figure><img src="img/01_spotify_playlist.jpg"><figcaption>Плейлист с одним треком → блок Recommended выдаёт похожих артистов.</figcaption></figure>
+
+<h3>3.3. Учёт лидов: таблица «GREAT ARTIST LEADS» <span class="ts">≈8:45</span></h3>
+<p>«Это задротство, но в DM у меня поле боя; без таблицы я теряю людей». Колонки:</p>
+<table>
+  <tr><th>Колонка</th><th>Что пишет</th></tr>
+  <tr><td>IG Username</td><td>ник артиста</td></tr>
+  <tr><td>Status</td><td>выпадающий список: <i>Not messaged</i> / <i>Message (waiting for reply)</i> / <i>Messaged (in conversation)</i> / <i>Pitched call</i></td></tr>
+  <tr><td>Notes</td><td>короткая оценка: «Christian rapper, has bread, music isn’t the best, entrepreneur», «Entrepreneur, looks breaded», «Founder, low likes (easy to reach)», «HOLY ICP», «decent image, probably got bread, low following»</td></tr>
+  <tr><td>Prompt</td><td>каким поисковым запросом нашёл этого человека (чтобы понимать, какие запросы дают лучших лидов)</td></tr>
+</table>
+<p><b>Поисковые запросы из колонки Prompt</b> (как видно на экране; длинные строки в таблице обрезаны):</p>
+<pre>beverly hills rapper
+monaco rapper
+ceo OR business owner
+site:instagram.com ("entrepreneur" OR "founder") ("rapper" …      ← обрезано на экране
+site:instagram.com ("rapper" OR "singer") ("mastering" OR …        ← обрезано на экране
+site:instagram.com ("rapper" OR "artist" OR "musician") ("CE…      ← обрезано на экране</pre>
+<figure><img src="img/02_leads_sheet.jpg"><figcaption>Таблица лидов wayvbeats: ник, статус, заметки, поисковый запрос.</figcaption></figure>
+
+<div class="box ok">
+  <span class="label">Пример «идеального» лида</span>
+  <p>Христианский рэпер-предприниматель: 82K подписчиков, но <b>мало лайков</b> («не ведись на 82K»). Бит слабый, при этом на руке iced-out AP. «Есть деньги + предприниматель + музыка слабая = я вижу знаки доллара. Этому человеку я не продаю лиз за $30, ему продаю пакет за 1K, минимум 2». В чате это назвали «идеальным кандидатом на beat pass».</p>
+</div>
+
+<h3>3.4. Метод 2: «Увод клиентов» из комментариев <span class="ts">≈11:00</span></h3>
+<ol class="steps">
+  <li>Найди type beat-продюсера в <b>своём</b> стиле (пример: канал с Rylo-type битами; история Sahil: Huncho type beat с 808, не попадающими в тональность).</li>
+  <li>Открой комментарии под его битами/постами: «Check DM, I’m trying to buy a beat», «How much would it cost?», «Yo where can I buy this?».</li>
+  <li>Это готовые покупатели, которым нужен твой стиль. Им пишешь ты, с битами лучше.</li>
+  <li>Плюс: не нужно строить свой type beat-канал.</li>
+</ol>
+
+<h3>3.5. Живой пример аутрича (артист kampaign.wo) <span class="ts">≈12:30</span></h3>
+<ol class="steps">
+  <li>Проверил: у артиста явно есть деньги («unbelievable amounts of money»).</li>
+  <li><b>Подписался</b>, лайкнул пост.</li>
+  <li>Посмотрел <b>сторис</b> в поисках, на что ответить. Цель: не шаблонное сообщение, а комплимент к <i>его</i> контенту + вопрос.</li>
+  <li>В сторис был свежий релиз (Point to Prove freestyle). Перед отправкой «был экстра»: открыл трек на Spotify и послушал. 2.5K monthly listeners, «идеальная картина».</li>
+  <li>Ответил на сторис: что слушает его на Spotify (+🔥) и вопрос:</li>
+</ol>
+<pre>why don't you have more monthly listeners bro?</pre>
+<div class="box key">
+  <span class="label">Почему этот вопрос работает</span>
+  <p>Почти все отвечают «да, ты прав, почему у меня их мало?». Это комплимент («ты достоин большего»), который заставляет человека задуматься: «ты его хвалишь так, что он этого не замечает».</p>
+  <p><b>Главное:</b> не пиши поверхностно («yo you’re hard, let me send beats»). Хорошему рэперу такое пишут десятки людей. 2–3 лишние минуты на изучение артиста окупаются многократно.</p>
+</div>
+
+<h3>3.6. Метод 3: Inbound через reels + ManyChat <span class="ts">≈16:30</span></h3>
+<p><b>Outreach</b>: ты идёшь к человеку. <b>Inbound</b>: человек приходит к тебе. Лучший инструмент для inbound — reels. Если подписчиков мало, нужно постить много.</p>
+<ol class="steps">
+  <li>Видео, где играет твой бит, + <b>CTA</b> (призыв к действию), например: «прокомментируй слово X, получишь пак бесплатных битов».</li>
+  <li><b>ManyChat</b> автоматически отправляет сообщение со ссылкой/битами.</li>
+  <li>Дальше ты вручную начинаешь разговор. Пример на экране (автосообщение было «yoo you commented to access more high level prod info right?»), затем пишешь:</li>
+</ol>
+<pre>yoo just peeped ur page btw - that recent song x is fire. u working on any projects atm?</pre>
+<ol class="steps" start="4">
+  <li>Когда отвечают про проекты: «what kind of vibe you on?» и т.д. Строишь раппорт, а не продаёшь в лоб («если мы один из 20 в директе и сразу дожимаем, результата не будет»).</li>
+</ol>
+<p class="muted">«Люди покупают не из-за того, что ты продаёшь, а из-за того, кто ты. Нужно быть приятным человеком».</p>
+
+<h3>3.7. Метод 4: Опрос в сторис <span class="ts">≈17:45</span></h3>
+<ol class="steps">
+  <li>Сторис-опрос: «Ищу 5 артистов, чтобы сделать хиты. Ты артист? <b>Да / Нет</b>».</li>
+  <li>Всем, кто нажал «Да», пишешь: «yo bro, I saw you vote on my story» + конкретный комплимент + «are you working on any projects at the moment?».</li>
+  <li>Это тёплые лиды: они уже подписаны на тебя, конвертируются легче, чем холодные.</li>
+</ol>
+<div class="box key"><p>«Контент нетворкает за тебя на автопилоте: ты спишь, а reel работает. Просыпаешься, и уже 10 рэперов, которым можно написать. Это гораздо лучше ручного аутрича».</p></div>
+
+<!-- ============ 4. REELS Q&A ============ -->
+<h2>4. Q&amp;A: как монтировать reels <span class="ts">19:15</span></h2>
+<p><span class="who">Вопрос JR:</span> как делать видео в стиле «POV: ты легально получил FL Studio, и это изменило твою жизнь» с быстро меняющимися клипами? <span class="who">Ответ wayvbeats</span> (экран: CapCut):</p>
+<ol class="steps">
+  <li><b>Первые 2–3 секунды должны зацепить.</b> «Journey»-reels (путь продюсера) работают в любой нише: старт, с которым все себя ассоциируют (старое некачественное фото, «потратил все деньги на этот ноутбук»).</li>
+  <li><b>Секрет:</b> подпись в стиле Snapchat добавлена <i>недавно</i> на видео, снятое годы назад. Она дорисовывает историю.</li>
+  <li>Быстро переходи к сути.</li>
+  <li><b>Порядок клипов решает:</b> на дроп бита ставь самый эффектный клип.</li>
+  <li><b>Склейки в такт:</b> по волновой форме видно дроп и клэпы, переключай клипы ровно на них («мы музыканты, нас триггерит, когда не в такт»).</li>
+  <li><b>Снимай на телефон</b>, вертикально. Горизонтальное видео с камеры, обрезанное под reels, выглядит хуже. На YouTube у него DJI Osmo, но это другое.</li>
+  <li><b>Пониженная экспозиция:</b> при съёмке тапни по экрану и опусти экспозицию, свет выглядит кинематографично.</li>
+  <li>Специально прерывай сессии в студии, чтобы снять эстетичные клипы.</li>
+  <li><b>Хороший клип — актив навсегда</b> (как хороший семпл). Переиспользуй одни и те же клипы сколько угодно: цель — новые подписчики, а не те, кто уже видел.</li>
+</ol>
+
+<!-- ============ 5. JOE ============ -->
+<h2 class="pb">5. Блок Joe: автоматическая лидогенерация <span class="ts">24:12–42:00</span></h2>
+<div class="box warn">
+  <span class="label">Важно</span>
+  <p>На записи у Joe сильно тормозила связь, речь почти не разобрать. Ниже всё восстановлено по экрану: доска Miro, Apify, ChatGPT, Google Docs с промптами, Grok, AutoIGDM.</p>
+</div>
+
+<h3>5.1. Контекст</h3>
+<ul>
+  <li>Joe ведёт продакшн-сервис (Silverline) для двух продюсеров. Работают в основном с <b>певцами</b>, не с рэперами. Joe отвечает за бэкенд: лидогенерацию, аутрич, записи на звонки.</li>
+  <li>Раньше делал всё вручную теми же методами, что и wayvbeats. Ещё пробовал Instagram «Suggested» (похожие аккаунты): «мусор, показывает рандом вплоть до кондитерских».</li>
+  <li>Собрал метод из YouTube-роликов про лидогенерацию в других нишах. Сейчас это <b>99% их стратегии</b>. Все блоки в календаре — discovery-звонки и сессии (9 discovery-звонков за неделю, следующая неделя забита полностью).</li>
+  <li>Нужен <b>ChatGPT Plus</b> (для анализа данных/CSV).</li>
+</ul>
+
+<h3>5.2. Схема на доске Miro: «How to leadsource artist’s like a pro producer»</h3>
+<figure><img src="img/03_miro_board.jpg"><figcaption>Доска Joe: дисклеймер и поисковая строка.</figcaption></figure>
+<table>
+  <tr><th>Блок на доске (оригинал)</th><th>Перевод</th></tr>
+  <tr><td>Disclaimer: You could be handed every single system to help you become fulltime [worth 100k+] but I guarantee 99% of you will never use this effectively.<br>These people are humans. You need to take the time to develop a relationship with them.<br><i>Selling them in the DMs is not a good look.</i><br>P.P.S: You need to have chat gpt+</td><td>Дисклеймер: вам можно дать любую систему, чтобы выйти на фулл-тайм [на 100K+], но 99% из вас не будут ей эффективно пользоваться. Это люди, нужно время, чтобы выстроить с ними отношения. <i>Продавать им прямо в DM — плохо выглядит.</i> P.P.S.: нужен ChatGPT Plus.</td></tr>
+  <tr><td>The problem: “everyone always mentions just reach out to x amount of artists”. But I used to always ask, how do you even do it?</td><td>Проблема: все говорят «просто напиши X артистам». А я всегда спрашивал: а где их брать?</td></tr>
+  <tr><td>STEP 1: Understanding the method → <code>site:instagram.com + melbourne singer -inurl:/p/ -inurl:/explore/</code> → What does this do?</td><td>Шаг 1: понять метод → поисковая строка → что она делает (см. 5.3).</td></tr>
+  <tr><td>STEP 2: Execution and the source → Go to https://apify.com/ → Go to the google search results scraper</td><td>Шаг 2: исполнение → apify.com → Google Search Results Scraper.</td></tr>
+  <tr><td>STEP 3: Rinse and repeat → There is literally no point of doing this if your not going to reach out to the artists here</td><td>Шаг 3: повторяй. Нет никакого смысла это делать, если ты не будешь писать этим артистам.</td></tr>
+</table>
+
+<h3>5.3. Шаг 1: поисковая строка (Google-операторы)</h3>
+<pre>site:instagram.com + melbourne singer -inurl:/p/ -inurl:/explore/</pre>
+<table>
+  <tr><th>Часть</th><th>Что делает</th></tr>
+  <tr><td><code>site:instagram.com</code></td><td>Ищет только по Instagram.</td></tr>
+  <tr><td><code>melbourne singer</code></td><td>Ключевые слова: город + роль. Google находит профили, в которых человек сам описывает себя так (в био/имени).</td></tr>
+  <tr><td><code>-inurl:/p/</code></td><td>Исключает отдельные посты (<code>instagram.com/p/…</code>).</td></tr>
+  <tr><td><code>-inurl:/explore/</code></td><td>Исключает страницы Explore (хештеги, локации). Остаются <b>профили и reels</b>.</td></tr>
+</table>
+<p>Пояснение на доске (In short): <i>«You’re telling Google to show only Instagram profiles that describe themselves as a “Melbourne singer.”»</i> Чтобы расширить на похожих артистов (R&amp;B, neo-soul, pop), собирай варианты через OR:</p>
+<pre>site:instagram.com (melbourne singer OR melbourne musician OR melbourne rnb OR melbourne …)</pre>
+<p>Запросы, которые Joe набирал вживую в Apify:</p>
+<pre>site:instagram.com Texas singer single out now -inurl:/p/ -inurl:/explore/
+site:instagram.com melbourne singer -inurl:/p/ -inurl:/explore/</pre>
+<div class="box key">
+  <span class="label">Компромисс точности</span>
+  <p>Чем конкретнее запрос, тем меньше результатов (первый узкий запрос дал ~20). Хороший запрос даёт до ~300 результатов, примерно половина окажется певцами, будут дубли.</p>
+</div>
+<h4>Фильтр по деньгам: геолокация <span class="ts">30:28</span></h4>
+<p><b>wayvbeats:</b> целься в богатые районы. Пример: Greenwich, Connecticut (богатый пригород). Если скрейпить рэперов оттуда, «у всех есть деньги».<br>
+<b>Joe:</b> спрашивает у ChatGPT списки богатых районов. Формулировка с его слов:</p>
+<pre>Give me all the most affluent areas in [city / country].
+Give me suburbs that are next to major cities that have a level of affluence.</pre>
+
+<h3>5.4. Шаг 2: Apify, Google Search Results Scraper <span class="ts">27:39</span></h3>
+<ol class="steps">
+  <li>Зайти на <b>apify.com</b>, создать бесплатный аккаунт (Joe работал на бесплатном тарифе).</li>
+  <li>В поиске актёров найти <b>Google Search Results Scraper</b> — <code>apify/google-search-scraper</code> (сделан самим Apify, «Maintained by Apify»). Joe пользуется только им.</li>
+  <li><b>Search term(s):</b> вставить поисковую строку из шага 1 (по одному запросу на строку).</li>
+  <li>Раскрыть <b>Number of results</b>: поле <i>Results per page</i> оставить пустым (Google теперь отдаёт максимум 10 результатов на страницу, параметр игнорируется). <b>Max pages per search = 100</b>.</li>
+  <li>Нажать <b>Save &amp; Start</b>. Через ~1 минуту начнут появляться данные.</li>
+  <li>Результат на звонке: 40 страниц, <b>383 organic results</b>, 2 мин 45 с, стоимость <b>$0.18</b>.</li>
+  <li>Во вкладке Output → <b>Organic results</b> проверить, что результаты органические. Видны колонки: Title, URL, Description, подписчики (например «3.2K+ followers»).</li>
+  <li><b>Export</b> → View: <i>Organic results</i> → Format: <b>CSV</b> → Select fields: <code>organicResults</code> → <b>Download</b>.</li>
+</ol>
+<div class="two">
+  <div><figure><img src="img/04_apify_input.jpg"><figcaption>Поля ввода: Search term(s), Max pages per search = 100.</figcaption></figure></div>
+  <div><figure><img src="img/05_apify_results.jpg"><figcaption>Результаты: профили и reels певцов с описанием и числом подписчиков.</figcaption></figure></div>
+</div>
+
+<h3>5.5. Шаг 3: чистка CSV в ChatGPT <span class="ts">≈33:40</span></h3>
+<p>У Joe в ChatGPT есть <b>Project</b> «Silverline production project» (чаты внутри: CSV cleaning summary, Extract first names CSV, Qualify CSV with compliments, Personalised compliment creation, Search query explanation…). В проект загружается CSV из Apify и вставляется промпт <b>«Silverline CSV Flattening Prompt»</b> (полный текст в разделе 6.1).</p>
+<p>Зачем: без фильтра «получаешь кучу повторяющихся аккаунтов, это бесит». Промпт склеивает все посты/reels одного артиста в одну строку, оставляет нужные колонки и отдаёт ссылку на скачивание.</p>
+<p>Результат на звонке: <b>383 строки → 261 уникальный артист</b>, файл <code>flattened_silverline_artists.csv</code>.</p>
+<p>У Joe есть и улучшенная версия: <b>«Silverline CSV Cleaning &amp; Personalized Compliment SOP (Revised)»</b>. Она дополнительно нормализует подписчиков, отсекает аккаунты с >20 000 подписчиков, а также студии, лейблы и другие организации (раздел 6.2). Joe обещал скинуть проект ChatGPT с промптом-фильтром в группу.</p>
+<figure><img src="img/06_flatten_prompt.jpg"><figcaption>Google Doc «Lead filtering prompt», вкладка с промптом очистки.</figcaption></figure>
+
+<h3>5.6. Шаг 4: персональные комплименты в Grok <span class="ts">35:52</span></h3>
+<ul>
+  <li>Joe перешёл на <b>Grok</b> (режим Expert): «он обучен на твитах и разговорах, поэтому комплименты звучат естественнее, чем у ChatGPT».</li>
+  <li>Загружает очищенный CSV <code>flattened_silverline_artists.csv</code> + вставляет промпт <b>«Silverline SOP: Personalized Compliment Creation»</b> (раздел 6.3).</li>
+  <li>Grok смотрит профиль/посты каждого артиста, находит конкретную песню или выступление и пишет <b>одно предложение-комплимент</b> с упоминанием этого трека.</li>
+  <li>На выходе таблица: <code>displayedUrl</code>, имя, <code>songOrPerformanceTitle</code>, <code>sourceUrl</code>, <code>contextType</code> (record / performance / creative), <code>compliment</code>, <code>needsReview</code>.</li>
+  <li>На 200+ лидах может долго думать и сбоить. В предыдущем рабочем прогоне Grok обрабатывал CSV пачками (batches) и отчитался: «83 rows … 67 resolved and 32 unresolved entries». Нерешённые помечаются <code>needsReview = true</code>.</li>
+</ul>
+<figure><img src="img/07_compliment_examples.jpg"><figcaption>Примеры комплиментов из SOP (раздел 8 документа).</figcaption></figure>
+
+<h3>5.7. Шаг 5: рассылка и записи на звонки</h3>
+<ul>
+  <li><b>AutoIGDM</b> (сервис авто-DM в Instagram): Joe кладёт туда список с комплиментами, сообщения уходят автоматически. На экране: аккаунт <i>silver.pr0d</i>, <b>51 leads messaged</b>. Кампания запущена около недели назад, пока текстом.</li>
+  <li>Дальше <b>ассистентка-сеттер</b> бронирует discovery-звонки. Систему можно полностью автоматизировать; Joe пока часть делает руками, потому что ещё тестирует.</li>
+  <li>Пример клиента из этой системы: певица, которая во время звонка сидела у них в студии. Чек <b>$1 400</b> (это было давно, сейчас цены выше).</li>
+</ul>
+<figure class="half"><img src="img/08_autoigdm.jpg"><figcaption>AutoIGDM → Statistics: 51 сообщение лидам.</figcaption></figure>
+
+<h3>5.8. Идеи «на вырост», прозвучавшие в блоке</h3>
+<ul>
+  <li><b>Голосовые без записи</b> <span class="ts">32:58</span>: друзья wayvbeats купили у большого маркетингового агентства шаблон аутрича за ~$1.5K. Там есть способ отправлять голосовые в Instagram, не записывая их. Сам способ на звонке <b>не показан</b>, wayvbeats собирался протестировать. Актуально для JR, который продаёт beat pass через голосовые.</li>
+  <li><b>Кастомные биты через Suno</b> <span class="ts">41:01</span> (идея Nate/wayvbeats): скрейпинг → AI определяет стиль артиста → Suno генерирует под него бит → у тебя «кастомный бит» под каждого, кому пишешь.</li>
+  <li><b>Для лупмейкеров</b> (Max): тем же Apify можно искать продюсеров нужного стиля, а писать им классическим способом.</li>
+</ul>
+<div class="box ok">
+  <span class="label">Совет wayvbeats после блока <span class="ts">39:31</span></span>
+  <p>«Когда Joe мне это показывал, я ничего не понял. Сделайте это сразу после звонка. Когда я начал, получал дубли и людей, которые вообще не артисты, и пришлось адаптироваться. Это как ринг: тебя будут бить, нужно быть гибким». Его собственный таргет эволюционировал так: предприниматели → R&amp;B-певцы → теперь целенаправленно «те, у кого слабая музыка».</p>
+  <p>Joe: «Я думал, если разберусь, этого не знает никто. Стоит немного пострадать, пока не разберёшься». Joe готов созвониться и помочь, если будут вопросы.</p>
+</div>
+
+<!-- ============ 6. PROMPTS ============ -->
+<h2 class="pb">6. Все промпты дословно</h2>
+<p class="muted">Оригинал на английском (так их и надо вставлять в ChatGPT / Grok), под каждым краткий перевод. Переписано с экрана.</p>
+
+<h3>6.1. Промпт №1 — Silverline CSV Flattening Prompt (ChatGPT)</h3>
+<pre>🎯 Silverline CSV Flattening Prompt (For Reels + Artist Data)
+
+Purpose
+To flatten all Instagram search or scraper CSVs so each artist appears only once — merging all their posts, reels, and details into a single, easy-to-read row for research and compliment generation.
+
+────────────────────────
+
+🧩 Processing Rules
+
+1️⃣ Remove Duplicate Artists
+• Group by the displayedUrl column (represents the artist's Instagram profile).
+• Each artist should appear only once.
+
+2️⃣ Merge All Related Data
+• Combine any text fields (e.g., title, description, likes, url, lastUpdated) into one string using " | " as a separator.
+• Keep one representative value for numeric or ID columns (e.g., follower count, index).
+• Keep all available posts and reel data for richer context.
+
+3️⃣ Preserve Core Columns
+If present, always include:
+displayedUrl, username, followersAmount, title, description, url, likes, lastUpdated
+
+4️⃣ Output Format
+• Save as a single CSV file named flattened_silverline_artists.csv.
+• Provide total rows before and after flattening.
+• Share a download link at the end.
+
+────────────────────────
+
+⚙️ Example Command
+Clean and flatten this CSV using the Silverline Flattening Prompt.
+Each artist (based on displayedUrl) should appear once with all their reels and captions merged using " | " separators.
+Then give me the download link and show how many unique artists remain.</pre>
+<p><b>Перевод:</b> склеить CSV так, чтобы каждый артист был одной строкой. (1) Группировать по <code>displayedUrl</code> (ссылка на профиль), каждый артист один раз. (2) Текстовые поля (title, description, likes, url, lastUpdated) объединить через « | »; для числовых/ID оставить одно значение; сохранить все посты и reels для контекста. (3) Обязательные колонки: displayedUrl, username, followersAmount, title, description, url, likes, lastUpdated. (4) Сохранить как <code>flattened_silverline_artists.csv</code>, показать число строк до/после, дать ссылку на скачивание. Последний блок — команда, которую пишешь вместе с файлом.</p>
+
+<h3>6.2. Промпт №1b — Silverline CSV Cleaning &amp; Personalized Compliment SOP (Revised)</h3>
+<p class="muted">Обновлённая версия чистки (на экране видны разделы 1–5; это начало документа, дальше идёт SOP комплиментов из 6.3).</p>
+<pre>🎯 Silverline CSV Cleaning & Personalized Compliment SOP (Revised)
+
+Purpose
+To prepare artist data for outreach and create one personalized, natural compliment that follows the Silverline brand voice and compliment framework.
+
+────────────────────────
+1️⃣ CSV Cleaning Rules
+
+Objective
+Ensure all artist accounts are clean, unique, human (not organisations), and within follower thresholds before generating compliments.
+
+Steps
+
+1. Remove Duplicates
+Each account in the displayedUrl column must appear only once.
+Remove any duplicate rows.
+
+2. Normalize Follower Counts
+In the followersAmount column:
+• Convert "K" into ×1,000 (e.g., 2.3K → 2300)
+• Convert "M" into ×1,000,000 (e.g., 1.2M → 1200000)
+
+3. Filter by Follower Count
+• Remove any accounts with more than 20,000 followers.
+• Keep rows that have blank, missing, or non-numeric follower values (e.g., "1 week ago").
+
+4. Remove Non-Artist or Organisation Accounts (NEW)
+Delete rows where the displayedUrl, bio, or username suggests the account belongs to an organisation, collective, or business — not an individual singer or performer.
+
+Remove accounts containing words such as:
+studio, records, recordlabel, productions, production, management,
+collective, events, entertainment, radio, tv, festival, bandpage,
+officialpage, group, choir, church, agency, academy, school, company
+
+Keep accounts that appear to represent individuals, especially those containing clear first names or personal identifiers (e.g., johnsmithmusic, emilyroseofficial).
+
+5. Final Report
+After cleaning, provide:
+• Number of rows removed
+• Number of rows remaining
+• Download link to the cleaned CSV</pre>
+<p><b>Перевод:</b> (1) удалить дубли по displayedUrl; (2) привести подписчиков к числам (K → ×1 000, M → ×1 000 000); (3) удалить аккаунты с >20 000 подписчиков, но <b>оставить</b> строки, где подписчиков не видно; (4) удалить студии, лейблы, продакшены, менеджмент, коллективы, ивенты, радио, ТВ, фестивали, хоры, церкви, агентства, академии, школы, компании (по списку слов), оставить личные аккаунты с именами; (5) отчёт: сколько удалено, сколько осталось, ссылка на CSV.</p>
+
+<h3>6.3. Промпт №2 — Silverline SOP: Personalized Compliment Creation (Grok)</h3>
+<pre>Silverline SOP: Personalized Compliment Creation
+
+Purpose
+To craft one authentic, research-driven compliment per artist that reflects Silverline's tone, demonstrates genuine listening, and references a specific song or performance.
+This SOP ensures every compliment feels personal, artist-specific, and aligned with Silverline's creative ethos.
+
+────────────────────────
+1️⃣ Objective
+Create one natural, context-specific compliment per artist — written as if by a real producer who has genuinely engaged with their music.
+
+────────────────────────
+2️⃣ Research Workflow
+Follow these steps in order for each artist:
+
+Step 1: Instagram Scan (Primary Source)
+• Review the artist's profile grid, focusing on the top 9 posts.
+• Look for posts that mention:
+   ◦ A song title in the caption or video overlay
+   ◦ Phrases like "out now," "single," "cover of," or "live at"
+   ◦ Clear visual or text references to performances or originals
+• Extract one specific title or performance that best represents their artistry.
+• Record its Instagram post URL as the verification source.
+
+Step 2: Secondary Source Check (if unclear)
+• If no title is identifiable on Instagram, check one secondary source:
+   ◦ Spotify artist page (track titles)
+   ◦ YouTube channel (video titles)
+• Take one verified title only.
+• Record the source URL used for verification.
+
+Step 3: Fallback Options
+• If no title or official release exists:
+   ◦ Reference a named live performance (e.g., "Live at The Night Cat").
+• If no suitable title or performance can be confirmed:
+   ◦ Mark for manual review. Do not generate a vague or placeholder compliment.
+
+────────────────────────
+3️⃣ Detection Heuristics
+When scanning posts or captions, look for:
+• Quoted or Title-Case phrases near trigger words:
+  "out now", "single", "live at", "cover of", "my song"
+• Caption patterns like:
+   ◦ "Song Title"
+   ◦ Song Title – Live
+   ◦ Cover: Song Title by [Artist]
+Then assign a context type:
+   Type | When to Use | Label
+   [таблица и разделы 4–7 на экране не показаны — см. примечание ниже]
+
+   …
+• contextType drives correct phrasing.
+• Event/cover singers end with ", where can I listen to your originals?"
+• If no valid reference exists → set needsReview = true and leave compliment blank.
+
+────────────────────────
+8️⃣ Examples
+Context      | Example
+Record       | "your record 'Come Home' hits with so much conviction, your vocal tone really compliments the production nicely."
+Performance  | "your performance Live at The Night Cat has such a tight pocket and hits with so much conviction."
+Creative     | "I really love the vibe in 'Welly on a good day', your creative process looks awesome."
+Event / Cover| "your performance of 'Valerie' has such a lively feel and hits with so much conviction, where can I listen to your originals?"
+
+Outcome
+By following this SOP:
+• Every compliment is rooted in real evidence (verified title or clip).
+• The compliment fits the artist's exact context (record, performance, or creative).
+• Messaging remains consistent, warm, and authentic — unmistakably Silverline.</pre>
+
+<div class="box warn">
+  <span class="label">Примечание о разделах 4–7</span>
+  <p>Joe пролистнул середину документа за долю секунды, поэтому разделы 4–7 на видео не попали. Их суть видна в ответе Grok, который на них ссылается:</p>
+  <ul>
+    <li><b>Section 4–5 (тон и слова):</b> комплимент — <b>одно предложение</b>, под жанр (Pop / R&amp;B / Indie / Singer-Songwriter или выступление), тёплый австралийский тон (слова вроде «digging», «ace»). <b>Запрещённые слова:</b> remarkable, rendition, memorable, finesse, honed/honest (последнее слово на экране читается нечётко).</li>
+    <li><b>Шаблоны по типу контекста:</b> <code>record</code> → «your record …», <code>performance</code> → «your performance …», <code>creative</code> → добавить «your creative process looks awesome».</li>
+    <li><b>Section 6 (имя):</b> имя или название группы из instagramHandle.</li>
+    <li><b>Section 7 (Quality Gates):</b> одно название, одно предложение, правильный контекст, тон по SOP.</li>
+  </ul>
+  <p>Если нужен полный рабочий вариант, эти пункты можно дописать в промпт как разделы 4–7 своими словами. Получится функционально тот же SOP.</p>
+</div>
+<p><b>Перевод сути:</b> на каждого артиста одно живое комплимент-предложение «от продюсера, который реально слушал». Порядок: (1) смотришь 9 верхних постов в Instagram и ищешь название трека / «out now» / «single» / «cover of» / «live at», записываешь ссылку на пост как доказательство; (2) если не нашёл, смотришь одну страницу Spotify или YouTube; (3) если релизов нет, ссылаешься на конкретное выступление; если и его нет, ставишь «на ручную проверку» (<code>needsReview = true</code>) и не пишешь размытый комплимент. Каверщикам и ивент-певцам в конце: «, where can I listen to your originals?» (где послушать твои собственные треки?).</p>
+
+<h3>6.4. Сообщения и вопросы для DM (wayvbeats)</h3>
+<pre>why don't you have more monthly listeners bro?
+
+yoo just peeped ur page btw - that recent song x is fire. u working on any projects atm?
+
+what kind of vibe you on?
+
+yo bro, I saw you vote on my story — [конкретный комплимент]. Are you working on any projects at the moment?</pre>
+
+<h3>6.5. Лид-магнит для email-базы (совет Segway) <span class="ts">49:50</span></h3>
+<pre>Guys, I normally never do this, but I'm giving away a beat pack of unreleased beats,
+which have never been on YouTube, for completely free.
+Send me a DM on Instagram with the word "BEATPASS" and I'll send it to you.</pre>
+<p>Совет Max: попроси ChatGPT сверстать письмо в HTML («I need this type of email, make it look nice, put a little picture at the top»).</p>
+
+<!-- ============ 7. Q&A ============ -->
+<h2>7. Вопросы участников и советы по контенту</h2>
+
+<h3>7.1. ICP: христианские рэперы <span class="ts">42:07</span></h3>
+<p>wayvbeats предположил, что христианские рэперы платят охотнее («мораль»). <b>JR (продаёт им):</b> «ты неправ на 50%: большинство очень бедные и самые гордые люди, которых я встречал, хуже или на уровне мейнстрим-рэпа». Вывод wayvbeats: <b>оценивай конкретного человека по его Instagram</b> («готов ли он созвониться? готов ли инвестировать в звук?»). Насмотренность приходит с практикой.</p>
+
+<h3>7.2. Контент под плейсменты (JR) <span class="ts">44:49</span></h3>
+<ul>
+  <li>Если цель — плейсменты, а не продажа артистам, reels целишь в <b>продюсеров</b>: постишь лучшие семплы и ждёшь «можешь скинуть этот семпл?».</li>
+  <li>У JR лучше всего зашёл reel с Nate + ManyChat: много комментариев с кодовым словом, потому что там был <b>вокальный семпл</b>. Продюсерам заходят эмоциональные семплы.</li>
+  <li>wayvbeats: 1–2 reels в день, не переживай за падение охватов; пробуй разные форматы (запись экрана с лупом + кивание головой → съёмка FL Studio в красивой локации и т.д.). Начни с копирования других, свой стиль найдёшь по ходу.</li>
+  <li>Идея Nate для JR: «я ушёл из Walmart, потому что сотрудники хотели украсть мой beat pass» + CTA на beat pass.</li>
+  <li>Приём wayvbeats (со слов JR): папка <b>«reels to steal»</b> с понравившимися reels для вдохновения.</li>
+  <li>JR: чем больше постишь и пишешь, тем больше подписчиков и входящих. Через reels на него вышли продюсеры с недавних альбомов (в транскрипте «Low Tech», вероятно Lil Tecca) и Huncho.</li>
+</ul>
+
+<h3>7.3. Email-база с YouTube (Segway) <span class="ts">48:21</span></h3>
+<p>У Segway есть YouTube и бесплатные загрузки на BeatStars, то есть «золотая жила» email-контактов артистов. Совет wayvbeats: email-кампания с лид-магнитом (текст в 6.5) → артисты сами пишут в Instagram → разговор → созвон. Segway решает, что лучше для него: звонки или голосовые. Принцип: <b>играй от сильных сторон</b> (ментор wayvbeats: «если хорошо продаёшь на звонках, продавай на звонках»). Если голосовые игнорируют или оплаты срываются, переходи на звонки.</p>
+
+<h3>7.4. Лупмейкер (Max) <span class="ts">52:01</span></h3>
+<ul>
+  <li>Max делает UK/chill drill лупы, которые подходят и продюсерам в стиле BabyFace Ray / Lil Shimmy. Вопрос: как собрать таких продюсеров. Joe: через Apify найти продюсеров этого саунда, писать классически.</li>
+  <li>JR: постить семплы и «как я сделал этот семпл»; YouTube Shorts, раз у Max есть YouTube-аудитория.</li>
+  <li>wayvbeats против Shorts: легко набрать просмотры, но подписчики «надуваются» и не смотрят длинные видео (у MrBeats отдельный канал под Shorts). Сам постит только в Instagram. JR: TikTok хорош для объёма.</li>
+  <li>Какой луп постить: KO — тот, у которого цепляющее начало. План Max: «как я сделал луп для type beat’а со 100–200K просмотров» (сидит в наушниках, type beat играет поверх, разбор).</li>
+  <li>JR: всем, у кого плейсмент, сделать разбор «как я сделал бит для X»: продюсерам интересно, какие VST, аккорды, BPM. Max предложил делать такие разборы на своём канале (как разбор с Segway, который дал много просмотров и email’ов).</li>
+</ul>
+
+<!-- ============ 8. ORG ============ -->
+<h2>8. Организационное и новости группы <span class="ts">1:01:31</span></h2>
+<ul>
+  <li><b>Chart Chasers Dropbox:</b> кидать туда лупы/семплы (нужно нажать «Join the folder»). Nate отправляет оттуда материал своим контактам.</li>
+  <li><b>Идея wayvbeats:</b> такая же папка под <b>биты</b>. Если артист просит стиль, которого у тебя нет (например, латин-поп), берёшь бит участника, продаёшь и делишь деньги с автором. Планируют «Chart Chasers samples» и «Chart Chasers beat pack».</li>
+  <li><b>Wins:</b> каждое воскресенье — weekly wins call (то же время, через 2 дня). В последнее воскресенье месяца — разбор побед за весь месяц. Совет JR: вести заметку со всеми победами месяца, это спасает в плохие недели.</li>
+  <li>Новости участников о плейсментах и переговорах Nate просил не выносить за пределы группы, поэтому здесь они не пересказываются.</li>
+  <li><b>Цена для первого крупного артиста / менеджмент</b> <span class="ts">1:08:57</span>: Nate и Segway отдают переговоры менеджменту. Segway может порекомендовать команду, которая помогает с роялти и мастерами («producer royalty»; работают за комиссию из аванса, поэтому платить заранее не нужно).</li>
+  <li><b>Apple Music-плейлист продюсера</b> <span class="ts">1:12:51</span>: доступен даже с минимумом плейсментов; менеджер wayvbeats предлагал всей группе. Segway скинет контакт человека, который делает такие плейлисты.</li>
+  <li><b>Лупы под Gunna</b> <span class="ts">1:14:06</span>: Nate просит лупы (лучше соло, чтобы мог их A&amp;R-ить), у него есть выход на менеджера Gunna; также связь с Mike Will Made It.</li>
+  <li>Discord Nate для совместного «cook-up» — ссылка в Zoom-чате / CC group chat.</li>
+</ul>
+
+<!-- ============ 9. ACTION PLAN ============ -->
+<h2 class="pb">9. Пошаговый план «сделать после звонка»</h2>
+<h3>Неделя 1: ручные методы (wayvbeats)</h3>
+<ol class="steps">
+  <li>Сформулировать свой ICP: стиль, жанр, город/страна, признаки денег, уровень слушателей (низкий/средний).</li>
+  <li>Завести Google-таблицу: IG Username / Status (выпадающий список) / Notes / Prompt (откуда лид).</li>
+  <li>Spotify-метод: 1 подходящий артист → новый плейлист → Recommended → 20–30 лидов в таблицу.</li>
+  <li>Пройтись по комментариям под type beat’ами конкурентов твоего стиля, добавить «хочу купить бит» в таблицу.</li>
+  <li>На каждого лида 2–3 минуты: подписка, лайк, сторис, послушать трек → конкретный комплимент + вопрос (6.4).</li>
+  <li>Запустить 1–2 reels в день с CTA + ManyChat; один раз сделать сторис-опрос «Ты артист?».</li>
+</ol>
+<h3>Неделя 2: система Joe</h3>
+<ol class="steps">
+  <li>Спросить у ChatGPT богатые районы в целевой стране/городе.</li>
+  <li>Собрать 5–10 поисковых строк: <code>site:instagram.com [район/город] [singer|rapper|rnb] -inurl:/p/ -inurl:/explore/</code> (+ варианты через OR).</li>
+  <li>Apify → <code>apify/google-search-scraper</code> → Max pages per search = 100 → Save &amp; Start → Export CSV (Organic results).</li>
+  <li>ChatGPT (лучше в отдельном Project) → CSV + Промпт 1b (или 1) → чистый CSV без дублей, организаций и аккаунтов >20K.</li>
+  <li>Grok (Expert) → чистый CSV + Промпт 2 → таблица с комплиментами; строки с <code>needsReview = true</code> проверить вручную.</li>
+  <li>Отправка: вручную или через авто-DM (AutoIGDM). Первое сообщение — комплимент + вопрос, без продажи.</li>
+  <li>Цель разговора — созвон (discovery call). Вести статусы в таблице.</li>
+  <li>Повторять, отслеживать, какие запросы дают лучших лидов (колонка Prompt).</li>
+</ol>
+<div class="box warn">
+  <span class="label">Осторожно</span>
+  <p>Массовые авто-DM в Instagram могут привести к ограничениям аккаунта. Начинай с небольших объёмов и прогретого аккаунта. Joe сам пока делает часть вручную.</p>
+</div>
+
+<!-- ============ 10. GLOSSARY ============ -->
+<h2>10. Глоссарий</h2>
+<table>
+  <tr><th style="width:24%">Термин</th><th>Значение</th></tr>
+  <tr><td>ICP</td><td>Ideal Customer Profile — портрет идеального клиента.</td></tr>
+  <tr><td>Lead / лид</td><td>Потенциальный клиент (здесь: Instagram-аккаунт артиста).</td></tr>
+  <tr><td>Outreach / cold outreach</td><td>Ты первый пишешь человеку (холодный — он тебя не знает).</td></tr>
+  <tr><td>Inbound</td><td>Человек сам приходит к тебе (через контент, CTA, опросы).</td></tr>
+  <tr><td>CTA</td><td>Call to action — призыв к действию («прокомментируй слово X»).</td></tr>
+  <tr><td>ManyChat</td><td>Сервис автоответов в Instagram: на комментарий с кодовым словом шлёт DM.</td></tr>
+  <tr><td>Lead magnet</td><td>Бесплатная ценность в обмен на контакт/действие (бесплатный пак битов).</td></tr>
+  <tr><td>Lease / exclusive</td><td>Лиз — неэксклюзивная лицензия на бит (дёшево); эксклюзив — полные права (дорого).</td></tr>
+  <tr><td>Beat pass</td><td>Пакет/подписка на биты (продукт JR и Segway).</td></tr>
+  <tr><td>Discovery call</td><td>Первый ознакомительный звонок, на котором продаётся услуга.</td></tr>
+  <tr><td>Appointment setter</td><td>Человек, который переписывается с лидами и бронирует звонки.</td></tr>
+  <tr><td>Placement</td><td>Твой бит/семпл попал в релиз известного артиста.</td></tr>
+  <tr><td>Apify / Actor</td><td>Платформа скрейпинга; «актёр» — готовый скрейпер (тут Google Search Results Scraper).</td></tr>
+  <tr><td>Scraping / CSV</td><td>Автоматический сбор данных с сайтов / табличный файл с результатами.</td></tr>
+  <tr><td>«Has bread»</td><td>Сленг: «у него есть деньги».</td></tr>
+  <tr><td>Glazing</td><td>Сленг: лесть, захваливание.</td></tr>
+  <tr><td>SOP</td><td>Standard Operating Procedure — пошаговая инструкция (здесь — промпт-регламент).</td></tr>
+</table>
+
+<p class="muted" style="margin-top:18pt">Источник: запись Fathom «CC SALES — HOW TO FIND RAPPERS» (25.10.2025). Транскрипт Fathom + распознавание экрана по кадрам видео. Неразборчивые места помечены.</p>
+
+</body>
+</html>
