@@ -7,6 +7,7 @@ const form = $('settings');
 const STATUS_LABELS = {
   idle: 'Ожидание',
   running: 'Работает',
+  select: 'Выбор продюсеров',
   done: 'Готово',
   stopped: 'Остановлено',
   error: 'Ошибка',
@@ -76,7 +77,76 @@ function renderJob(job) {
     ),
   );
   if (atBottom) logBox.scrollTop = logBox.scrollHeight;
+
+  renderChannels(job);
 }
+
+// ---------- Выбор продюсеров после YouTube ----------
+
+let channels = [];
+let channelsVersion = null;
+
+function renderChannels(job) {
+  const card = $('channelsCard');
+  const list = job.channels || [];
+  card.hidden = job.running || !list.length;
+  if (card.hidden) return;
+  // Пересобираем список только когда пришли новые каналы, чтобы не сбить отметки пользователя.
+  const version = list.map((c) => `${c.key}:${c.instagram}`).join('|');
+  if (version === channelsVersion) return;
+  channelsVersion = version;
+  channels = list.map((c) => ({ ...c, selected: !!c.selected, instagram: c.instagram || '' }));
+  drawChannels();
+}
+
+function drawChannels() {
+  const picked = channels.filter((c) => c.selected && c.instagram).length;
+  $('channelsCount').textContent = `выбрано ${picked} из ${channels.length}`;
+  $('scanSelected').disabled = picked === 0;
+  $('channelList').replaceChildren(
+    ...channels.map((c, i) =>
+      el('div', { class: `channel${c.selected ? ' selected' : ''}` },
+        el('input', {
+          type: 'checkbox',
+          checked: c.selected,
+          onchange: (e) => {
+            channels[i].selected = e.target.checked;
+            drawChannels();
+          },
+        }),
+        el('div', { class: 'channel-body' },
+          el('a', { href: c.url, target: '_blank', class: 'channel-name' }, c.name || c.path || c.key),
+          el('div', { class: 'muted small-text' },
+            [
+              c.subscribers != null ? `${formatCount(c.subscribers)} подп.` : 'подписчики ?',
+              `${c.videoCount} видео в выдаче`,
+              c.igSource ? `IG: ${c.igSource}` : 'IG не найден',
+            ].join(' · '),
+          ),
+          el('input', {
+            type: 'text',
+            value: c.instagram ? `@${c.instagram}` : '',
+            placeholder: '@instagram продюсера',
+            oninput: (e) => {
+              channels[i].instagram = e.target.value.trim().replace(/^@/, '');
+              if (channels[i].instagram && !channels[i].selected) channels[i].selected = true;
+              $('scanSelected').disabled = !channels.some((x) => x.selected && x.instagram);
+            },
+            onchange: drawChannels,
+          }),
+        ),
+      ),
+    ),
+  );
+}
+
+$('scanSelected').addEventListener('click', async () => {
+  const producers = channels
+    .filter((c) => c.selected && c.instagram)
+    .map((c) => ({ username: c.instagram, channelName: c.name, channelUrl: c.url, subscribers: c.subscribers }));
+  const res = await send({ type: 'scanSelected', producers, channels, settings: readForm() });
+  if (!res?.ok) alert(res?.error || 'Не удалось запустить');
+});
 
 let currentLeads = {};
 

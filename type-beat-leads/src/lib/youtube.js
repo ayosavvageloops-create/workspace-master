@@ -26,13 +26,6 @@ export function parseInitialData(html) {
   );
 }
 
-export function parseYtcfg(html) {
-  const apiKey = (html.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1] || null;
-  const clientVersion = (html.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/) || [])[1] || null;
-  const context = extractJsonAfter(html, '"INNERTUBE_CONTEXT":');
-  return { apiKey, clientVersion, context };
-}
-
 function videoFromRenderer(v) {
   const run = (v.ownerText?.runs || v.longBylineText?.runs || [])[0] || {};
   const browse = run.navigationEndpoint?.browseEndpoint || {};
@@ -106,6 +99,21 @@ export function parseSearchResults(json) {
   return { videos: videos.filter((v) => v.videoId && v.channelId), continuation };
 }
 
+// Видео, прочитанные из DOM страницы поиска (pagescripts.ytScrapeSearch).
+export function videosFromScrape(scrape) {
+  return (scrape.videos || [])
+    .filter((v) => v.videoId && v.channelPath)
+    .map((v) => ({
+      videoId: v.videoId,
+      title: v.title,
+      channelName: v.channelName,
+      channelId: /^\/channel\/(UC[\w-]+)/.test(v.channelPath) ? v.channelPath.split('/')[2] : null,
+      channelPath: v.channelPath,
+      views: parseCount(v.viewsText),
+      published: '',
+    }));
+}
+
 const TYPE_BEAT_RE = /type\s*beat|instrumental|\bprod\.?\b|\bbeat\b/i;
 
 // Группирует видео по каналам и считает метрики. Отбрасывает официальные/Topic/VEVO каналы.
@@ -113,10 +121,13 @@ export function aggregateChannels(videos) {
   const byId = new Map();
   for (const v of videos) {
     if (/ - Topic$|VEVO$/i.test(v.channelName)) continue;
-    let ch = byId.get(v.channelId);
+    const key = v.channelId || v.channelPath;
+    if (!key) continue;
+    let ch = byId.get(key);
     if (!ch) {
       ch = {
-        channelId: v.channelId,
+        key,
+        channelId: v.channelId || null,
         name: v.channelName,
         path: v.channelPath,
         url: `https://www.youtube.com${v.channelPath || `/channel/${v.channelId}`}`,
@@ -126,8 +137,9 @@ export function aggregateChannels(videos) {
         maxViews: 0,
         sampleVideos: [],
       };
-      byId.set(v.channelId, ch);
+      byId.set(key, ch);
     }
+    if (!ch.name && v.channelName) ch.name = v.channelName;
     ch.videoCount++;
     if (TYPE_BEAT_RE.test(v.title)) ch.typeBeatVideos++;
     ch.totalViews += v.views || 0;
@@ -146,9 +158,11 @@ export function watchUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}&hl=en&gl=US`;
 }
 
-export function parseSubscribers(html) {
-  const m = html.match(/"(\d[\d.,]*\s?[KMB]?) subscribers?"/i);
-  return m ? parseCount(m[1]) : null;
+export function parseSubscribers(text) {
+  const m = String(text || '').match(
+    /(\d{1,3}(?:[,\s ]\d{3})+|\d+(?:[.,]\d+)?)\s*([KMB]|тыс\.?|млн)?\s*(?:subscribers?|подписчик)/i,
+  );
+  return m ? parseCount(m[1] + (m[2] || '')) : null;
 }
 
 const IG_RESERVED = new Set([
@@ -242,20 +256,4 @@ export function parseChannelAbout(html) {
   // Фолбэк: весь HTML страницы (туда попадает описание «витринного» видео канала).
   if (!handles.length) handles = findInstagramHandles(html).slice(0, 3);
   return { subscribers, handles };
-}
-
-// Тело POST-запроса для подгрузки следующей страницы выдачи.
-export function continuationRequest(ytcfg, token) {
-  return {
-    url: `https://www.youtube.com/youtubei/v1/search?prettyPrint=false${ytcfg.apiKey ? `&key=${ytcfg.apiKey}` : ''}`,
-    options: {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-YouTube-Client-Name': '1',
-        ...(ytcfg.clientVersion ? { 'X-YouTube-Client-Version': ytcfg.clientVersion } : {}),
-      },
-      body: JSON.stringify({ context: ytcfg.context, continuation: token }),
-    },
-  };
 }

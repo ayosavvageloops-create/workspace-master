@@ -172,3 +172,13 @@ td.bio { max-width: 260px; white-space: pre-line; color: var(--muted); font-size
 td select { width: auto; }
 .handle { font-weight: 700; }
 .src + .src { margin-top: 6px; }
+
+/* Выбор продюсеров */
+.channel-list { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; }
+.channel { display: flex; gap: 8px; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; }
+.channel.selected { border-color: var(--accent); }
+.channel > input[type='checkbox'] { margin-top: 3px; }
+.channel-body { flex: 1; min-width: 0; }
+.channel-name { font-weight: 700; }
+.channel-body input[type='text'] { margin-top: 5px; padding: 4px 7px; }
+.status-select { background: var(--unchecked); color: #fff; }

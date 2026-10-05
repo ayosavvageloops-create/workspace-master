@@ -1,134 +1,199 @@
-// Instagram: URL внутренних web-API и нормализация ответов.
-// Запросы выполняются из открытой вкладки instagram.com (с куками залогиненного пользователя).
+// Instagram: адреса страниц и разбор того, что прочитано с открытых страниц (см. pagescripts.js).
+// API Instagram не используется.
 
 import { extractMentions } from './classify.js';
-import { safeJson } from './util.js';
-
-const API = 'https://www.instagram.com/api/v1';
+import { parseCount, safeJson, walk } from './util.js';
 
 export const igUrls = {
   profilePage: (u) => `https://www.instagram.com/${u}/`,
   taggedPage: (u) => `https://www.instagram.com/${u}/tagged/`,
   postPage: (code) => `https://www.instagram.com/p/${code}/`,
-  profileInfo: (u) => `${API}/users/web_profile_info/?username=${encodeURIComponent(u)}`,
-  userFeed: (id, maxId) => `${API}/feed/user/${id}/?count=12${maxId ? `&max_id=${encodeURIComponent(maxId)}` : ''}`,
-  // cursor — { param: 'min_id' | 'max_id', value } из normalizeComments.
-  comments: (mediaId, cursor) =>
-    `${API}/media/${mediaId}/comments/?can_support_threading=true&permalink_enabled=false${cursor ? `&${cursor.param}=${encodeURIComponent(cursor.value)}` : ''}`,
-  tagged: (id, maxId) => `${API}/usertags/${id}/feed/?count=12${maxId ? `&max_id=${encodeURIComponent(maxId)}` : ''}`,
 };
 
-// Разбирает ответ fetch'а. Бросает типизированные ошибки, чтобы оркестратор мог решить: ждать, пропустить или остановиться.
 export class IgError extends Error {
   constructor(kind, message) {
     super(message);
-    this.kind = kind; // 'login' | 'rate_limit' | 'challenge' | 'not_found' | 'network' | 'bad_response'
+    this.kind = kind; // 'login' | 'challenge' | 'rate_limit'
   }
 }
 
-export function parseIgResponse(res) {
-  if (!res || res.status === 0) throw new IgError('network', res?.error || 'нет ответа');
-  if (res.url && /\/accounts\/login|\/challenge\//.test(res.url)) {
-    throw new IgError(res.url.includes('challenge') ? 'challenge' : 'login', 'требуется вход в Instagram');
-  }
-  const json = safeJson(res.text);
-  if (res.status === 429 || /please wait a few minutes/i.test(res.text || '')) {
-    throw new IgError('rate_limit', 'Instagram ограничил запросы (429)');
-  }
-  if (json?.message === 'checkpoint_required' || json?.message === 'challenge_required') {
-    throw new IgError('challenge', 'Instagram запросил проверку аккаунта (checkpoint)');
-  }
-  if (json?.require_login || res.status === 401 || json?.message === 'login_required') {
-    throw new IgError('login', 'требуется вход в Instagram');
-  }
-  if (res.status === 404) throw new IgError('not_found', 'не найдено');
-  if (!json) throw new IgError('bad_response', `неожиданный ответ (HTTP ${res.status})`);
-  if (res.status >= 400) throw new IgError('bad_response', json.message || `HTTP ${res.status}`);
-  return json;
+// Проверка состояния страницы: не выкинуло ли на логин/проверку/«подождите».
+export function assertPageUsable(scrape) {
+  if (scrape.challenge) throw new IgError('challenge', 'Instagram запросил проверку аккаунта');
+  if (scrape.loginWall) throw new IgError('login', 'требуется вход в Instagram');
+  if (scrape.rateLimited) throw new IgError('rate_limit', 'Instagram просит подождать несколько минут');
 }
 
-export function normalizeProfile(json) {
-  const u = json?.data?.user;
-  if (!u) return null;
-  const media = u.edge_owner_to_timeline_media || {};
-  return {
-    id: u.id,
-    username: (u.username || '').toLowerCase(),
-    fullName: u.full_name || '',
-    bio: u.biography || '',
-    category: u.category_name || u.business_category_name || '',
-    externalUrl: u.external_url || '',
-    links: (u.bio_links || []).map((l) => l.url || l.lynx_url).filter(Boolean),
-    followers: u.edge_followed_by?.count ?? null,
-    following: u.edge_follow?.count ?? null,
-    postCount: media.count ?? null,
-    isPrivate: !!u.is_private,
-    isVerified: !!u.is_verified,
-    isBusiness: !!u.is_business_account,
-    // Первые ~12 постов приходят сразу — используем как фолбэк, если feed API недоступен.
-    recentPosts: (media.edges || []).map(({ node: n }) => {
-      const caption = n.edge_media_to_caption?.edges?.[0]?.node?.text || '';
-      return {
-        id: n.id,
-        code: n.shortcode,
-        caption,
-        commentCount: n.edge_media_to_comment?.count ?? 0,
-        isVideo: !!n.is_video,
-        takenAt: n.taken_at_timestamp || null,
-        mentions: extractMentions(caption),
-        taggedUsers: (n.edge_media_to_tagged_user?.edges || []).map((e) => e.node?.user?.username?.toLowerCase()).filter(Boolean),
-      };
-    }),
+const COUNT_LINE_RE = /^([\d.,\s ]+\s*(?:[KMB]|тыс\.?|млн)?)\s*(posts?|followers?|following|публикаци\S*|подписчик\S*|подписок|подписк\S*)$/i;
+const UI_LINES = new Set([
+  'follow', 'following', 'follow back', 'message', 'requested', 'edit profile', 'view archive', 'options',
+  'verified', 'contact', 'email', 'call', 'directions', 'subscribe', 'share profile', 'ad tools',
+  'подписаться', 'подписки', 'вы подписаны', 'отправить сообщение', 'сообщение', 'запрос отправлен',
+  'редактировать профиль', 'посмотреть архив', 'подтвержденный', 'связаться', 'эл. адрес', 'поделиться профилем',
+]);
+
+function decodeLink(href) {
+  try {
+    const url = new URL(href);
+    if (/(^|\.)l\.instagram\.com$/.test(url.hostname) && url.searchParams.get('u')) return url.searchParams.get('u');
+    if (/instagram\.com$/.test(url.hostname)) return null;
+    return href;
+  } catch {
+    return null;
+  }
+}
+
+// Профиль из шапки страницы. Если страница отдала встроенные данные профиля — берём точные поля оттуда.
+export function profileFromPage(scrape, username) {
+  const u = username.toLowerCase();
+  const profile = {
+    username: u,
+    fullName: '',
+    bio: '',
+    category: '',
+    externalUrl: '',
+    links: [],
+    followers: null,
+    following: null,
+    postCount: null,
+    isPrivate: !!scrape.isPrivate,
+    isVerified: !!scrape.verified,
+    source: 'страница',
   };
-}
 
-function normalizeFeedItem(it) {
-  const caption = it.caption?.text || '';
-  const tagged = (it.usertags?.in || []).map((t) => t.user?.username?.toLowerCase()).filter(Boolean);
-  const coauthors = (it.coauthor_producers || []).map((c) => c.username?.toLowerCase()).filter(Boolean);
-  return {
-    id: String(it.pk || it.id || '').split('_')[0],
-    code: it.code,
-    caption,
-    commentCount: it.comment_count ?? 0,
-    isVideo: it.media_type === 2 || it.product_type === 'clips',
-    takenAt: it.taken_at || null,
-    owner: it.user?.username?.toLowerCase() || null,
-    ownerFullName: it.user?.full_name || '',
-    ownerVerified: !!it.user?.is_verified,
-    mentions: extractMentions(caption),
-    taggedUsers: [...new Set([...tagged, ...coauthors])],
-  };
-}
-
-export function normalizeFeed(json) {
-  return {
-    items: (json?.items || []).map(normalizeFeedItem).filter((p) => p.id && p.code),
-    nextMaxId: json?.more_available ? json.next_max_id : null,
-  };
-}
-
-export function normalizeComments(json) {
-  return {
-    comments: (json?.comments || []).map((c) => ({
-      id: String(c.pk || c.id),
-      text: c.text || '',
-      username: c.user?.username?.toLowerCase() || '',
-      fullName: c.user?.full_name || '',
-      isVerified: !!c.user?.is_verified,
-      likes: c.comment_like_count || 0,
-      createdAt: c.created_at || null,
-    })),
-    cursor: commentsCursor(json),
-  };
-}
-
-function commentsCursor(json) {
-  if (json?.next_min_id && (json.has_more_headload_comments || json.has_more_comments)) {
-    return { param: 'min_id', value: json.next_min_id };
+  // 1. Шапка профиля.
+  const rawLines = String(scrape.headerText || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  // "18" и "posts" иногда оказываются на разных строках — склеиваем.
+  const lines = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const next = rawLines[i + 1];
+    if (next && /^[\d.,\s\u00a0]+\s*(?:[KMB]|тыс\.?|млн)?$/i.test(rawLines[i]) && COUNT_LINE_RE.test(`${rawLines[i]} ${next}`)) {
+      lines.push(`${rawLines[i]} ${next}`);
+      i++;
+    } else lines.push(rawLines[i]);
   }
-  if (json?.next_max_id && json.has_more_comments !== false) {
-    return { param: 'max_id', value: json.next_max_id };
+  const rest = [];
+  for (const line of lines) {
+    const low = line.toLowerCase();
+    const count = line.match(COUNT_LINE_RE);
+    if (count) {
+      const n = parseCount(count[1]);
+      if (/^(post|публикаци)/i.test(count[2])) profile.postCount = n;
+      else if (/^(follower|подписчик)/i.test(count[2])) profile.followers = n;
+      else profile.following = n;
+      continue;
+    }
+    if (low === u || UI_LINES.has(low) || /^(followed by|подписан|и ещё|and \d+ more)/i.test(low)) continue;
+    rest.push(line);
   }
-  return null;
+  if (rest.length) {
+    profile.fullName = rest[0];
+    profile.bio = rest.slice(1).join('\n');
+  }
+  profile.links = [...new Set((scrape.headerLinks || []).map((l) => decodeLink(l.href)).filter(Boolean))];
+  profile.externalUrl = profile.links[0] || '';
+
+  // 2. Мета-описание: "106K Followers, 3,497 Following, 18 Posts - See Instagram photos…".
+  if (profile.followers == null && scrape.metaDescription) {
+    const parts = scrape.metaDescription.split(/\s+[-–—]\s+/)[0].split(/,\s+/);
+    if (parts.length >= 3) {
+      profile.followers = parseCount(parts[0]);
+      profile.following = parseCount(parts[1]);
+      profile.postCount = parseCount(parts[2]);
+    }
+  }
+  if (!profile.fullName && scrape.ogTitle) {
+    profile.fullName = scrape.ogTitle.split(/\s*\(@/)[0].trim();
+  }
+
+  // 3. Встроенные в страницу данные профиля (если есть) — точнее, чем текст шапки.
+  for (const blob of scrape.blobs || []) {
+    const json = safeJson(blob);
+    if (!json) continue;
+    walk(json, (o) => {
+      if (typeof o.username !== 'string' || o.username.toLowerCase() !== u || typeof o.biography !== 'string') return true;
+      profile.fullName = o.full_name || profile.fullName;
+      profile.bio = o.biography;
+      profile.category = o.category || o.category_name || o.business_category_name || profile.category;
+      if (o.external_url) profile.externalUrl = o.external_url;
+      const bioLinks = (o.bio_links || []).map((l) => l.url).filter(Boolean);
+      if (bioLinks.length) profile.links = [...new Set([...bioLinks, ...profile.links])];
+      profile.followers = o.follower_count ?? o.edge_followed_by?.count ?? profile.followers;
+      profile.postCount = o.media_count ?? profile.postCount;
+      profile.isPrivate = o.is_private ?? profile.isPrivate;
+      profile.isVerified = o.is_verified ?? profile.isVerified;
+      return false;
+    });
+  }
+
+  const empty = !profile.fullName && !profile.bio && profile.followers == null && !profile.links.length;
+  return empty ? null : profile;
+}
+
+// Служебные элементы под комментарием: время, лайки, «Ответить», перевод и т. п. Часто идут одной строкой: "2w 3 likes Reply".
+const NOISE_TOKEN_RE = new RegExp(
+  [
+    '\\b\\d+\\s*(?:s|m|h|d|w|y|sec|min|mins|hr|hrs)\\b',
+    '\\d+\\s*(?:сек|мин|ч|д|дн|н|нед|г)\\.?(?=\\s|$)',
+    '\\b[A-Z][a-z]{2,8} \\d{1,2}(?:, \\d{4})?\\b',
+    '\\d{1,2} [а-я]{3,8}\\.?(?: \\d{4})?',
+    '\\b\\d[\\d,.]*\\s*(?:likes?|replies|reply)\\b',
+    '\\b(?:reply|see translation|translated|verified|edited|author|pinned|hide replies|view (?:all )?replies|view all \\d+ replies|like)\\b',
+    'отметк\\S* «нравится»:?\\s*\\d*',
+    '\\d+\\s*отметк\\S* «нравится»',
+    '(?:ответить|показать перевод|изменено|автор|закреплено|скрыть ответы|посмотреть ответы|нравится)',
+    '\\(\\d+\\)',
+    '[•·—-]',
+  ].join('|'),
+  'gi',
+);
+
+// Склеенные элементы ("2wReply", "1 нед.Ответить") сначала разделяем по границе строчная→заглавная.
+const isNoiseLine = (line) =>
+  line
+    .replace(/([a-zа-яё\d.])([A-ZА-ЯЁ])/g, '$1 $2')
+    .replace(NOISE_TOKEN_RE, '')
+    .replace(/[\s.,:]+/g, '') === '';
+
+export function cleanCommentText(raw, handle) {
+  return String(raw || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && l.toLowerCase() !== handle && !isNoiseLine(l))
+    .join(' ')
+    .trim();
+}
+
+// Автор поста: из og:description ("12 likes, 3 comments - nick on May 1, 2026: …"), шапки или первого блока.
+export function ownerFromPost(scrape) {
+  const m = String(scrape.metaDescription || '').match(/[-–—]\s*([A-Za-z0-9_.]{1,30})\s+(?:on|в)\s/);
+  if (m) return m[1].toLowerCase();
+  if (scrape.ownerHint) return scrape.ownerHint;
+  return scrape.blocks?.[0]?.handle || null;
+}
+
+// Комментарии и подпись автора со страницы поста.
+export function parsePost(scrape) {
+  const owner = ownerFromPost(scrape);
+  let caption = '';
+  let captionMentions = [];
+  const comments = [];
+  const seen = new Set();
+  for (const b of scrape.blocks || []) {
+    const text = cleanCommentText(b.text, b.handle);
+    if (!text) continue;
+    if (b.handle === owner && !caption) {
+      caption = text;
+      captionMentions = [...new Set([...extractMentions(text), ...b.mentions.map((x) => x.slice(1).toLowerCase())])];
+      continue;
+    }
+    const key = `${b.handle}|${text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    comments.push({ username: b.handle, text });
+  }
+  return { owner, caption, captionMentions, comments };
 }

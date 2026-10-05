@@ -23,21 +23,22 @@ export const DEFAULT_SETTINGS = {
   query: 'Rylo Rodriguez type beat',
   searchPages: 3, // ~20 видео на страницу
   minSubscribers: 5000,
-  producerCount: 3,
+  producerCount: 3, // сколько каналов отметить заранее
+  channelsToCheck: 12, // сколько каналов открыть («О канале» / видео)
+  autoSelect: false, // false — после YouTube остановиться и дать выбрать продюсеров
   manualProducers: '', // IG-хендлы через запятую — если заполнено, YouTube пропускается
   // Instagram
-  postsToFetch: 24,
-  postsToScan: 8,
-  commentsPerPost: 150,
+  postsToFetch: 24, // сколько постов взять из сетки профиля
+  postsToScan: 8, // сколько из них открыть и прочитать комментарии
+  commentsPerPost: 100,
   minIntent: 4,
   scanComments: true,
   scanTagged: true,
-  taggedPosts: 36,
+  taggedPosts: 24,
   includePlacements: true,
   maxProfileChecks: 60,
   artistThreshold: 3,
   // Поведение
-  visualNavigation: true, // реально переходить вкладкой на каждую страницу, которую анализируем
   delayMin: 2500,
   delayMax: 6000,
   recheckDays: 14,
@@ -45,7 +46,7 @@ export const DEFAULT_SETTINGS = {
 
 export const EMPTY_JOB = {
   running: false,
-  status: 'idle', // idle | running | done | stopped | error | interrupted
+  status: 'idle', // idle | running | select | done | stopped | error | interrupted
   phase: null, // youtube | instagram | profiles
   message: '',
   startedAt: null,

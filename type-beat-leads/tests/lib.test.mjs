@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { analyzeComment, classifyArtist, extractMentions, scorePost } from '../src/lib/classify.js';
-import { IgError, normalizeComments, normalizeFeed, normalizeProfile, parseIgResponse } from '../src/lib/instagram.js';
+import { IgError, assertPageUsable, cleanCommentText, ownerFromPost, parsePost, profileFromPage } from '../src/lib/instagram.js';
 import { leadPriority } from '../src/lib/store.js';
 import { extractJsonAfter, parseCount } from '../src/lib/util.js';
 import {
@@ -10,7 +10,9 @@ import {
   findInstagramHandles,
   parseChannelAbout,
   parseSearchResults,
+  parseSubscribers,
   parseVideoDescription,
+  videosFromScrape,
 } from '../src/lib/youtube.js';
 
 test('parseCount', () => {
@@ -18,6 +20,8 @@ test('parseCount', () => {
   assert.equal(parseCount('12,476 views'), 12476);
   assert.equal(parseCount('31.2K'), 31200);
   assert.equal(parseCount('No views'), null);
+  assert.equal(parseCount('3 Beats'), 3);
+  assert.equal(parseCount('106 тыс.'), 106000);
 });
 
 test('extractJsonAfter handles braces inside strings', () => {
@@ -126,43 +130,81 @@ test('parseChannelAbout / parseVideoDescription', () => {
   assert.deepEqual(findInstagramHandles(parseVideoDescription(watch)), ['jaybeats']);
 });
 
-test('Instagram response parsing and errors', () => {
-  assert.throws(() => parseIgResponse({ status: 429, text: '{"message":"Please wait a few minutes"}' }), (e) => e instanceof IgError && e.kind === 'rate_limit');
-  assert.throws(() => parseIgResponse({ status: 200, url: 'https://www.instagram.com/accounts/login/', text: '<html>' }), (e) => e.kind === 'login');
-  assert.throws(() => parseIgResponse({ status: 400, text: '{"message":"checkpoint_required"}' }), (e) => e.kind === 'challenge');
-
-  const profile = normalizeProfile({
-    data: {
-      user: {
-        id: '42', username: 'Artist', full_name: 'A', biography: 'rapper', category_name: 'Artist',
-        bio_links: [{ url: 'https://open.spotify.com/x' }], edge_followed_by: { count: 1500 },
-        edge_owner_to_timeline_media: {
-          count: 1,
-          edges: [{ node: { id: '1', shortcode: 'C1', is_video: true, edge_media_to_comment: { count: 3 }, edge_media_to_caption: { edges: [{ node: { text: 'w/ @prod' } }] } } }],
-        },
-      },
+test('profileFromPage: header text, meta, links', () => {
+  const p = profileFromPage(
+    {
+      headerText: 'lilbuyer\nFollow\nMessage\n42 posts\n3,400 followers\n120 following\nLil Buyer\nMusician/band\nRapper 🎤 new single out now\nopen.spotify.com/artist/1',
+      headerLinks: [{ href: 'https://l.instagram.com/?u=https%3A%2F%2Fopen.spotify.com%2Fartist%2F1&e=x', text: 'open.spotify.com/artist/1' }],
+      verified: false,
     },
-  });
-  assert.equal(profile.username, 'artist');
-  assert.equal(profile.followers, 1500);
-  assert.deepEqual(profile.recentPosts[0].mentions, ['prod']);
+    'LilBuyer',
+  );
+  assert.equal(p.followers, 3400);
+  assert.equal(p.postCount, 42);
+  assert.equal(p.fullName, 'Lil Buyer');
+  assert.match(p.bio, /Rapper/);
+  assert.deepEqual(p.links, ['https://open.spotify.com/artist/1']);
+  assert.ok(classifyArtist(p).isArtist);
 
-  const feed = normalizeFeed({
-    items: [{ pk: '99', code: 'XYZ', media_type: 2, comment_count: 7, caption: { text: 'new beat' }, user: { username: 'Owner' }, usertags: { in: [{ user: { username: 'Tagged1' } }] } }],
-    more_available: true,
-    next_max_id: 'next',
-  });
-  assert.equal(feed.items[0].owner, 'owner');
-  assert.deepEqual(feed.items[0].taggedUsers, ['tagged1']);
-  assert.equal(feed.nextMaxId, 'next');
+  const ru = profileFromPage({ headerText: 'x\n18\nпубликаций\n106 тыс.\nподписчиков\n10 подписок\nИмя' }, 'x');
+  assert.equal(ru.followers, 106000);
+  assert.equal(ru.postCount, 18);
 
-  const comments = normalizeComments({
-    comments: [{ pk: 1, text: 'how much?', user: { username: 'Buyer' } }],
-    has_more_headload_comments: true,
-    next_min_id: '{"cursor":1}',
+  const meta = profileFromPage({ headerText: '', metaDescription: '106K Followers, 3,497 Following, 18 Posts - See Instagram photos and videos from Pdubcookin (@pdubcookin)', ogTitle: 'Pdubcookin (@pdubcookin) • Instagram photos and videos' }, 'pdubcookin');
+  assert.equal(meta.followers, 106000);
+  assert.equal(meta.fullName, 'Pdubcookin');
+
+  assert.equal(profileFromPage({ headerText: '' }, 'nobody'), null);
+});
+
+test('cleanCommentText strips UI noise', () => {
+  assert.equal(cleanCommentText('buyer\n2w\nCheck DM, I’m trying to buy a beat\n3 likes\nReply\nSee translation', 'buyer'), 'Check DM, I’m trying to buy a beat');
+  assert.equal(cleanCommentText('fan\n5 нед.\n🔥🔥🔥\nОтветить', 'fan'), '🔥🔥🔥');
+  assert.equal(cleanCommentText('buyer\nHow much would it cost?\n2w 3 likes Reply', 'buyer'), 'How much would it cost?');
+  assert.equal(cleanCommentText('a\nnew single out in 2w, who wants a feature?\n1d Reply', 'a'), 'new single out in 2w, who wants a feature?');
+  assert.equal(cleanCommentText('a\nView replies (3)\nhit me up', 'a'), 'hit me up');
+  assert.equal(cleanCommentText('b\nHow much?\n2wReply', 'b'), 'How much?');
+  assert.equal(cleanCommentText('b\nСколько стоит?\n1 нед.Ответить', 'b'), 'Сколько стоит?');
+});
+
+test('parsePost: owner, caption mentions, comments', () => {
+  const scrape = {
+    metaDescription: '120 likes, 14 comments - prodalpha on May 1, 2026: "Out now w/ @placement_artist"',
+    blocks: [
+      { handle: 'prodalpha', text: 'prodalpha\n1w\nOut now w/ @placement_artist 🔥', mentions: ['@placement_artist'] },
+      { handle: 'buyer', text: 'buyer\n2d\nhow much for this beat?\nReply', mentions: [] },
+      { handle: 'buyer', text: 'buyer\n2d\nhow much for this beat?\nReply', mentions: [] },
+      { handle: 'fan', text: 'fan\n2d\nReply', mentions: [] },
+    ],
+  };
+  const post = parsePost(scrape);
+  assert.equal(post.owner, 'prodalpha');
+  assert.deepEqual(post.captionMentions, ['placement_artist']);
+  assert.deepEqual(post.comments, [{ username: 'buyer', text: 'how much for this beat?' }]);
+  assert.equal(ownerFromPost({ ownerHint: 'someone', blocks: [] }), 'someone');
+});
+
+test('assertPageUsable', () => {
+  assert.throws(() => assertPageUsable({ loginWall: true }), (e) => e instanceof IgError && e.kind === 'login');
+  assert.throws(() => assertPageUsable({ rateLimited: true }), (e) => e.kind === 'rate_limit');
+  assert.doesNotThrow(() => assertPageUsable({}));
+});
+
+test('YouTube DOM search scrape → videos; subscriber text', () => {
+  const videos = videosFromScrape({
+    videos: [
+      { videoId: 'a1', title: 'Rylo Type Beat', channelPath: '/@ProdStunnah', channelName: 'Stunnah', viewsText: '12K' },
+      { videoId: 'b2', title: 'x', channelPath: '/channel/UCabc', channelName: 'Ch', viewsText: '1,234' },
+      { videoId: 'c3', title: 'no channel', channelPath: null },
+    ],
   });
-  assert.equal(comments.comments[0].username, 'buyer');
-  assert.deepEqual(comments.cursor, { param: 'min_id', value: '{"cursor":1}' });
+  assert.equal(videos.length, 2);
+  assert.equal(videos[0].views, 12000);
+  assert.equal(videos[1].channelId, 'UCabc');
+  assert.equal(aggregateChannels(videos).length, 1);
+  assert.equal(parseSubscribers('@ProdStunnah•31.2K subscribers•500 videos'), 31200);
+  assert.equal(parseSubscribers('2026\n31.2K subscribers'), 31200);
+  assert.equal(parseSubscribers('203 тыс. подписчиков'), 203000);
 });
 
 test('lead priority', () => {

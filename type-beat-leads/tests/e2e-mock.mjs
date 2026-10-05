@@ -1,4 +1,5 @@
 // E2E: грузит расширение в Chromium и прогоняет Instagram-этап против локального мок-сервера.
+// Мок отдаёт обычные HTML-страницы (профиль, пост с кнопкой «ещё комментарии», Tagged) — API не используется.
 // www.instagram.com резолвится на 127.0.0.1 (самоподписанный сертификат).
 // Запуск: npm run test:e2e  (нужны playwright и openssl; путь к браузеру — CHROMIUM_PATH, если нужен)
 
@@ -12,51 +13,49 @@ import { fileURLToPath } from 'node:url';
 
 const extPath = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+const lines = (...xs) => xs.map((x) => `<div>${x}</div>`).join('');
+const outLink = (url) => `<a href="https://l.instagram.com/?u=${encodeURIComponent(url)}&e=x">${url.replace(/^https?:\/\//, '')}</a>`;
+
 const profiles = {
-  prodalpha: { id: '100', username: 'prodalpha', full_name: 'Prod Alpha', biography: 'Producer | type beats', category_name: 'Music producer', followers: 52000 },
-  buyer_artist: { id: '201', username: 'buyer_artist', full_name: 'Lil Buyer', biography: 'Rapper 🎤 new single out now', category_name: 'Musician/Band', external_url: 'https://open.spotify.com/artist/1', followers: 3400 },
-  buyer_prod: { id: '202', username: 'buyer_prod', full_name: 'Beat Guy', biography: 'producer / drum kits / mixing & mastering', category_name: '', followers: 900 },
-  tagger_artist: { id: '301', username: 'tagger_artist', full_name: 'Tag Artist', biography: 'singer songwriter • booking: x@y.z', category_name: 'Artist', followers: 15000 },
-  placement_artist: { id: '401', username: 'placement_artist', full_name: 'Placed', biography: 'R&B artist. Stream my EP', category_name: '', external_url: 'https://linktr.ee/placed', followers: 88000 },
+  prodalpha: { posts: 30, followers: '52K', name: 'Prod Alpha', bio: ['Music producer', 'type beats daily'], grid: ['/prodalpha/p/BEATPOST01/', '/prodalpha/reel/PLACEPOST1/', '/prodalpha/p/SELFIEPOST/'] },
+  buyer_artist: { posts: 40, followers: '3,400', name: 'Lil Buyer', bio: ['Musician/band', 'Rapper 🎤 new single out now'], link: 'https://open.spotify.com/artist/1' },
+  buyer_prod: { posts: 300, followers: '900', name: 'Beat Guy', bio: ['producer / drum kits / mixing &amp; mastering'] },
+  tagger_artist: { posts: 80, followers: '15K', name: 'Tag Artist', bio: ['Artist', 'singer songwriter • booking: x@y.z'] },
+  placement_artist: { posts: 120, followers: '88K', name: 'Placed', bio: ['R&amp;B artist. Stream my EP'], link: 'https://linktr.ee/placed' },
 };
 
-const userJson = (p) => ({
-  data: {
-    user: {
-      id: p.id, username: p.username, full_name: p.full_name, biography: p.biography, category_name: p.category_name,
-      external_url: p.external_url || null, bio_links: [], is_private: false, is_verified: false,
-      edge_followed_by: { count: p.followers }, edge_follow: { count: 10 },
-      edge_owner_to_timeline_media: { count: 30, edges: [] },
-    },
+const profilePage = (u, tagged = false) => {
+  const p = profiles[u];
+  if (!p) return `<main><div>Sorry, this page isn't available.</div></main>`;
+  const grid = tagged ? ['/p/TAGGEDPOST1/'] : p.grid || [];
+  return `<main><header><section>${lines(u, 'Follow', 'Message', `${p.posts} posts`, `${p.followers} followers`, '10 following', p.name, ...p.bio)}${p.link ? outLink(p.link) : ''}</section></header>
+    <div class="grid">${grid.map((g) => `<a href="${g}"><img alt="${g.includes('BEATPOST') ? 'new beat link in bio' : 'photo'}"></a>`).join('')}</div></main>`;
+};
+
+const comment = (u, text) =>
+  `<li><div><a href="/${u}/"><img alt=""></a></div><div><h3><a href="/${u}/">${u}</a></h3><span>${text}</span><div><time>2w</time><button>Reply</button></div></div></li>`;
+
+const posts = {
+  BEATPOST01: {
+    owner: 'prodalpha',
+    caption: 'new beat 🔥 link in bio',
+    comments: [comment('buyer_artist', 'Check DM, I’m trying to buy a beat'), comment('random_fan', '🔥🔥🔥'), comment('prodalpha', 'thank you!')],
+    more: comment('buyer_prod', 'How much would it cost?'),
   },
-});
-
-const feed = {
-  items: [
-    { pk: '9001', code: 'BEAT1', media_type: 2, comment_count: 4, caption: { text: 'new beat 🔥 link in bio' }, user: { username: 'prodalpha' } },
-    { pk: '9002', code: 'PLACE1', media_type: 2, comment_count: 1, caption: { text: 'Out now w/ @placement_artist' }, user: { username: 'prodalpha' } },
-    { pk: '9003', code: 'SELFIE', media_type: 1, comment_count: 0, caption: { text: 'vibes' }, user: { username: 'prodalpha' } },
-  ],
-  more_available: false,
+  PLACEPOST1: { owner: 'prodalpha', caption: 'Out now w/ <a href="/placement_artist/">@placement_artist</a>', comments: [] },
+  SELFIEPOST: { owner: 'prodalpha', caption: 'vibes', comments: [] },
+  TAGGEDPOST1: { owner: 'tagger_artist', caption: 'my new song prod <a href="/prodalpha/">@prodalpha</a>', comments: [] },
 };
 
-const commentsPage1 = {
-  comments: [
-    { pk: 1, text: 'Check DM, I’m trying to buy a beat', user: { username: 'buyer_artist' } },
-    { pk: 2, text: '🔥🔥🔥', user: { username: 'random_fan' } },
-  ],
-  has_more_headload_comments: true,
-  next_min_id: 'page2',
-};
-const commentsPage2 = {
-  comments: [
-    { pk: 3, text: 'How much would it cost?', user: { username: 'buyer_prod' } },
-    { pk: 4, text: 'thank you!', user: { username: 'prodalpha' } },
-  ],
-};
-const tagged = {
-  items: [{ pk: '7001', code: 'TAG1', media_type: 2, caption: { text: 'my new song prod @prodalpha' }, user: { username: 'tagger_artist' } }],
-  more_available: false,
+const postPage = (code) => {
+  const p = posts[code];
+  if (!p) return `<main><div>Sorry, this page isn't available.</div></main>`;
+  const loadMore = p.more
+    ? `<button id="more" onclick="document.getElementById('list').insertAdjacentHTML('beforeend', ${JSON.stringify(p.more).replace(/"/g, '&quot;')}); this.remove()"><svg aria-label="Load more comments"></svg></button>`
+    : '';
+  return `<head><meta property="og:description" content="10 likes, 4 comments - ${p.owner} on May 1, 2026: &quot;post&quot;"></head>
+  <main><article><header><a href="/${p.owner}/">${p.owner}</a></header>
+  <ul id="list">${comment(p.owner, p.caption)}${p.comments.join('')}</ul>${loadMore}</article></main>`;
 };
 
 const ctxDir = mkdtempSync(join(tmpdir(), 'tbl-e2e-'));
@@ -73,20 +72,19 @@ const seen = [];
 const server = createServer({ key: readFileSync(keyPath), cert: readFileSync(certPath) }, (req, res) => {
   const url = new URL(req.url, 'https://www.instagram.com');
   seen.push(url.pathname + url.search);
-  const json = (body, status = 200) => {
-    res.writeHead(status, { 'content-type': 'application/json' });
-    res.end(JSON.stringify(body));
-  };
-  if (url.pathname === '/api/v1/users/web_profile_info/') {
-    const p = profiles[url.searchParams.get('username')];
-    return p ? json(userJson(p)) : json({}, 404);
+  let body;
+  let m;
+  if (url.pathname.startsWith('/api/')) body = null; // расширение не должно ходить в API
+  else if ((m = url.pathname.match(/^\/(?:[\w.]+\/)?(?:p|reel)\/([\w-]+)\/$/))) body = postPage(m[1]);
+  else if ((m = url.pathname.match(/^\/([\w.]+)\/tagged\/$/))) body = profilePage(m[1], true);
+  else if ((m = url.pathname.match(/^\/([\w.]+)\/$/))) body = profilePage(m[1]);
+  else body = '<main></main>';
+  if (body == null) {
+    res.writeHead(500);
+    return res.end('api used');
   }
-  if (url.pathname.startsWith('/api/v1/feed/user/')) return json(feed);
-  if (url.pathname === '/api/v1/media/9001/comments/') return json(url.searchParams.get('min_id') ? commentsPage2 : commentsPage1);
-  if (url.pathname.startsWith('/api/v1/media/')) return json({ comments: [] });
-  if (url.pathname.startsWith('/api/v1/usertags/')) return json(tagged);
-  res.writeHead(200, { 'content-type': 'text/html', 'set-cookie': 'csrftoken=test; Path=/' });
-  res.end(`<html><body>${url.pathname}</body></html>`);
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+  res.end(`<!doctype html><html>${body.startsWith('<head>') ? body : `<body>${body}</body>`}</html>`);
 });
 await new Promise((r) => server.listen(Number(process.env.MOCK_PORT || 443), '127.0.0.1', r));
 const { port } = server.address();
@@ -115,18 +113,19 @@ const errors = [];
 panel.on('pageerror', (e) => errors.push(e.message));
 await panel.goto(`chrome-extension://${extId}/src/ui/sidepanel.html`);
 await panel.evaluate(() =>
-  chrome.storage.local.set({ settings: { manualProducers: '@prodalpha', delayMin: 500, delayMax: 700, visualNavigation: true } }),
+  chrome.storage.local.set({ settings: { manualProducers: '@prodalpha', delayMin: 500, delayMax: 700 } }),
 );
 await panel.reload();
 await panel.click('#startBtn');
 
 let job;
-for (let i = 0; i < 120; i++) {
+for (let i = 0; i < 180; i++) {
   await new Promise((r) => setTimeout(r, 1000));
   job = await panel.evaluate(async () => (await chrome.storage.local.get('job')).job);
   if (job && !job.running && job.status !== 'idle') break;
 }
 const leads = await panel.evaluate(async () => (await chrome.storage.local.get('leads')).leads);
+if (process.env.DEBUG) console.log(JSON.stringify(leads.buyer_prod?.sources));
 for (const l of job.log) console.log(`  [${l.level}] ${l.msg}`);
 await panel.screenshot({ path: join(ctxDir, 'panel.png'), fullPage: true });
 const table = await ctx.newPage();
@@ -152,5 +151,8 @@ expect(leads.tagger_artist?.priority === 'warm', 'Tagged post owner artist → w
 expect(leads.placement_artist?.isArtist === true, 'artist mentioned in placement caption → artist');
 expect(!leads.random_fan, 'emoji-only commenter ignored');
 expect(!leads.prodalpha, 'producer own replies ignored');
-expect(seen.some((s) => s.includes('min_id=page2')), 'comments pagination followed');
-expect(seen.some((s) => s === '/prodalpha/tagged/'), 'Tagged tab opened');
+expect(leads.buyer_prod?.sources?.[0]?.text === 'How much would it cost?', '"load more comments" clicked, extra comment read');
+expect(seen.includes('/prodalpha/tagged/'), 'Tagged tab opened');
+expect(seen.includes('/p/TAGGEDPOST1/'), 'Tagged post opened to find its author');
+expect(seen.includes('/buyer_artist/'), 'candidate profile opened');
+expect(!seen.some((s) => s.startsWith('/api/')), 'no Instagram API requests');

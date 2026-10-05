@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Type Beat Leads",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Лидогенерация для продюсеров: YouTube type beat-каналы → их Instagram → артисты из комментариев и отметок (Tagged).",
   "minimum_chrome_version": "116",
   "permissions": ["storage", "unlimitedStorage", "tabs", "scripting", "sidePanel"],

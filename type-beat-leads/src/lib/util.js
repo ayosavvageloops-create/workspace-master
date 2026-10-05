@@ -5,15 +5,16 @@ export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export const randomBetween = (min, max) =>
   Math.round(min + Math.random() * Math.max(0, max - min));
 
-// "1.2M subscribers" -> 1200000, "12,345 views" -> 12345, "987K" -> 987000.
+// "1.2M subscribers" -> 1200000, "12,345 views" -> 12345, "987K" -> 987000, "106 тыс." -> 106000.
 export function parseCount(value) {
   if (value == null) return null;
   if (typeof value === 'number') return value;
   const match = String(value)
-    .replace(/ /g, ' ')
-    .match(/(\d[\d.,\s]*)\s*([KMB])?/i);
+    .replace(/[  ]/g, ' ')
+    .match(/(\d[\d.,\s]*)(млрд|млн|тыс|[KMB](?![a-z]))?/i);
   if (!match) return null;
-  const suffix = (match[2] || '').toUpperCase();
+  const rawSuffix = (match[2] || '').toLowerCase();
+  const suffix = { k: 'K', m: 'M', b: 'B', тыс: 'K', млн: 'M', млрд: 'B' }[rawSuffix] || '';
   let digits = match[1].trim();
   digits = suffix ? digits.replace(',', '.').replace(/\s/g, '') : digits.replace(/[.,\s]/g, '');
   const num = parseFloat(digits);

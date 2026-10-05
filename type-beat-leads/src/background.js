@@ -1,20 +1,23 @@
-// Оркестратор: YouTube → Instagram продюсеров → комментарии + Tagged → проверка профилей → лиды.
+// Оркестратор. Всё делается действиями во вкладках, без API:
+// YouTube (поиск → «О канале» → при необходимости видео) → выбор продюсеров →
+// Instagram (профиль → посты с комментариями → Tagged → профили кандидатов) → лиды.
 
 import { analyzeComment, classifyArtist, scorePost } from './lib/classify.js';
-import { IgError, igUrls, normalizeComments, normalizeFeed, normalizeProfile, parseIgResponse } from './lib/instagram.js';
+import { IgError, assertPageUsable, igUrls, parsePost, profileFromPage } from './lib/instagram.js';
+import { igScrapeGrid, igScrapePost, ytScrapeChannelAbout, ytScrapeSearch, ytScrapeVideo } from './lib/pagescripts.js';
 import { EMPTY_JOB, KEYS, getLeads, getSettings, leadPriority } from './lib/store.js';
 import { randomBetween, sleep } from './lib/util.js';
 import {
   aggregateChannels,
   channelAboutUrl,
-  continuationRequest,
   findInstagramHandles,
   parseChannelAbout,
   parseInitialData,
   parseSearchResults,
+  parseSubscribers,
   parseVideoDescription,
-  parseYtcfg,
   searchUrl,
+  videosFromScrape,
   watchUrl,
 } from './lib/youtube.js';
 
@@ -23,6 +26,7 @@ import {
 let job = structuredClone(EMPTY_JOB);
 let leads = {};
 let profileCache = {};
+let settings = null;
 let stopRequested = false;
 let keepAliveTimer = null;
 const tabs = { yt: null, ig: null };
@@ -77,7 +81,7 @@ function stopKeepAlive() {
   keepAliveTimer = null;
 }
 
-// ---------- Вкладки и запросы из контекста страницы ----------
+// ---------- Вкладки ----------
 
 async function tabAlive(id) {
   if (id == null) return false;
@@ -115,118 +119,81 @@ async function navigate(key, url) {
     tabs[key] = tab.id;
     await waitForComplete(tab.id);
   }
-  await sleep(800); // даём SPA дорисоваться
-  return tabs[key];
+  await sleep(800);
 }
 
-// Выполняется ВНУТРИ страницы (youtube.com / instagram.com): fetch с куками пользователя.
-async function injectedFetch(url, opts) {
-  try {
-    const headers = Object.assign({}, opts && opts.headers);
-    if (opts && opts.instagram) {
-      const csrf = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-      if (csrf) headers['X-CSRFToken'] = csrf[1];
-      headers['X-IG-App-ID'] = '936619743392459';
-      headers['X-ASBD-ID'] = '129477';
-      headers['X-Requested-With'] = 'XMLHttpRequest';
-      try {
-        const claim = sessionStorage.getItem('www-claim-v2');
-        if (claim) headers['X-IG-WWW-Claim'] = claim;
-      } catch (e) {}
-    }
-    const res = await fetch(url, {
-      method: (opts && opts.method) || 'GET',
-      headers,
-      body: opts && opts.body,
-      credentials: 'include',
-    });
-    return { ok: res.ok, status: res.status, url: res.url, text: await res.text() };
-  } catch (e) {
-    return { ok: false, status: 0, url, text: '', error: String(e) };
-  }
-}
-
-async function pageFetch(tabId, url, opts = {}) {
+// Выполняет функцию из pagescripts.js на открытой странице. Если вкладка показывает ошибку сети — одна перезагрузка.
+async function runInTab(key, func, args = []) {
   for (let attempt = 1; ; attempt++) {
     try {
-      const [injection] = await chrome.scripting.executeScript({
-        target: { tabId },
-        func: injectedFetch,
-        args: [url, opts],
-      });
-      return injection?.result || { ok: false, status: 0, text: '', error: 'скрипт не выполнился' };
+      const [injection] = await chrome.scripting.executeScript({ target: { tabId: tabs[key] }, func, args });
+      if (!injection || injection.result == null) throw new Error('страница не ответила');
+      return injection.result;
     } catch (e) {
-      // Вкладка показывает страницу сетевой ошибки — одна попытка перезагрузить.
-      if (attempt >= 2 || !/error page/i.test(e.message)) throw e;
-      log('Вкладка не загрузилась, перезагружаю…', 'warn');
-      const loaded = waitForComplete(tabId);
-      await chrome.tabs.reload(tabId);
+      const network = /error page|не ответила|No frame/i.test(e.message);
+      if (network && attempt >= 2) throw new Error('страница не загрузилась (ошибка сети или страница недоступна)');
+      if (!network) throw e;
+      log('Страница не загрузилась, перезагружаю…', 'warn');
+      const loaded = waitForComplete(tabs[key]);
+      await chrome.tabs.reload(tabs[key]);
       await loaded;
       await sleep(1500);
     }
   }
 }
 
-async function ensureTab(key, fallbackUrl) {
-  if (!(await tabAlive(tabs[key]))) await navigate(key, fallbackUrl);
-  return tabs[key];
+async function visit(key, url, func, args = []) {
+  await navigate(key, url);
+  return runInTab(key, func, args);
 }
 
 // ---------- YouTube ----------
 
-async function ytFetch(url, opts) {
-  const tabId = await ensureTab('yt', 'https://www.youtube.com/');
-  const res = await pageFetch(tabId, url, opts);
-  if (!res.ok) throw new Error(`YouTube HTTP ${res.status} ${res.error || ''}`.trim());
-  return res.text;
-}
-
 async function youtubePhase(s) {
   job.phase = 'youtube';
   log(`YouTube: ищу «${s.query}»`);
-  const url = searchUrl(s.query);
-  await navigate('yt', url);
-  const html = await ytFetch(url);
-  const data = parseInitialData(html);
-  if (!data) throw new Error('Не удалось разобрать выдачу YouTube (ytInitialData не найден)');
-  const ytcfg = parseYtcfg(html);
-
-  let { videos, continuation } = parseSearchResults(data);
-  for (let page = 2; page <= s.searchPages && continuation; page++) {
-    checkStop();
-    progress('Страницы выдачи YouTube', page - 1, s.searchPages);
-    await pause(800, 1600);
-    const req = continuationRequest(ytcfg, continuation);
-    try {
-      const next = parseSearchResults(JSON.parse(await ytFetch(req.url, req.options)));
-      videos = videos.concat(next.videos);
-      continuation = next.continuation;
-    } catch (e) {
-      log(`Не удалось подгрузить страницу ${page}: ${e.message}`, 'warn');
-      break;
-    }
+  const search = await visit('yt', searchUrl(s.query), ytScrapeSearch, [{ scrolls: Math.max(0, s.searchPages - 1) }]);
+  let videos = videosFromScrape(search);
+  if (!videos.length && search.script) {
+    videos = parseSearchResults(parseInitialData(search.script) || {}).videos;
   }
+  if (!videos.length) throw new Error('На странице поиска YouTube не нашлось видео. Проверьте запрос или откройте вкладку YouTube вручную.');
+
   const channels = aggregateChannels(videos).sort((a, b) => b.totalViews - a.totalViews);
   log(`Найдено ${videos.length} видео, ${channels.length} type beat-каналов`);
 
-  const toCheck = channels.slice(0, Math.max(s.producerCount * 4, 10));
+  const toCheck = channels.slice(0, s.channelsToCheck);
   for (let i = 0; i < toCheck.length; i++) {
     checkStop();
     const ch = toCheck[i];
-    progress('Проверка каналов YouTube', i, toCheck.length);
+    progress('Каналы YouTube', i, toCheck.length);
     try {
-      const aboutUrl = channelAboutUrl(ch);
-      if (s.visualNavigation) await navigate('yt', aboutUrl);
-      const about = parseChannelAbout(await ytFetch(aboutUrl));
-      ch.subscribers = about.subscribers;
-      ch.instagram = about.handles[0] || null;
-      if (!ch.instagram && ch.sampleVideos[0]) {
-        await pause(600, 1200);
-        const desc = parseVideoDescription(await ytFetch(watchUrl(ch.sampleVideos[0].videoId)));
-        ch.instagram = findInstagramHandles(desc)[0] || null;
+      const about = await visit('yt', channelAboutUrl(ch), ytScrapeChannelAbout);
+      const fromScript = about.script ? parseChannelAbout(about.script) : { subscribers: null, handles: [] };
+      ch.subscribers = parseSubscribers(`${about.headerText}\n${about.aboutText}`) ?? fromScript.subscribers;
+      let handles = findInstagramHandles([about.aboutText, ...about.links].join('\n'));
+      if (!handles.length) handles = fromScript.handles;
+      ch.igSource = handles.length ? 'о канале' : null;
+
+      // Нет Instagram в «О канале» — открываем видео канала и читаем описание.
+      for (const v of handles.length ? [] : ch.sampleVideos.slice(0, 2)) {
+        log(`${ch.name}: в «О канале» Instagram нет — открываю видео «${v.title.slice(0, 60)}»`);
+        await pause(800, 1500);
+        const video = await visit('yt', watchUrl(v.videoId), ytScrapeVideo);
+        const desc = parseVideoDescription(`"shortDescription":"${video.shortDescription}"`);
+        handles = findInstagramHandles([video.text, ...video.links, desc].join('\n'));
+        if (handles.length) {
+          ch.igSource = 'описание видео';
+          break;
+        }
       }
-      log(`${ch.name}: ${ch.subscribers ?? '?'} подписчиков, IG: ${ch.instagram ? '@' + ch.instagram : 'не найден'}`);
+      ch.instagram = handles[0] || null;
+      ch.instagramAlt = handles.slice(1, 3);
+      log(
+        `${ch.name}: ${ch.subscribers ?? '?'} подписчиков, IG: ${ch.instagram ? `@${ch.instagram} (${ch.igSource})` : 'не найден'}`,
+      );
     } catch (e) {
+      if (e instanceof StopError) throw e;
       log(`${ch.name}: ошибка — ${e.message}`, 'warn');
     }
     job.channels = toCheck.map(stripChannel);
@@ -234,88 +201,54 @@ async function youtubePhase(s) {
     await pause(700, 1500);
   }
 
-  const chosen = toCheck
-    .filter((c) => c.instagram && (c.subscribers ?? 0) >= s.minSubscribers)
+  // Предварительно отмечаем самых крупных с найденным Instagram — пользователь может поменять выбор.
+  const preselected = new Set(
+    toCheck
+      .filter((c) => c.instagram && (c.subscribers ?? 0) >= s.minSubscribers)
+      .sort((a, b) => (b.subscribers || 0) - (a.subscribers || 0))
+      .slice(0, s.producerCount)
+      .map((c) => c.key),
+  );
+  job.channels = toCheck
+    .map(stripChannel)
+    .map((c) => ({ ...c, selected: preselected.has(c.key) }))
     .sort((a, b) => (b.subscribers || 0) - (a.subscribers || 0));
-  const seen = new Set();
-  const producers = [];
-  for (const c of chosen) {
-    if (seen.has(c.instagram)) continue;
-    seen.add(c.instagram);
-    producers.push({ username: c.instagram, channelName: c.name, channelUrl: c.url, subscribers: c.subscribers });
-    if (producers.length >= s.producerCount) break;
-  }
-  if (!producers.length) {
-    throw new Error(
-      `Не найдено каналов с Instagram и ≥ ${s.minSubscribers} подписчиков. Уменьшите порог или укажите продюсеров вручную.`,
-    );
-  }
-  log(`Выбраны продюсеры: ${producers.map((p) => '@' + p.username).join(', ')}`, 'success');
-  return producers;
+  return job.channels;
 }
 
 function stripChannel(c) {
   const { sampleVideos, ...rest } = c;
-  return { ...rest, sampleVideo: sampleVideos[0]?.title || '' };
+  return { ...rest, sampleVideo: sampleVideos?.[0]?.title || '' };
 }
 
-// ---------- Instagram ----------
+const channelToProducer = (c) => ({
+  username: c.instagram,
+  channelName: c.name,
+  channelUrl: c.url,
+  subscribers: c.subscribers,
+});
 
-let settings = null;
+// ---------- Instagram (только страницы) ----------
 
-async function igRequest(url) {
-  const tabId = await ensureTab('ig', 'https://www.instagram.com/');
+async function igVisit(url, func, opts) {
   for (let attempt = 1; ; attempt++) {
-    checkStop();
-    const res = await pageFetch(tabId, url, { instagram: true });
+    const scrape = await visit('ig', url, func, [opts]);
     try {
-      const json = parseIgResponse(res);
-      await pause(settings.delayMin, settings.delayMax);
-      return json;
+      assertPageUsable(scrape);
     } catch (e) {
-      if (!(e instanceof IgError)) throw e;
-      if (e.kind === 'rate_limit' && attempt <= 3) {
-        const wait = 60000 * attempt;
-        log(`Instagram ограничил запросы — жду ${wait / 1000} с (попытка ${attempt}/3)`, 'warn');
-        await pause(wait, wait + 5000);
-        continue;
-      }
-      if (e.kind === 'network' && attempt <= 2) {
-        await pause(3000, 5000);
+      if (e.kind === 'rate_limit' && attempt === 1) {
+        log('Instagram просит подождать — пауза 3 минуты и повтор', 'warn');
+        await pause(180000, 200000);
         continue;
       }
       throw e;
     }
+    await pause(settings.delayMin, settings.delayMax);
+    return scrape;
   }
 }
 
-// Ошибки, после которых продолжать Instagram-часть бессмысленно.
-const isFatalIg = (e) => e instanceof IgError && ['login', 'challenge', 'rate_limit'].includes(e.kind);
-
-async function fetchProfile(username) {
-  try {
-    return normalizeProfile(await igRequest(igUrls.profileInfo(username)));
-  } catch (e) {
-    if (e instanceof IgError && e.kind === 'not_found') return null;
-    throw e;
-  }
-}
-
-async function fetchPosts(profile, limit) {
-  const posts = [];
-  let maxId = null;
-  try {
-    do {
-      const page = normalizeFeed(await igRequest(igUrls.userFeed(profile.id, maxId)));
-      posts.push(...page.items);
-      maxId = page.nextMaxId;
-    } while (maxId && posts.length < limit);
-  } catch (e) {
-    if (isFatalIg(e) || e instanceof StopError) throw e;
-    log(`Лента @${profile.username} недоступна через API (${e.message}) — беру первые посты профиля`, 'warn');
-  }
-  return (posts.length ? posts : profile.recentPosts).slice(0, limit);
-}
+const isFatalIg = (e) => e instanceof IgError;
 
 function addCandidate(candidates, username, source) {
   if (!username) return;
@@ -325,118 +258,106 @@ function addCandidate(candidates, username, source) {
 }
 
 async function scanProducer(producer, candidates, s, producerHandles) {
-  log(`Instagram: открываю @${producer.username}`);
-  await navigate('ig', igUrls.profilePage(producer.username));
-  const tab = await chrome.tabs.get(tabs.ig);
-  if (/\/accounts\/login/.test(tab.url || '')) throw new IgError('login', 'требуется вход в Instagram');
-
-  const profile = await fetchProfile(producer.username);
-  if (!profile) {
+  const u = producer.username;
+  log(`Instagram: открываю профиль @${u}`);
+  const page = await igVisit(igUrls.profilePage(u), igScrapeGrid, {
+    username: u,
+    scrolls: Math.ceil(s.postsToFetch / 12),
+    maxCodes: s.postsToFetch,
+  });
+  if (page.notFound) {
     producer.status = 'не найден';
-    log(`@${producer.username} не найден в Instagram`, 'warn');
+    log(`@${u} не найден в Instagram`, 'warn');
     return;
   }
-  Object.assign(producer, { id: profile.id, followers: profile.followers, isPrivate: profile.isPrivate, status: 'сканирую' });
-  producer.stats = { posts: 0, postsScanned: 0, comments: 0, intentComments: 0, tagged: 0, placements: 0 };
+  const profile = profileFromPage(page, u);
+  producer.followers = profile?.followers ?? null;
+  producer.status = 'сканирую';
+  producer.stats = { posts: page.codes.length, postsScanned: 0, comments: 0, intentComments: 0, tagged: 0, placements: 0 };
   saveJob();
-  if (profile.isPrivate) {
+  if (page.isPrivate) {
     producer.status = 'закрытый профиль';
-    log(`@${producer.username} — закрытый профиль, пропускаю`, 'warn');
+    log(`@${u} — закрытый профиль, пропускаю`, 'warn');
     return;
   }
+  log(`@${u}: ${producer.followers ?? '?'} подписчиков, в сетке ${page.codes.length} постов`);
 
-  const posts = await fetchPosts(profile, s.postsToFetch);
-  producer.stats.posts = posts.length;
-  log(`@${producer.username}: ${profile.followers} подписчиков, получено ${posts.length} постов`);
-
-  // Плейсменты: артисты, отмеченные/упомянутые в постах продюсера.
-  if (s.includePlacements) {
-    for (const p of posts) {
-      for (const u of new Set([...p.taggedUsers, ...p.mentions])) {
-        if (producerHandles.has(u)) continue;
-        addCandidate(candidates, u, {
-          type: 'placement',
-          producer: producer.username,
-          postCode: p.code,
-          text: p.caption.slice(0, 200),
-        });
-        producer.stats.placements++;
-      }
-    }
-  }
-
-  // Комментарии под битами/плейсментами.
-  if (s.scanComments) {
-    const ranked = posts
-      .filter((p) => p.commentCount > 0)
-      .sort((a, b) => scorePost(b) - scorePost(a))
+  // Посты: открываем каждый, догружаем комментарии, читаем их со страницы.
+  if (s.scanComments || s.includePlacements) {
+    const posts = page.codes
+      .map((c, i) => ({ ...c, caption: c.alt, rank: scorePost({ caption: c.alt, isVideo: c.isVideo }) - i * 0.05 }))
+      .sort((a, b) => b.rank - a.rank)
       .slice(0, s.postsToScan);
-    for (let i = 0; i < ranked.length; i++) {
-      const post = ranked[i];
-      progress(`@${producer.username}: комментарии`, i, ranked.length);
-      if (s.visualNavigation) await navigate('ig', igUrls.postPage(post.code));
-      let cursor = null;
-      let fetched = 0;
+    for (let i = 0; i < posts.length; i++) {
+      const code = posts[i].code;
+      progress(`@${u}: посты`, i, posts.length);
+      let post;
       try {
-        do {
-          const page = normalizeComments(await igRequest(igUrls.comments(post.id, cursor)));
-          for (const c of page.comments) {
-            fetched++;
-            if (!c.username || producerHandles.has(c.username)) continue;
-            const intent = analyzeComment(c.text);
-            if (intent.score >= s.minIntent) {
-              producer.stats.intentComments++;
-              addCandidate(candidates, c.username, {
-                type: 'comment',
-                producer: producer.username,
-                postCode: post.code,
-                text: c.text.slice(0, 300),
-                intent: intent.score,
-                labels: intent.labels,
-                at: c.createdAt,
-              });
-            }
-          }
-          cursor = page.comments.length ? page.cursor : null;
-        } while (cursor && fetched < s.commentsPerPost);
+        post = await igVisit(igUrls.postPage(code), igScrapePost, {
+          maxComments: s.scanComments ? s.commentsPerPost : 0,
+          maxLoads: s.scanComments ? Math.ceil(s.commentsPerPost / 12) : 0,
+        });
       } catch (e) {
         if (isFatalIg(e) || e instanceof StopError) throw e;
-        log(`Комментарии поста ${post.code}: ${e.message}`, 'warn');
+        log(`Пост ${code}: ${e.message}`, 'warn');
+        continue;
       }
-      producer.stats.comments += fetched;
+      if (post.notFound) continue;
+      const parsed = parsePost(post);
+
+      if (s.includePlacements) {
+        for (const m of parsed.captionMentions) {
+          if (producerHandles.has(m)) continue;
+          addCandidate(candidates, m, { type: 'placement', producer: u, postCode: code, text: parsed.caption.slice(0, 200) });
+          producer.stats.placements++;
+        }
+      }
+      if (s.scanComments) {
+        for (const c of parsed.comments) {
+          producer.stats.comments++;
+          if (producerHandles.has(c.username)) continue;
+          const intent = analyzeComment(c.text);
+          if (intent.score < s.minIntent) continue;
+          producer.stats.intentComments++;
+          addCandidate(candidates, c.username, {
+            type: 'comment',
+            producer: u,
+            postCode: code,
+            text: c.text.slice(0, 300),
+            intent: intent.score,
+            labels: intent.labels,
+          });
+        }
+      }
       producer.stats.postsScanned++;
       saveJob();
     }
-    log(`@${producer.username}: просмотрено ${producer.stats.comments} комментариев, с намерением купить — ${producer.stats.intentComments}`);
+    log(`@${u}: открыто ${producer.stats.postsScanned} постов, прочитано ${producer.stats.comments} комментариев, с намерением купить — ${producer.stats.intentComments}`);
   }
 
-  // Вкладка Tagged: посты, где продюсер отмечен (обычно — треки артистов на его битах).
+  // Tagged: открываем вкладку, затем каждый пост — его автор и есть кандидат.
   if (s.scanTagged) {
-    await navigate('ig', igUrls.taggedPage(producer.username));
-    let maxId = null;
-    let count = 0;
-    try {
-      do {
-        const page = normalizeFeed(await igRequest(igUrls.tagged(profile.id, maxId)));
-        for (const item of page.items) {
-          count++;
-          if (!item.owner || producerHandles.has(item.owner)) continue;
-          addCandidate(candidates, item.owner, {
-            type: 'tagged',
-            producer: producer.username,
-            postCode: item.code,
-            text: item.caption.slice(0, 200),
-          });
-          producer.stats.tagged++;
-        }
-        maxId = page.nextMaxId;
-        progress(`@${producer.username}: Tagged`, count, s.taggedPosts);
-      } while (maxId && count < s.taggedPosts);
-    } catch (e) {
-      if (isFatalIg(e) || e instanceof StopError) throw e;
-      log(`Tagged @${producer.username}: ${e.message}`, 'warn');
+    log(`@${u}: открываю вкладку Tagged`);
+    const tagged = await igVisit(igUrls.taggedPage(u), igScrapeGrid, {
+      scrolls: Math.ceil(s.taggedPosts / 12) + 1,
+      maxCodes: s.taggedPosts,
+    });
+    log(`@${u}: в Tagged ${tagged.codes.length} постов — открываю каждый`);
+    for (let i = 0; i < tagged.codes.length; i++) {
+      const code = tagged.codes[i].code;
+      progress(`@${u}: Tagged`, i, tagged.codes.length);
+      try {
+        const post = await igVisit(igUrls.postPage(code), igScrapePost, { maxComments: 0, maxLoads: 0 });
+        const parsed = parsePost(post);
+        if (!parsed.owner || producerHandles.has(parsed.owner)) continue;
+        addCandidate(candidates, parsed.owner, { type: 'tagged', producer: u, postCode: code, text: parsed.caption.slice(0, 200) });
+        producer.stats.tagged++;
+      } catch (e) {
+        if (isFatalIg(e) || e instanceof StopError) throw e;
+        log(`Tagged-пост ${code}: ${e.message}`, 'warn');
+      }
     }
-    log(`@${producer.username}: в Tagged найдено ${producer.stats.tagged} постов от других аккаунтов`);
+    log(`@${u}: из Tagged — ${producer.stats.tagged} постов других аккаунтов`);
   }
   producer.status = 'готово';
   saveJob();
@@ -487,6 +408,10 @@ function upsertLead(username, sources, profile, verdict) {
   leads[username] = lead;
 }
 
+async function saveLeads() {
+  await chrome.storage.local.set({ [KEYS.leads]: leads });
+}
+
 async function checkProfiles(candidates, s, producerHandles) {
   job.phase = 'profiles';
   const ordered = [...candidates.entries()]
@@ -495,32 +420,36 @@ async function checkProfiles(candidates, s, producerHandles) {
   log(`Кандидатов для проверки: ${ordered.length}`);
 
   const freshMs = s.recheckDays * 86400000;
-  let fetched = 0;
+  let opened = 0;
   let artists = 0;
   for (let i = 0; i < ordered.length; i++) {
+    const [username, sources] = ordered[i];
     if (stopRequested) {
-      for (const [u, src] of ordered.slice(i)) upsertLead(u, src, null, null);
+      for (const [cu, src] of ordered.slice(i)) upsertLead(cu, src, null, null);
       await saveLeads();
       checkStop();
     }
-    const [username, sources] = ordered[i];
     progress('Проверка профилей', i, ordered.length);
     const cached = profileCache[username];
     let profile = cached && Date.now() - cached.checkedAt < freshMs ? cached.profile : null;
-    if (!profile && fetched < s.maxProfileChecks) {
+    if (!profile && opened < s.maxProfileChecks) {
       try {
-        if (s.visualNavigation) await navigate('ig', igUrls.profilePage(username));
-        profile = await fetchProfile(username);
-        fetched++;
+        const page = await igVisit(igUrls.profilePage(username), igScrapeGrid, { username, scrolls: 0, maxCodes: 1 });
+        opened++;
+        if (page.notFound) {
+          log(`@${username}: профиль не найден`, 'warn');
+          continue;
+        }
+        profile = profileFromPage(page, username);
         if (profile) {
-          const { recentPosts, ...slim } = profile;
-          profile = slim;
           profileCache[username] = { checkedAt: Date.now(), profile };
           await chrome.storage.local.set({ [KEYS.profileCache]: profileCache });
+        } else {
+          log(`@${username}: не удалось прочитать шапку профиля`, 'warn');
         }
       } catch (e) {
         if (isFatalIg(e) || e instanceof StopError) {
-          for (const [u, src] of ordered.slice(i)) upsertLead(u, src, null, null);
+          for (const [cu, src] of ordered.slice(i)) upsertLead(cu, src, null, null);
           await saveLeads();
           throw e;
         }
@@ -538,14 +467,10 @@ async function checkProfiles(candidates, s, producerHandles) {
     }
     await saveLeads();
   }
-  if (fetched >= s.maxProfileChecks && ordered.length > fetched) {
-    log(`Достигнут лимит проверок (${s.maxProfileChecks}). Остальные кандидаты сохранены как «не проверен» — запустите ещё раз, кэш не даст проверять повторно.`, 'warn');
+  if (opened >= s.maxProfileChecks && ordered.length > opened) {
+    log(`Достигнут лимит проверок (${s.maxProfileChecks}). Остальные сохранены как «не проверен» — запустите ещё раз, проверенные профили повторно не открываются.`, 'warn');
   }
   log(`Готово: артистов найдено — ${artists}`, 'success');
-}
-
-async function saveLeads() {
-  await chrome.storage.local.set({ [KEYS.leads]: leads });
 }
 
 async function instagramPhase(producers, s) {
@@ -564,9 +489,12 @@ async function instagramPhase(producers, s) {
         log(`@${producers[i].username}: ${e.message}`, 'warn');
       }
     }
+    if (producers.every((p) => p.status === 'ошибка')) {
+      throw new Error('Не удалось открыть ни одного профиля продюсера в Instagram. Проверьте, что instagram.com открывается в этом браузере и вы вошли в аккаунт.');
+    }
   } catch (e) {
     // Не теряем уже собранных кандидатов: сохраняем их как «не проверен».
-    for (const [u, sources] of candidates) if (!producerHandles.has(u)) upsertLead(u, sources, null, null);
+    for (const [cu, sources] of candidates) if (!producerHandles.has(cu)) upsertLead(cu, sources, null, null);
     await saveLeads();
     throw e;
   }
@@ -575,24 +503,44 @@ async function instagramPhase(producers, s) {
 
 // ---------- Запуск ----------
 
-async function runJob(s) {
+function parseManualProducers(text) {
+  return String(text || '')
+    .split(/[\s,;]+/)
+    .map((h) => h.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/.*$/, '').toLowerCase())
+    .filter(Boolean);
+}
+
+// producers — если передан, YouTube пропускается (продолжение после выбора в панели).
+async function runJob(s, producers = null) {
   settings = s;
   stopRequested = false;
   leads = await getLeads();
   profileCache = (await chrome.storage.local.get(KEYS.profileCache))[KEYS.profileCache] || {};
-  job = { ...structuredClone(EMPTY_JOB), running: true, status: 'running', startedAt: Date.now() };
+  const keptChannels = producers ? job.channels : [];
+  job = { ...structuredClone(EMPTY_JOB), running: true, status: 'running', startedAt: Date.now(), channels: keptChannels };
   await saveJob(true);
   startKeepAlive();
   try {
-    const manual = s.manualProducers
-      .split(/[\s,;]+/)
-      .map((h) => h.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/.*$/, '').toLowerCase())
-      .filter(Boolean);
-    job.producers = manual.length
-      ? manual.map((username) => ({ username, channelName: '(вручную)' }))
-      : await youtubePhase(s);
-    saveJob();
-    await instagramPhase(job.producers, s);
+    let list = producers;
+    if (!list) {
+      const manual = parseManualProducers(s.manualProducers);
+      if (manual.length) {
+        list = manual.map((username) => ({ username, channelName: '(вручную)' }));
+      } else {
+        const channels = await youtubePhase(s);
+        if (!s.autoSelect) {
+          job.status = 'select';
+          job.message = 'Отметьте продюсеров в списке и нажмите «Сканировать Instagram».';
+          log(`Найдено каналов: ${channels.length}. Выберите продюсеров в панели.`, 'success');
+          return;
+        }
+        list = channels.filter((c) => c.selected).map(channelToProducer);
+        if (!list.length) throw new Error(`Нет каналов с Instagram и ≥ ${s.minSubscribers} подписчиков. Выберите продюсеров вручную.`);
+      }
+    }
+    job.producers = list;
+    log(`Сканирую Instagram: ${list.map((p) => '@' + p.username).join(', ')}`);
+    await instagramPhase(list, s);
     job.status = 'done';
     job.message = 'Готово';
   } catch (e) {
@@ -615,14 +563,30 @@ async function runJob(s) {
   }
 }
 
+async function startWith(msgSettings) {
+  const s = { ...(await getSettings()), ...(msgSettings || {}) };
+  await chrome.storage.local.set({ [KEYS.settings]: s });
+  return s;
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     switch (msg?.type) {
       case 'start': {
         if (job.running) return { ok: false, error: 'Уже запущено' };
-        const s = { ...(await getSettings()), ...(msg.settings || {}) };
-        await chrome.storage.local.set({ [KEYS.settings]: s });
-        runJob(s);
+        runJob(await startWith(msg.settings));
+        return { ok: true };
+      }
+      case 'scanSelected': {
+        if (job.running) return { ok: false, error: 'Уже запущено' };
+        const producers = (msg.producers || [])
+          .map((p) => ({ ...p, username: parseManualProducers(p.username)[0] }))
+          .filter((p) => p.username);
+        if (!producers.length) return { ok: false, error: 'Не выбрано ни одного продюсера с Instagram' };
+        const saved = (await chrome.storage.local.get(KEYS.job))[KEYS.job];
+        if (saved?.channels && !job.channels.length) job.channels = saved.channels;
+        if (msg.channels) job.channels = msg.channels;
+        runJob(await startWith(msg.settings), producers);
         return { ok: true };
       }
       case 'stop':
@@ -655,5 +619,7 @@ chrome.runtime.onInstalled.addListener(() => {
     await chrome.storage.local.set({
       [KEYS.job]: { ...saved, running: false, status: 'interrupted', message: 'Задача прервана (браузер выгрузил расширение). Лиды сохранены — запустите снова.' },
     });
+  } else if (saved && !job.running) {
+    job = { ...structuredClone(EMPTY_JOB), ...saved };
   }
 })();

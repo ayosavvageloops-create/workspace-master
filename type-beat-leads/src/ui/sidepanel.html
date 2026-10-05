@@ -19,10 +19,15 @@
         <input name="query" type="text" placeholder="Rylo Rodriguez type beat" required />
       </label>
       <div class="row">
-        <label>Страниц выдачи <input name="searchPages" type="number" min="1" max="10" /></label>
-        <label>Мин. подписчиков <input name="minSubscribers" type="number" min="0" /></label>
-        <label>Продюсеров <input name="producerCount" type="number" min="1" max="10" /></label>
+        <label>Прокруток выдачи <input name="searchPages" type="number" min="1" max="10" /></label>
+        <label>Каналов открыть <input name="channelsToCheck" type="number" min="1" max="40" /></label>
       </div>
+      <div class="row">
+        <label>Мин. подписчиков <input name="minSubscribers" type="number" min="0" /></label>
+        <label>Отметить сразу <input name="producerCount" type="number" min="1" max="10" /></label>
+      </div>
+      <label class="check"><input name="autoSelect" type="checkbox" /> Не спрашивать — сразу брать отмеченных продюсеров</label>
+      <p class="hint">Если в «О канале» нет Instagram — вкладка откроет видео канала и возьмёт его из описания.</p>
       <label>…или сразу Instagram продюсеров (через запятую)
         <input name="manualProducers" type="text" placeholder="@stunnahbeatz, @tsunamisoslime" />
       </label>
@@ -34,12 +39,11 @@
       <label class="check"><input name="scanComments" type="checkbox" /> Комментарии под постами (Check DM / how much / where can I buy)</label>
       <label class="check"><input name="scanTagged" type="checkbox" /> Вкладка Tagged (кто отмечает продюсера)</label>
       <label class="check"><input name="includePlacements" type="checkbox" /> Артисты, отмеченные в постах продюсера (плейсменты)</label>
-      <label class="check"><input name="visualNavigation" type="checkbox" /> Открывать каждую страницу во вкладке (медленнее, естественнее)</label>
       <details>
         <summary>Лимиты и задержки</summary>
         <div class="row">
-          <label>Постов загрузить <input name="postsToFetch" type="number" min="1" max="120" /></label>
-          <label>Постов с комментами <input name="postsToScan" type="number" min="1" max="60" /></label>
+          <label>Постов из сетки <input name="postsToFetch" type="number" min="1" max="120" /></label>
+          <label>Открыть постов <input name="postsToScan" type="number" min="1" max="60" /></label>
         </div>
         <div class="row">
           <label>Комментов на пост <input name="commentsPerPost" type="number" min="10" max="2000" /></label>
@@ -56,7 +60,7 @@
           <label>Перепроверка, дней <input name="recheckDays" type="number" min="0" max="365" /></label>
         </div>
       </details>
-      <p class="hint">Нужно быть залогиненным в Instagram в этом браузере.</p>
+      <p class="hint">Без API: вкладка сама открывает посты, догружает комментарии, вкладку Tagged и профили. Нужно быть залогиненным в Instagram.</p>
     </section>
 
     <div class="actions">
@@ -64,6 +68,18 @@
       <button id="stopBtn" type="button" class="danger" hidden>Остановить</button>
     </div>
   </form>
+
+  <section class="card" id="channelsCard" hidden>
+    <div class="card-head">
+      <h2>Продюсеры с YouTube</h2>
+      <span class="muted" id="channelsCount"></span>
+    </div>
+    <p class="hint">Отметьте, кого сканировать. Instagram можно исправить или вписать вручную.</p>
+    <div id="channelList" class="channel-list"></div>
+    <div class="actions">
+      <button id="scanSelected" type="button" class="primary">Сканировать Instagram</button>
+    </div>
+  </section>
 
   <section class="card" id="progressCard" hidden>
     <div id="message" class="message"></div>
