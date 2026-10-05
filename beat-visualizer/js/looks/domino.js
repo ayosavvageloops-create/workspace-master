@@ -54,9 +54,12 @@
       g.fillStyle = opt.bg; g.fillRect(0, 0, w, h);
       const { list, idx } = S.cache.rows;
       const nR = Math.max(1, list.length);
-      const y0 = S.portrait ? h * 0.07 : h * 0.12, y1 = S.portrait ? h * 0.97 : h * 0.95;
-      const rowH = Math.min((y1 - y0) / nR, u * 0.12);
-      const yb = y1 - ((y1 - y0) - nR * rowH) / 2;
+      // rows live between the header and the core's handle strip; the top row's plank rises
+      // ~1.3 rows above its floor line, so that much head room is reserved
+      const markTop = (S.portrait ? h - u * 0.16 : h - S.pad * 0.9) - u * 0.035;
+      const y0 = S.pad + u * 0.05, y1 = markTop - u * 0.015;
+      const rowH = Math.min((y1 - y0) / (nR + 0.4), u * 0.12);
+      const yb = y1 - ((y1 - y0) - (nR + 0.4) * rowH) / 2;
       const base = (i) => yb - i * rowH;                                  // floor line of row i, low pitch at bottom
       const x0 = 0, x1 = w, W = x1 - x0;
       const win = S.bar * opt.bars, phx = x0 + W * opt.playhead;
@@ -130,8 +133,21 @@
         U.text(g, 'no notes · load a midi file', w / 2, by + u * 0.06, { size: u * 0.022, font: U.FONT.MONO, color: '#6d6b78', align: 'center' });
       }
       // header
-      U.text(g, `${S.meta.title || 'untitled'} · ${S.sub}`, S.pad, S.pad * 0.9 + u * 0.01, { size: u * 0.022, font: U.FONT.MONO, color: '#4a4856' });
-      U.text(g, S.timeLabel(), w - S.pad, S.pad * 0.9 + u * 0.01, { size: u * 0.022, font: U.FONT.MONO, color: '#4a4856', align: 'right' });
+      // header: time on the right, "title · bpm · key" fitted into the rest (only the title is cut);
+      // a soft floor-coloured band behind it keeps it readable over passing blocks
+      const hy = S.pad * 0.9 + u * 0.01, hs = u * 0.022, mono = U.FONT.MONO;
+      const band = g.createLinearGradient(0, 0, 0, hy + u * 0.03);
+      const rgb = U.hexToRgb(opt.bg).join(',');
+      band.addColorStop(0, `rgba(${rgb},0.95)`); band.addColorStop(0.75, `rgba(${rgb},0.85)`); band.addColorStop(1, `rgba(${rgb},0)`);
+      g.fillStyle = band; g.fillRect(0, 0, w, hy + u * 0.03);
+      const tw = U.text(g, S.timeLabel(), w - S.pad, hy, { size: hs, font: mono, color: '#4a4856', align: 'right' });
+      const sub = ` · ${S.sub}`, title = S.meta.title || 'untitled', room = w - S.pad * 2 - tw - u * 0.04;
+      let size = hs;
+      const full = U.textWidth(g, title + sub, { size, font: mono });
+      if (full > room) size = Math.max(hs * 0.72, hs * room / full);
+      const subW = U.textWidth(g, sub, { size, font: mono });
+      const ttw = U.text(g, title, S.pad, hy, { size, font: mono, color: '#4a4856', max: room - subW });
+      U.text(g, sub, S.pad + ttw, hy, { size, font: mono, color: '#7a7886' });
     },
   });
 })();

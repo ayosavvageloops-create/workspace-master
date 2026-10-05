@@ -186,7 +186,7 @@
     const nBeats = Math.floor((dur - off) / spb);
     const chromaAt = (t) => {
       const mag = A.fft(t, 8192), hz = sr / 8192, ch = new Float32Array(12);
-      for (let k = Math.floor(110 / hz); k < Math.min(mag.length, 1800 / hz); k++) {
+      for (let k = Math.floor(200 / hz); k < Math.min(mag.length, 2000 / hz); k++) {
         const m = Math.round(hzToMidi(k * hz));
         ch[((m % 12) + 12) % 12] += mag[k] * mag[k];
       }
@@ -211,9 +211,14 @@
       return best && best.score > 0.55 ? best : null;
     };
     const sum = (b0, n) => { const ch = new Float32Array(12); for (let b = b0; b < b0 + n && b < nBeats; b++) for (let k = 0; k < 12; k++) ch[k] += beatChroma[b][k]; return ch; };
+    // bars with little harmonic energy (drums and 808 only) get no chord
+    const energy = (b0, n) => sum(b0, n).reduce((a, v) => a + v, 0);
+    const barE = []; for (let b = 0; b + 1 < nBeats; b += 4) barE.push(energy(b, 4));
+    const medE = [...barE].sort((a, b) => a - b)[Math.floor(barE.length * 0.6)] || 0;
     // one chord per bar unless the two halves clearly disagree; seg holds half-bar slots
     const seg = [];
     for (let b = 0; b + 1 < nBeats; b += 4) {
+      if (barE[b / 4] < medE * 0.3) { seg.push(null, null); continue; }
       const whole = match(sum(b, 4)), h1 = match(sum(b, 2)), h2 = b + 3 < nBeats ? match(sum(b + 2, 2)) : null;
       const split = h1 && h2 && (h1.root !== h2.root || h1.name !== h2.name) && h1.score > 0.72 && h2.score > 0.72 &&
         (!whole || (h1.score + h2.score) / 2 > whole.score + 0.08);

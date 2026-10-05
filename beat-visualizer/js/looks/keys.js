@@ -73,21 +73,31 @@
       const colOf = (p) => (p.role === 'bass' ? opt.accent : p.role === 'chords' ? opt.chords : p.role === 'lead' ? '#f08a2c' : '#3d8bfd');
       const keyX = (p) => (isBlack(p) ? (wIndex(p - 1) + 1) * kw : (wIndex(p) + 0.5) * kw);
 
-      // camera: keyboard centre follows the recently played notes (pure function of time)
+      // camera: the keyboard centre glides toward the notes being played. The target (mean key
+      // position of the sounding notes) is sampled on a fixed absolute time grid and blended with
+      // a wide smooth kernel, so the pan is smooth and continuous - it never steps when a note starts.
       const { lo, hi } = S.cache;
       const mid = (keyX(lo) + keyX(hi)) / 2;
+      // (biweight kernel: weights fall to exactly zero at the window edge, so samples enter and
+      // leave the window without any step)
+      const DT = 0.1, RAD = 2.4, j0 = Math.floor((S.t - RAD) / DT), j1 = Math.ceil((S.t + RAD) / DT);
       let acc = 0, wsum = 0;
-      for (let k = 0; k < 10; k++) {
-        const tt = S.t - k * 0.25, wt = Math.exp(-k * 0.25);
+      for (let j = j0; j <= j1; j++) {
+        const tt = j * DT, d = (S.t - tt) / RAD;
+        if (d <= -1 || d >= 1) continue;
+        const q = 1 - d * d, wt = q * q;
         let sx = 0, n = 0;
         for (const p of parts) for (const x of Parts.active(p, tt)) { sx += keyX(x.p); n++; }
         acc += (n ? sx / n : mid) * wt; wsum += wt;
       }
-      const cx = U.lerp(mid, acc / wsum, 0.55);
+      const cx = U.lerp(mid, wsum ? acc / wsum : mid, 0.5);
       const ax = w * 0.5, ay = S.portrait ? h * 0.37 : h * 0.45;
       const oy = L * 0.45;
       const toS = (lx, ly) => [ax + c * (lx - cx) - s * (ly + oy), ay + s * (lx - cx) + c * (ly + oy)];
       const D = Math.hypot(w, h) * 0.6;
+      const markTop = (S.portrait ? h - u * 0.16 : h - S.pad * 0.9) - u * 0.035;   // core handle strip
+      const capY = markTop - u * 0.03;                                            // portrait caption baseline
+      const floorMax = S.portrait ? capY - u * 0.13 : markTop - u * 0.02;          // strollers stay above this
 
       // keyboard in its own rotated frame
       g.save();
@@ -147,8 +157,11 @@
         let lx = U.hash(S.seed, i, 5) * D * 2 + dir * v * S.t;
         lx = cx + (((lx - cx + D) % (D * 2)) + D * 2) % (D * 2) - D;
         const [x, y] = toS(lx, ly);
-        if (x < -ph || x > w + ph || y < -ph || y > h * (S.portrait ? 0.8 : 0.9)) continue;
-        figs.push({ x, y, lift: Math.abs(Math.sin(S.t * 9 + i)) * ph * 0.04, walk: Math.sin(S.t * 9 + i), seed: 1000 + i, alpha: 1, scale: 0.92 });
+        if (x < -ph || x > w + ph || y < -ph || y > floorMax + u * 0.05) continue;
+        let fadeA = U.clamp((floorMax - y) / (u * 0.05) + 1);   // fade out near the caption rows instead of popping
+        // landscape/square: captions sit top-left, so strollers fade out as they walk under them
+        if (!S.portrait && x < S.pad * 1.6 + w * 0.5 + ph) fadeA = Math.min(fadeA, U.clamp((y - ph * 1.3 - (S.pad * 1.6 + u * 0.06)) / (u * 0.05)));
+        if (fadeA > 0) figs.push({ x, y, lift: Math.abs(Math.sin(S.t * 9 + i)) * ph * 0.04, walk: Math.sin(S.t * 9 + i), seed: 1000 + i, alpha: fadeA, scale: 0.92 });
       }
       figs.sort((a, b) => a.y - b.y);
       // ripples under the people who just landed
@@ -169,12 +182,17 @@
       }
       g.globalAlpha = 1;
 
-      // captions
       const count = on.size;
-      const cy = S.portrait ? h * 0.84 : h - S.pad;
-      U.text(g, parts.length ? `${count} on the keys` : 'nobody on the keys yet', S.pad * 1.6, S.portrait ? cy : S.pad * 1.6, { size: u * 0.026, font: U.FONT.SANS, weight: 600, color: '#1b1b1f' });
-      U.text(g, `${S.meta.title || 'untitled'} · ${S.sub}`, w - S.pad * 1.6, cy, { size: u * 0.026, font: U.FONT.SANS, weight: 600, color: '#1b1b1f', align: 'right' });
-      U.text(g, S.timeLabel(), w - S.pad * 1.6, cy + u * 0.034, { size: u * 0.019, font: U.FONT.MONO, color: 'rgba(30,30,35,0.5)', align: 'right' });
+      // captions: two rows. Portrait: bottom, above the core's handle strip. Landscape/square:
+      // top-left, on the empty floor behind the keyboard.
+      const cs = u * 0.026, maxW = S.portrait ? w - S.pad * 3.2 : w * 0.5;
+      const titleStr = `${S.meta.title || 'untitled'} · ${S.sub}`;
+      const countStr = parts.length ? `${count} on the keys` : 'nobody on the keys yet';
+      const cx0 = S.pad * 1.6;
+      const r1 = S.portrait ? capY - u * 0.045 : S.pad * 1.6, r2 = S.portrait ? capY : S.pad * 1.6 + u * 0.045;
+      const cw = U.text(g, countStr, cx0, r1, { size: cs, font: U.FONT.SANS, weight: 600, color: '#1b1b1f', max: maxW * 0.6 });
+      U.text(g, S.timeLabel(), S.portrait ? w - cx0 : cx0 + cw + u * 0.03, r1, { size: u * 0.019, font: U.FONT.MONO, color: 'rgba(30,30,35,0.5)', align: S.portrait ? 'right' : 'left' });
+      U.text(g, titleStr, cx0, r2, { size: cs * 0.92, font: U.FONT.SANS, weight: 500, color: 'rgba(27,27,31,0.75)', max: maxW });
     },
   });
 })();
