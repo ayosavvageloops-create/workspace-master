@@ -1,35 +1,68 @@
 {
-  "_comment": "Каждая задача = кнопка в хабе. cmd — команда, которую ты обычно запускаешь в терминале. cwd — папка, из которой запускать. Пути ниже — примеры, замени на свои.",
+  "_comment": "Каждая задача = кнопка в хабе. cwd считается от ~/workspace-master (клон репозитория на Маке). Если клон лежит в другом месте, поменяй пути.",
   "tasks": [
     {
-      "id": "dolphin-outbound",
-      "title": "Рассылка по профилям Dolphin (артисты, high ticket)",
-      "group": "Outbound",
-      "cmd": "python3 send_dms.py --campaign artists",
-      "cwd": "~/Projects/dolphin-outreach",
-      "confirm": true
+      "id": "type-beat-leads",
+      "title": "1. Лиды: Type Beat Leads (открыть Chrome с YouTube)",
+      "group": "Лиды",
+      "cmd": "open -a 'Google Chrome' 'https://www.youtube.com/results?search_query=type+beat'",
+      "cwd": "~"
     },
     {
-      "id": "dolphin-loops",
-      "title": "Рассылка лупов (продюсеры)",
-      "group": "Outbound",
-      "cmd": "python3 send_loops.py --campaign producers",
-      "cwd": "~/Projects/dolphin-outreach",
-      "confirm": true
+      "id": "spotify-method",
+      "title": "1б. Лиды: Spotify-метод (плейлист → Recommended)",
+      "group": "Лиды",
+      "cmd": "open -a Spotify || open 'https://open.spotify.com'",
+      "cwd": "~"
     },
     {
-      "id": "dolphin-followups",
-      "title": "Фоллоу-апы тем, кто не ответил 48ч+",
+      "id": "apify",
+      "title": "1в. Лиды: Google → Apify (site:instagram.com …)",
+      "group": "Лиды",
+      "cmd": "open 'https://apify.com/apify/google-search-scraper'",
+      "cwd": "~"
+    },
+    {
+      "id": "dolphin-outreach",
+      "title": "2. Рассылка: Dolphin Outreach (панель :4747)",
       "group": "Outbound",
-      "cmd": "python3 send_dms.py --campaign followups",
-      "cwd": "~/Projects/dolphin-outreach",
+      "cmd": "(sleep 3; open http://localhost:4747) & npm start",
+      "cwd": "~/workspace-master/dolphin-outreach",
       "confirm": true
     },
     {
       "id": "open-dolphin",
-      "title": "Открыть Dolphin Anty",
-      "group": "Приложения",
+      "title": "Открыть Dolphin Anty (нужен для рассылки)",
+      "group": "Outbound",
       "cmd": "open -a 'Dolphin Anty'",
+      "cwd": "~"
+    },
+    {
+      "id": "beat-visualizer",
+      "title": "3. Контент: Beat Visualizer (бит → вертикальное видео)",
+      "group": "Контент",
+      "cmd": "open -a 'Beat Visualizer' || open -a 'Google Chrome' index.html",
+      "cwd": "~/workspace-master/beat-visualizer"
+    },
+    {
+      "id": "fl-recorder",
+      "title": "3б. Контент: FL Tutorial Recorder (туториал из FL)",
+      "group": "Контент",
+      "cmd": "npm start",
+      "cwd": "~/workspace-master/fl-tutorial-recorder"
+    },
+    {
+      "id": "beat-tutorial-maker",
+      "title": "3в. Контент: Beat Tutorial Maker (ручной монтаж туториала)",
+      "group": "Контент",
+      "cmd": "open -a 'Google Chrome' index.html",
+      "cwd": "~/workspace-master/beat-tutorial-maker"
+    },
+    {
+      "id": "manychat",
+      "title": "ManyChat (воронка low ticket)",
+      "group": "Воронка",
+      "cmd": "open 'https://app.manychat.com'",
       "cwd": "~"
     },
     {

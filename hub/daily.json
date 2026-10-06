@@ -1,16 +1,20 @@
 {
-  "_comment": "Ежедневные целевые действия. target — норма на день. Цифры выведены из plan/10k-plan.md; поменяешь цены/конверсии — пересчитай и поправь здесь.",
+  "_comment": "Ежедневные целевые действия под твои инструменты. Расшифровка и порядок — plan/daily-system.md.",
   "actions": [
-    {"id": "outbound_dm",   "title": "Холодные DM артистам (через Dolphin)",            "target": 150, "block": "Утро"},
-    {"id": "loops_sent",    "title": "Рассылка лупов продюсерам",                        "target": 50,  "block": "Утро"},
-    {"id": "content",       "title": "Рилс/шортс с CTA «напиши START»",                  "target": 1,   "block": "Утро"},
-    {"id": "stories",       "title": "Сторис (процесс, кейсы, CTA)",                     "target": 4,   "block": "Утро"},
-    {"id": "replies",       "title": "Ответить на все ответы и keyword-DM (< 2 часов)", "target": 20,  "block": "День"},
-    {"id": "followups",     "title": "Фоллоу-апы вручную (тёплые диалоги)",              "target": 15,  "block": "День"},
-    {"id": "calls_booked",  "title": "Забронировано звонков",                            "target": 2,   "block": "День"},
-    {"id": "calls_done",    "title": "Проведено звонков (discovery / sales)",            "target": 1,   "block": "День"},
-    {"id": "beats",         "title": "Битов / луп-паков сделано",                         "target": 2,   "block": "Вечер"},
-    {"id": "ht_sales",      "title": "Продажи high ticket ($)",                          "target": 0,   "block": "Итог", "money": true},
-    {"id": "lt_sales",      "title": "Продажи low ticket ($)",                           "target": 0,   "block": "Итог", "money": true}
+    {"id": "leads_found",   "title": "Лиды собраны (Type Beat Leads / Spotify / Apify) → в CSV",      "target": 150, "block": "1. Лиды (08:00–09:00)"},
+    {"id": "hot_leads",     "title": "Из них 🔥 горячих (спрашивали «how much / check DM»)",          "target": 20,  "block": "1. Лиды (08:00–09:00)"},
+    {"id": "manual_dm",     "title": "Ручные «экстра» DM горячим (2–3 мин на артиста, ответ на сторис)", "target": 10, "block": "2. Рассылка (09:00–10:00)"},
+    {"id": "outbound_dm",   "title": "Холодные DM через Dolphin Outreach (6 профилей × 25)",          "target": 150, "block": "2. Рассылка (09:00–10:00)"},
+    {"id": "loops_sent",    "title": "Лупы отправлены продюсерам",                                    "target": 30,  "block": "2. Рассылка (09:00–10:00)"},
+    {"id": "beats",         "title": "Бит сделан (запись в FL Tutorial Recorder)",                    "target": 1,   "block": "3. Продакшн (10:00–13:00)"},
+    {"id": "loops_made",    "title": "Лупов сделано (для рассылки и луп-китов)",                      "target": 3,   "block": "3. Продакшн (10:00–13:00)"},
+    {"id": "reels",         "title": "Видео опубликовано (Beat Visualizer / туториал) с CTA-словом",  "target": 2,   "block": "4. Контент (14:00–15:00)"},
+    {"id": "stories",       "title": "Сторис (процесс, кейс, опрос «Ты артист?»)",                    "target": 4,   "block": "4. Контент (14:00–15:00)"},
+    {"id": "replies",       "title": "Ответить всем: ManyChat-лиды, ответы на рассылку, опрос",       "target": 25,  "block": "5. Диалоги (15:00–18:00)"},
+    {"id": "followups",     "title": "Фоллоу-апы тем, кто замолчал",                                  "target": 15,  "block": "5. Диалоги (15:00–18:00)"},
+    {"id": "calls_booked",  "title": "Звонков забронировано",                                         "target": 2,   "block": "5. Диалоги (15:00–18:00)"},
+    {"id": "calls_done",    "title": "Звонков проведено",                                             "target": 1,   "block": "5. Диалоги (15:00–18:00)"},
+    {"id": "ht_sales",      "title": "Продажи high ticket ($)",                                       "target": 0,   "block": "6. Итог дня", "money": true},
+    {"id": "lt_sales",      "title": "Продажи low ticket ($)",                                        "target": 0,   "block": "6. Итог дня", "money": true}
   ]
 }
