@@ -30,6 +30,7 @@ http.createServer(async (req, res) => {
     log: [{ text: 'готов' }],
   });
   if (req.url === '/api/artists/import') { state.imported.push(body.text); save(); return json({ added: 2, duplicates: 0 }); }
+  if (req.url === '/api/config') { state.config = body; save(); return json({ ok: true }); }
   if (req.url === '/api/run/start') { state.started = body; state.running = true; save(); return json({ ok: true }); }
   res.writeHead(404); res.end('{}');
 }).listen(Number(process.env.PORT), '127.0.0.1');
@@ -68,7 +69,7 @@ test('сценарий «Утренняя рассылка» проходит ц
   const { out, store } = setup();
   const hub = new Hub({ store, platform: 'linux' });
   t.after(() => hub.shutdown());
-  store.set({ disabledSteps: { 'morning-outreach': [0] } }); // Dolphin Anty в тесте не открываем
+  store.set({ disabledSteps: { 'morning-outreach': [0] }, dolphinToken: 'tok-123' }); // Dolphin Anty в тесте не открываем
 
   await hub.runScenario('morning-outreach');
   const run = hub.runs['morning-outreach'];
@@ -77,6 +78,8 @@ test('сценарий «Утренняя рассылка» проходит ц
 
   const mock = JSON.parse(fs.readFileSync(out, 'utf8'));
   assert.deepStrictEqual(mock.started.profileIds, ['p1', 'p2']);
+  assert.strictEqual(mock.config.dolphin.token, 'tok-123'); // токен ушёл в Dolphin Outreach
+  assert.strictEqual((await hub.snapshot()).settings.dolphinToken, undefined); // в интерфейс токен не отдаётся
   const imported = parseCsv(mock.imported[0]);
   assert.deepStrictEqual(imported.map((r) => r.username), ['lil.wave', 'rnb.mia']);
 

@@ -54,6 +54,10 @@ class Outreach {
     };
   }
 
+  setToken(token) {
+    return this.call('POST', '/api/config', { dolphin: { token } });
+  }
+
   importCsv(text) {
     return this.call('POST', '/api/artists/import', { text });
   }

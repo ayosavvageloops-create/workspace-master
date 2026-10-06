@@ -141,6 +141,7 @@ function renderSettings() {
   $('#wsDir').textContent = s.workspaceDir;
   $('#dlDir').textContent = s.downloadsDir;
   if (document.activeElement !== $('#port')) $('#port').value = s.outreachPort;
+  $('#tokenState').innerHTML = s.hasDolphinToken ? '<b class="ok-text">Токен сохранён ✓</b>' : '<b class="warn-text">Токен не задан</b>';
   $('#pathList').innerHTML = snap.modules.filter((m) => m.dir).map((m) => `
     <div class="pathrow"><b>${esc(m.title)}</b><code>${esc(m.dir)}</code>
       <button class="btn" data-pick="${m.id}">Выбрать…</button>
@@ -154,6 +155,11 @@ async function pick(current, apply) {
 }
 $('#pickWs').onclick = () => pick(snap.settings.workspaceDir, (d) => ({ workspaceDir: d }));
 $('#pickDl').onclick = () => pick(snap.settings.downloadsDir, (d) => ({ downloadsDir: d }));
+$('#saveToken').onclick = async () => {
+  const v = $('#token').value.trim();
+  if (!v) return toast('Вставь токен', true);
+  try { await window.hub.saveSettings({ dolphinToken: v }); $('#token').value = ''; toast('Токен сохранён'); } catch (e) { toast(e.message, true); }
+};
 $('#savePort').onclick = async () => { await window.hub.saveSettings({ outreachPort: Number($('#port').value) || 4747 }); toast('Сохранено'); };
 $('#pathList').addEventListener('click', async (e) => {
   const b = e.target.closest('button');

@@ -73,7 +73,7 @@ class Hub extends EventEmitter {
       disabled: this.store.get('disabledSteps')[s.id] || [],
       run: this.runs[s.id] || null,
     }));
-    return { modules, scenarios, settings: this.store.data };
+    return { modules, scenarios, settings: this.publicSettings() };
   }
 
   // ---------- действия над программами ----------
@@ -103,12 +103,34 @@ class Hub extends EventEmitter {
   }
 
   async startServer(m) {
-    if (await this.outreach.alive()) return 'уже работает';
-    this.procs.start(m.id, m.cmd, this.ensureDir(m));
-    if (!(await this.outreach.waitAlive(45000))) {
-      throw new Error('Dolphin Outreach не ответил за 45 секунд. Открой лог программы.');
+    let res = 'уже работает';
+    if (!(await this.outreach.alive())) {
+      this.procs.start(m.id, m.cmd, this.ensureDir(m));
+      if (!(await this.outreach.waitAlive(45000))) {
+        throw new Error('Dolphin Outreach не ответил за 45 секунд. Открой лог программы.');
+      }
+      res = 'запущен';
     }
-    return 'запущен';
+    await this.pushToken();
+    return res;
+  }
+
+  /** Токен Dolphin из настроек Money Hub → в Dolphin Outreach. */
+  async pushToken() {
+    const token = this.store.get('dolphinToken');
+    if (token && (await this.outreach.alive())) await this.outreach.setToken(token);
+  }
+
+  async saveSettings(patch) {
+    this.store.set(patch);
+    if ('dolphinToken' in patch) await this.pushToken();
+    this.emit('change');
+    return this.publicSettings();
+  }
+
+  publicSettings() {
+    const { dolphinToken, ...rest } = this.store.data;
+    return { ...rest, hasDolphinToken: Boolean(dolphinToken) };
   }
 
   async action(id, act) {

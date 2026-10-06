@@ -8,6 +8,7 @@ const DEFAULTS = {
   workspaceDir: path.join(os.homedir(), 'workspace-master'),
   downloadsDir: path.join(os.homedir(), 'Downloads'),
   outreachPort: 4747,
+  dolphinToken: '', // хранится только в этом файле на Маке
   paths: {}, // id программы -> своя папка
   disabledSteps: {}, // id сценария -> [номера выключенных шагов]
   imported: [], // уже перенесённые экспорты лидов: "имя|mtime"

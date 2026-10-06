@@ -46,7 +46,7 @@ app.whenReady().then(() => {
   ipcMain.handle('hub:log', wrap((id) => hub.log(id)));
   ipcMain.handle('hub:scenario', wrap((id) => { hub.runScenario(id); return true; }));
   ipcMain.handle('hub:step', wrap((id, i, on) => hub.setStepEnabled(id, i, on)));
-  ipcMain.handle('hub:settings', wrap((patch) => { store.set(patch); hub.emit('change'); return store.data; }));
+  ipcMain.handle('hub:settings', wrap((patch) => hub.saveSettings(patch)));
   ipcMain.handle('hub:pickDir', wrap(async (current) => {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'], defaultPath: current || undefined });
     return r.canceled ? null : r.filePaths[0];

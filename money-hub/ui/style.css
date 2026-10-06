@@ -92,3 +92,5 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 .pathrow b { width: 170px; font-weight: 500; }
 .pathrow code { flex: 1; }
 .note.warn-text { color: var(--bad); }
+.inp.wide { width: 360px; }
+.ok-text { color: var(--acc); }
