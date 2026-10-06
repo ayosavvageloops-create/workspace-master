@@ -40,7 +40,9 @@ app.whenReady().then(() => {
     embedded: (port) => startEmbeddedOutreach({ dataDir: path.join(app.getPath('userData'), 'dolphin-outreach'), port }),
   });
   // встроенный Dolphin Outreach поднимаем сразу: нужен для списка профилей на «Этапе 1»
-  hub.startServer(hub.module('dolphin-outreach')).then(() => hub.emit('change')).catch(() => {});
+  hub.autoToken().catch(() => {}).finally(() => {
+    hub.startServer(hub.module('dolphin-outreach')).then(() => hub.emit('change')).catch(() => {});
+  });
   hub.on('change', () => notify('hub:change'));
   hub.on('log', (id) => notify('hub:log', id));
 
@@ -53,6 +55,7 @@ app.whenReady().then(() => {
   ipcMain.handle('hub:scenario', wrap((id) => { hub.runScenario(id); return true; }));
   ipcMain.handle('hub:step', wrap((id, i, on) => hub.setStepEnabled(id, i, on)));
   ipcMain.handle('hub:settings', wrap((patch) => hub.saveSettings(patch)));
+  ipcMain.handle('hub:findToken', wrap(() => hub.autoToken({ force: true })));
   ipcMain.handle('hub:profiles', wrap((refresh) => hub.profiles({ refresh })));
   ipcMain.handle('hub:selectProfiles', wrap((ids) => hub.selectProfiles(ids)));
   ipcMain.handle('hub:pickDir', wrap(async (current) => {

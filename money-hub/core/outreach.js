@@ -58,6 +58,10 @@ class Outreach {
     return this.call('GET', '/api/state', null, 5000);
   }
 
+  artists() {
+    return this.call('GET', '/api/artists', null, 10000);
+  }
+
   refreshProfiles() {
     return this.call('POST', '/api/profiles/refresh', {}, 30000);
   }

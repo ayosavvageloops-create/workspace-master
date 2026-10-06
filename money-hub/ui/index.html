@@ -24,6 +24,12 @@
       <h3>Кого ищем</h3>
       <div class="form">
         <label class="f wide">Референс-артист (имя или ссылка Spotify)<input id="s_seed" class="inp"></label>
+        <label class="f wide">Кто ищет похожих
+          <select id="s_source" class="inp">
+            <option value="finder">Artist Finder — полностью автоматически</option>
+            <option value="alike">Savage Alike — Money Hub даст ссылку и подхватит его CSV</option>
+          </select></label>
+        <label class="f chk"><input id="s_pickOne" type="checkbox"> Сначала Artist Finder выбирает одного артиста по метрикам, потом ищем похожих на него</label>
         <label class="f">Сколько артистов<input id="s_count" type="number" min="1" max="500" class="inp"></label>
         <label class="f">Слушателей в месяц, от<input id="s_minListeners" type="number" class="inp"></label>
         <label class="f">до<input id="s_maxListeners" type="number" class="inp"></label>
@@ -80,7 +86,7 @@
       <div class="row"><code id="dlDir"></code><button class="btn" id="pickDl">Выбрать…</button></div>
       <h3>Dolphin API токен</h3>
       <p class="sub">Dolphin → Настройки → API → создать токен. Хранится только на этом Маке, Money Hub сам передаёт его в Dolphin Outreach. <span id="tokenState"></span></p>
-      <div class="row"><input id="token" type="password" class="inp wide" placeholder="вставь токен"><button class="btn" id="saveToken">Сохранить</button></div>
+      <div class="row"><input id="token" type="password" class="inp wide" placeholder="вставь токен"><button class="btn" id="saveToken">Сохранить</button><button class="btn" id="findToken">Найти на этом Маке</button></div>
       <h3>Порт Dolphin Outreach</h3>
       <div class="row"><input id="port" type="number" class="inp"><button class="btn" id="savePort">Сохранить</button></div>
     </div>

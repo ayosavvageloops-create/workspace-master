@@ -13,6 +13,8 @@ const DEFAULTS = {
   // Этап 1: поиск артистов в Artist Finder
   stage1: {
     seed: 'Tory Lanez', // референс: имя артиста или ссылка Spotify
+    similarSource: 'finder', // кто ищет похожих: 'finder' (Artist Finder, полностью сам) или 'alike' (Savage Alike)
+    pickOne: true, // сначала Artist Finder выбирает 1 артиста по метрикам, потом ищем похожих на него
     count: 30,
     minListeners: 1600,
     maxListeners: 24000,

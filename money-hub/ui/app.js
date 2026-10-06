@@ -183,13 +183,15 @@ function renderStage() {
   $('#s_ext').value = s.extensionName || 'IG Sender Pro';
   for (const k of NUM) $(`#s_${k}`).value = s.stage1[k] ?? '';
   $('#s_filterFollowers').checked = Boolean(s.stage1.filterFollowers);
+  $('#s_pickOne').checked = s.stage1.pickOne !== false;
+  $('#s_source').value = s.stage1.similarSource || 'finder';
   for (const k of ['dm', 'story', 'post']) $(`#m_${k}`).checked = Boolean(s.methods[k]);
   $('#tplList').innerHTML = '';
   for (const t of s.templates) $('#tplList').append(tplRow(t));
 }
 
 async function saveStage() {
-  const stage1 = { seed: $('#s_seed').value.trim(), filterFollowers: $('#s_filterFollowers').checked };
+  const stage1 = { seed: $('#s_seed').value.trim(), filterFollowers: $('#s_filterFollowers').checked, pickOne: $('#s_pickOne').checked, similarSource: $('#s_source').value };
   for (const k of NUM) stage1[k] = Number($(`#s_${k}`).value) || 0;
   const templates = [...document.querySelectorAll('#tplList textarea')].map((t) => t.value.trim()).filter(Boolean);
   const methods = { dm: $('#m_dm').checked, story: $('#m_story').checked, post: $('#m_post').checked };
@@ -198,7 +200,7 @@ async function saveStage() {
   $('#saveState').textContent = 'сохранено ✓';
 }
 
-document.querySelectorAll('#stage1 input').forEach((i) => i.addEventListener('input', markDirty));
+document.querySelectorAll('#stage1 input, #stage1 select').forEach((i) => i.addEventListener('input', markDirty));
 $('#tplAdd').onclick = () => { $('#tplList').append(tplRow('')); markDirty(); };
 $('#saveStage').onclick = () => saveStage().catch((e) => toast(e.message, true));
 
@@ -252,6 +254,12 @@ $('#saveToken').onclick = async () => {
   const v = $('#token').value.trim();
   if (!v) return toast('Вставь токен', true);
   try { await window.hub.saveSettings({ dolphinToken: v }); $('#token').value = ''; toast('Токен сохранён'); } catch (e) { toast(e.message, true); }
+};
+$('#findToken').onclick = async () => {
+  try {
+    const src = await window.hub.findToken();
+    toast(src ? `Токен найден в «${src}» и сохранён` : 'На этом Маке сохранённый токен не найден — создай его в Dolphin: Настройки → API', !src);
+  } catch (e) { toast(e.message, true); }
 };
 $('#savePort').onclick = async () => { await window.hub.saveSettings({ outreachPort: Number($('#port').value) || 4747 }); toast('Сохранено'); };
 $('#pathList').addEventListener('click', async (e) => {

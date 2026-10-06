@@ -65,7 +65,8 @@ const SCENARIOS = [
     about: 'Artist Finder находит артистов по референсу → Dolphin Outreach делит их между профилями, пишет каждому опенер по шаблонам и запускает расширение (директ / сторис / пост).',
     steps: [
       { type: 'startFinder', title: 'Открыть Artist Finder' },
-      { type: 'discover', title: 'Найти похожих артистов по референсу' },
+      { type: 'pickArtist', title: 'Artist Finder: выбрать 1 артиста по референсу и метрикам' },
+      { type: 'discover', title: 'Найти похожих на него (Artist Finder или Savage Alike)' },
       { type: 'openApp', module: 'dolphin-anty', title: 'Открыть Dolphin Anty', waitSec: 10 },
       { type: 'startServer', module: 'dolphin-outreach', title: 'Запустить Dolphin Outreach (+ токен)' },
       { type: 'prepareOutreach', title: 'Передать шаблоны опенеров и способы отправки' },

@@ -133,7 +133,7 @@ test('Этап 1: Artist Finder → шаблоны и способы → имп�
   t.after(() => { hub.shutdown(); finder.close(); });
   store.set({
     finderPort: finder.address().port,
-    disabledSteps: { stage1: [2] }, // Dolphin Anty в тесте не открываем
+    disabledSteps: { stage1: [3] }, // Dolphin Anty в тесте не открываем
     usedHandles: ['old.one'],
     stage1: { seed: 'Tory Lanez', count: 3, minListeners: 1600, maxListeners: 24000, filterFollowers: false, minFollowers: 3000, maxFollowers: 50000 },
     templates: ['Yo {{first_name:bro}}, "{{track}}" hits', '  '],
@@ -142,8 +142,8 @@ test('Этап 1: Artist Finder → шаблоны и способы → имп�
 
   await hub.runScenario('stage1');
   const run = hub.runs.stage1;
-  assert.deepStrictEqual(run.steps.map((s) => s.status), ['ok', 'ok', 'off', 'ok', 'ok', 'ok', 'ok'], JSON.stringify(run.steps));
-  assert.match(run.steps[1].note, /найдено 2 артистов/);
+  assert.deepStrictEqual(run.steps.map((s) => s.status), ['ok', 'skip', 'ok', 'off', 'ok', 'ok', 'ok', 'ok'], JSON.stringify(run.steps));
+  assert.match(run.steps[2].note, /найдено 2 артистов/);
 
   assert.strictEqual(discoverBody.seed, 'Tory Lanez');
   assert.strictEqual(discoverBody.count, 3);
@@ -182,13 +182,17 @@ test('встроенный Dolphin Outreach (настоящий код): про�
   store.set({
     outreachPort: port, finderPort: finder.address().port, dolphinToken: 'tok-1', extensionName: 'Savage Reach',
     workspaceDir: '/nonexistent', // папка не нужна — Outreach встроенный
-    disabledSteps: { stage1: [2, 6] }, // без Dolphin Anty и без реального старта профилей
+    disabledSteps: { stage1: [3, 7] }, // без Dolphin Anty и без реального старта профилей
     templates: ['Yo {{first_name:bro}}, "{{track:your latest}}" goes hard'],
     methods: { dm: true, story: false, post: true },
   });
 
   await hub.runScenario('stage1');
-  assert.deepStrictEqual(hub.runs.stage1.steps.map((s) => s.status), ['ok', 'ok', 'off', 'ok', 'ok', 'ok', 'off'], JSON.stringify(hub.runs.stage1.steps));
+  assert.deepStrictEqual(hub.runs.stage1.steps.map((s) => s.status), ['ok', 'ok', 'ok', 'off', 'ok', 'ok', 'ok', 'off'], JSON.stringify(hub.runs.stage1.steps));
+  assert.match(hub.runs.stage1.steps[6].note, /файл: money-hub-/);
+  const saved = fs.readdirSync(path.join(root, 'Downloads')).find((f) => f.startsWith('money-hub-'));
+  const savedRows = parseCsv(fs.readFileSync(path.join(root, 'Downloads', saved), 'utf8'));
+  assert.strictEqual(savedRows.find((r) => r.username === 'jay.wave').opener, 'Yo Jay, "Night Drive" goes hard');
 
   const base = `http://127.0.0.1:${port}`;
   const artists = (await (await fetch(`${base}/api/artists`)).json()).items;
@@ -208,4 +212,66 @@ test('встроенный Dolphin Outreach (настоящий код): про�
   assert.strictEqual(mod.status, 'running');
   assert.strictEqual(mod.embedded, true);
   assert.strictEqual(mod.external, undefined);
+});
+
+test('Этап 1: Artist Finder выбирает 1 артиста → похожие на него; Savage Alike подхватывается по CSV', async (t) => {
+  const http = require('node:http');
+  const { startEmbeddedOutreach } = require('../core/embedded');
+  const { root, store } = setup();
+  const dl = path.join(root, 'Downloads');
+  const port = PORT + 300;
+  const seeds = [];
+  const finder = http.createServer(async (req, res) => {
+    let raw = ''; for await (const c of req) raw += c;
+    const json = (o) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+    if (req.url === '/health') return json({ ok: true });
+    if (req.url === '/discover') { const b = JSON.parse(raw); seeds.push([b.seed, b.count]); return json({ ok: true, jobId: b.count === 1 ? 'one' : 'many' }); }
+    if (req.url === '/discover/one') return json({ ok: true, state: 'done', rows: [{ name: 'Picked Star', igHandle: 'picked.star', spotifyUrl: 'https://open.spotify.com/artist/P', monthlyListeners: 9000 }] });
+    return json({ ok: true, state: 'done', rows: [{ name: 'Sim One', igHandle: 'sim.one', track: 'A' }, { name: 'Picked Star', igHandle: 'picked.star' }] });
+  });
+  await new Promise((r) => finder.listen(0, '127.0.0.1', r));
+  const hub = new Hub({ store, platform: 'linux', tokenScan: () => null, embedded: (p) => startEmbeddedOutreach({ dataDir: path.join(root, 'do2'), port: p }) });
+  hub.finder.discover = ((orig) => (p, o) => orig.call(hub.finder, p, { ...o, pollMs: 10 }))(hub.finder.discover);
+  hub.alikePollMs = 20;
+  t.after(() => { hub.embeddedServer?.close(); finder.close(); });
+  store.set({
+    outreachPort: port, finderPort: finder.address().port, disabledSteps: { stage1: [3, 7] },
+    stage1: { seed: 'Tory Lanez', pickOne: true, similarSource: 'finder', count: 30, minListeners: 1600, maxListeners: 24000 },
+    templates: ['Yo {{first_name:bro}}'], methods: { dm: true, story: true, post: true },
+  });
+
+  // 1) Artist Finder: 1 артист → 30 похожих на него (сам выбранный в рассылку не попадает)
+  await hub.runScenario('stage1');
+  let steps = hub.runs.stage1.steps;
+  assert.deepStrictEqual(steps.map((s) => s.status), ['ok', 'ok', 'ok', 'off', 'ok', 'ok', 'ok', 'off'], JSON.stringify(steps));
+  assert.match(steps[1].note, /выбран Picked Star \(@picked\.star\), 9000 слушателей/);
+  assert.deepStrictEqual(seeds, [['Tory Lanez', 1], ['Picked Star', 30]]);
+  assert.deepStrictEqual(hub.found.map((a) => a.username), ['sim.one', 'picked.star']);
+
+  // 2) Savage Alike: CSV с готовыми опенерами появляется в «Загрузках»
+  store.set({ stage1: { ...store.get('stage1'), similarSource: 'alike' } });
+  setTimeout(() => fs.writeFileSync(path.join(dl, 'alike-export.csv'),
+    'artist,instagram,top_tracks,message,spotify_url\n' +
+    'Nova,https://instagram.com/nova.wav/,Glow | Other,"yo Nova, Glow is crazy",x\n' +
+    'Sim One,@sim.one,A,already used,\n' +
+    'Kai,@kai.music,,,\n'), 150);
+  await hub.runScenario('stage1');
+  steps = hub.runs.stage1.steps;
+  assert.deepStrictEqual(steps.map((s) => s.status), ['ok', 'ok', 'ok', 'off', 'ok', 'ok', 'ok', 'off'], JSON.stringify(steps));
+  assert.match(steps[2].note, /alike-export\.csv: 2 артистов, с готовыми опенерами: 1/);
+  const items = (await (await fetch(`http://127.0.0.1:${port}/api/artists`)).json()).items;
+  const op = Object.fromEntries(items.map((a) => [a.username, a.opener]));
+  assert.strictEqual(op['nova.wav'], 'yo Nova, Glow is crazy'); // опенер из Savage Alike как есть
+  assert.strictEqual(op['kai.music'], 'Yo Kai'); // нет опенера — из шаблона
+});
+
+test('токен Dolphin находится в настройках Savage DM Bot 2', () => {
+  const { findDolphinToken } = require('../core/tokenscan');
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'appsup-'));
+  fs.mkdirSync(path.join(base, 'Other App'), { recursive: true });
+  fs.writeFileSync(path.join(base, 'Other App', 'settings.json'), JSON.stringify({ dolphin_token: 'x'.repeat(40) }));
+  assert.strictEqual(findDolphinToken(base), null); // чужие программы не трогаем
+  fs.mkdirSync(path.join(base, 'Savage DM Bot 2', 'data'), { recursive: true });
+  fs.writeFileSync(path.join(base, 'Savage DM Bot 2', 'data', 'settings.json'), JSON.stringify({ min_delay: 30, dolphin_token: 'eyJ' + 'a'.repeat(60) }));
+  assert.deepStrictEqual(findDolphinToken(base), { token: 'eyJ' + 'a'.repeat(60), source: 'Savage DM Bot 2' });
 });

@@ -115,3 +115,4 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 .prof input { accent-color: var(--acc); }
 .prof small { color: var(--mute); }
 .prof small.warn-text { color: var(--bad); }
+select.inp { width: 100%; padding: 8px 10px; }

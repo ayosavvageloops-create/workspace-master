@@ -9,12 +9,14 @@ const { Outreach } = require('./outreach');
 const leads = require('./leads');
 const { Finder, toOutreachRows } = require('./finder');
 const { toCsv } = require('./csv');
+const { findDolphinToken } = require('./tokenscan');
+const alike = require('./alike');
 
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class Hub extends EventEmitter {
-  constructor({ store, processes, outreach, embedded, platform = process.platform } = {}) {
+  constructor({ store, processes, outreach, embedded, tokenScan = findDolphinToken, platform = process.platform } = {}) {
     super();
     this.store = store;
     this.platform = platform;
@@ -24,6 +26,8 @@ class Hub extends EventEmitter {
     this.found = null; // последние найденные артисты (этап 1)
     this.embedded = embedded || null; // запуск встроенного Dolphin Outreach
     this.embeddedServer = null;
+    this.tokenScan = tokenScan;
+    this.picked = null; // артист, которого выбрал Artist Finder (этап 1)
     this.runs = {}; // id сценария -> { running, steps: [{status, note}] }
     this.procs.on('change', () => this.emit('change'));
     this.procs.on('log', (id) => this.emit('log', id));
@@ -223,19 +227,71 @@ class Hub extends EventEmitter {
     return 'открыт';
   }
 
-  async discover(progress) {
-    const p = this.store.get('stage1');
-    const seed = String(p.seed || '').trim();
-    if (!seed) throw new Error('Не задан референс-артист (вкладка «Этап 1»)');
-    const job = await this.finder.discover({
-      seed,
-      count: Math.min(500, Math.max(1, Number(p.count) || 100)),
+  /** Токен Dolphin: если не задан — ищем в настройках Savage DM Bot и других программ на Маке. */
+  async autoToken({ force = false } = {}) {
+    if (this.store.get('dolphinToken') && !force) return null;
+    const found = this.tokenScan();
+    if (!found) return null;
+    await this.saveSettings({ dolphinToken: found.token });
+    return found.source;
+  }
+
+  filters(p) {
+    return {
       minListeners: Number(p.minListeners) || 0,
       maxListeners: Number(p.maxListeners) || 0,
       filterFollowers: Boolean(p.filterFollowers),
       minFollowers: Number(p.minFollowers) || 0,
       maxFollowers: Number(p.maxFollowers) || 0,
-      exclude: this.store.get('usedHandles'),
+    };
+  }
+
+  async pickArtist(progress) {
+    const p = this.store.get('stage1');
+    this.picked = null;
+    if (!p.pickOne) return { skipped: true, note: 'выключено — ищем сразу по референсу' };
+    const seed = String(p.seed || '').trim();
+    if (!seed) throw new Error('Не задан референс-артист (вкладка «Этап 1»)');
+    const job = await this.finder.discover(
+      { seed, count: 1, ...this.filters(p), exclude: this.store.get('usedHandles') },
+      { onProgress: (found, want, state) => progress(state === 'resolving' ? 'ищу референс…' : 'подбираю артиста…') },
+    );
+    const a = (job.rows || [])[0];
+    if (!a) throw new Error(`Artist Finder не нашёл артиста под эти метрики (референс ${job.seedName || seed})`);
+    this.picked = a;
+    const ls = a.monthlyListeners ? `, ${a.monthlyListeners} слушателей` : '';
+    return `выбран ${a.name}${a.igHandle ? ` (@${String(a.igHandle).replace(/^@/, '')})` : ''}${ls}`;
+  }
+
+  async discoverAlike(progress) {
+    const p = this.store.get('stage1');
+    const link = this.picked?.spotifyUrl || (/open\.spotify\.com/.test(p.seed) ? p.seed : '');
+    if (!link) throw new Error('Для Savage Alike нужна Spotify-ссылка: включи выбор артиста через Artist Finder или вставь ссылку в поле референса');
+    const since = Date.now();
+    if (this.platform === 'darwin') {
+      await this.procs.run(`printf %s ${q(link)} | pbcopy`);
+      const r = await this.procs.run(`open -a 'Savage Alike'`);
+      if (!r.ok) throw new Error('Не нашёл программу «Savage Alike» в «Программах»');
+    }
+    progress(`Ссылка ${this.picked?.name ? `на ${this.picked.name} ` : ''}уже в буфере: вставь её в Savage Alike (⌘V), найди ${p.count || 30} и сохрани CSV в «Загрузки» — дальше я сам`);
+    const file = await alike.waitNewCsv(this.store.get('downloadsDir'), since, { pollMs: this.alikePollMs || 2000 });
+    const used = new Set(this.store.get('usedHandles'));
+    this.found = alike.rowsFromCsv(fs.readFileSync(file, 'utf8')).filter((a) => !used.has(a.username)).slice(0, Math.max(1, Number(p.count) || 30));
+    if (!this.found.length) throw new Error(`В ${path.basename(file)} нет новых артистов с Instagram`);
+    const withOpeners = this.found.filter((a) => a.opener).length;
+    return `${path.basename(file)}: ${this.found.length} артистов${withOpeners ? `, с готовыми опенерами: ${withOpeners}` : ''}`;
+  }
+
+  async discover(progress) {
+    const p = this.store.get('stage1');
+    if (p.similarSource === 'alike') return this.discoverAlike(progress);
+    const seed = this.picked ? (this.picked.name || this.picked.spotifyUrl) : String(p.seed || '').trim();
+    if (!seed) throw new Error('Не задан референс-артист (вкладка «Этап 1»)');
+    const job = await this.finder.discover({
+      seed,
+      count: Math.min(500, Math.max(1, Number(p.count) || 30)),
+      ...this.filters(p),
+      exclude: [...this.store.get('usedHandles'), ...(this.picked?.igHandle ? [String(this.picked.igHandle).replace(/^@/, '').toLowerCase()] : [])],
     }, { onProgress: (found, want, state) => progress(`${state === 'resolving' ? 'ищу референс…' : 'ищу'} найдено ${found} из ${want}`) });
     this.found = toOutreachRows(job.rows);
     if (!this.found.length) return { skipped: true, note: `${job.seedName || seed}: никого не нашлось под эти фильтры` };
@@ -255,13 +311,29 @@ class Hub extends EventEmitter {
 
   async importFound() {
     if (!this.found || !this.found.length) throw new Error('Нет найденных артистов: сначала шаг поиска');
-    const csv = toCsv(this.found, ['username', 'name', 'track', 'listeners', 'ig_followers', 'spotify_url']);
+    const cols = ['username', 'name', 'track', 'listeners', 'ig_followers', 'spotify_url'];
+    if (this.found.some((a) => a.opener)) cols.push('opener'); // готовые опенеры из Savage Alike — как есть
+    const csv = toCsv(this.found, cols);
     const r = await this.outreach.importCsv(csv);
     const used = new Set(this.store.get('usedHandles'));
     for (const a of this.found) used.add(a.username);
     this.store.set({ usedHandles: [...used].slice(-20000) });
     const dup = r.duplicates?.length ? `, уже были в базе: ${r.duplicates.length}` : '';
-    return `в очередь добавлено ${r.added ?? 0}${dup}`;
+    let saved = '';
+    try { saved = `; файл: ${path.basename(await this.exportFound())}`; } catch { /* файл — бонус, рассылку не останавливаем */ }
+    return `в очередь добавлено ${r.added ?? 0}${dup}${saved}`;
+  }
+
+  /** Найденные артисты вместе с готовыми опенерами → CSV в «Загрузки». */
+  async exportFound() {
+    const want = new Map(this.found.map((a) => [a.username, a]));
+    const { items = [] } = await this.outreach.artists();
+    const rows = items.filter((x) => want.has(x.username)).map((x) => ({ ...want.get(x.username), opener: x.opener }));
+    const seed = (this.picked?.name || this.store.get('stage1').seed || 'artists').replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 40);
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+    const file = path.join(this.store.get('downloadsDir'), `money-hub-${seed}-${stamp}.csv`);
+    fs.writeFileSync(file, '\uFEFF' + toCsv(rows, ['username', 'name', 'track', 'opener', 'listeners', 'spotify_url']));
+    return file;
   }
 
   // ---------- профили Dolphin ----------
@@ -290,6 +362,8 @@ class Hub extends EventEmitter {
     switch (step.type) {
       case 'startFinder':
         return this.startFinder();
+      case 'pickArtist':
+        return this.pickArtist(progress);
       case 'discover':
         return this.discover(progress);
       case 'prepareOutreach':

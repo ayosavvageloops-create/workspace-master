@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('hub', {
   setStep: (id, i, on) => call('hub:step', id, i, on),
   saveSettings: (patch) => call('hub:settings', patch),
   pickDir: (current) => call('hub:pickDir', current),
+  findToken: () => call('hub:findToken'),
   profiles: (refresh) => call('hub:profiles', refresh),
   selectProfiles: (ids) => call('hub:selectProfiles', ids),
   onChange: (fn) => ipcRenderer.on('hub:change', () => fn()),
