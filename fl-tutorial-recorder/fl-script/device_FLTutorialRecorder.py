@@ -1,5 +1,5 @@
-# name=FL Tutorial Recorder
-# url=https://github.com/ayosavvageloops-create/workspace-master
+#name=FL Tutorial Recorder
+#url=https://github.com/ayosavvageloops-create/workspace-master
 #
 # Bridge between FL Studio and the FL Tutorial Recorder app.
 # The app talks to this script over a MIDI port with SysEx messages:
@@ -13,9 +13,20 @@ import ui
 import device
 import mixer
 
-VERSION = '1'
+VERSION = '2'
 HEAD = bytes([0xF0, 0x7D, 0x46, 0x54])
 WINDOWS = {'rack': 1, 'playlist': 2, 'piano': 3}  # widChannelRack, widPlaylist, widPianoRoll
+
+
+greeted = False
+
+
+def hint(msg):
+    # Shows up in FL's hint bar, so the user can see the script is alive without our app.
+    try:
+        ui.setHintMsg(msg)
+    except Exception:
+        pass
 
 
 def send(*fields):
@@ -63,10 +74,13 @@ def list_project():
 
 
 def OnInit():
+    print('FL Tutorial Recorder: script loaded, output linked: %s' % device.isAssigned())
+    hint('FL Tutorial Recorder: скрипт загружен')
     send('hello', VERSION)
 
 
 def OnSysEx(event):
+    global greeted
     data = bytes(event.sysex)
     if not data.startswith(HEAD):
         return
@@ -79,7 +93,14 @@ def OnSysEx(event):
     cmd = f[0]
     try:
         if cmd == 'hello':
-            send('hello', VERSION)
+            if not greeted:
+                greeted = True
+                if device.isAssigned():
+                    hint('FL Tutorial Recorder: связь есть')
+                else:
+                    hint('FL Tutorial Recorder: команды доходят, но не настроен Output (Port 10)')
+                print('FL Tutorial Recorder: app connected, output linked: %s' % device.isAssigned())
+            send('hello', VERSION, 1 if device.isAssigned() else 0)
         elif cmd == 'list':
             list_project()
         elif cmd == 'play':

@@ -1,9 +1,10 @@
-const { app, BrowserWindow, desktopCapturer, session, ipcMain, globalShortcut, dialog, shell, screen, Menu } = require('electron');
+const { app, BrowserWindow, desktopCapturer, session, ipcMain, globalShortcut, dialog, shell, screen, Menu, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const { pathToFileURL } = require('url');
 const { createBridge, installScript, scriptDir } = require('./fl-bridge');
+const { createUpdater, scheduleSwap, bundlePath } = require('./updater');
 
 // ffmpeg-static lives outside the asar archive once packaged.
 const FFMPEG = require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
@@ -233,16 +234,48 @@ ipcMain.handle('fl:song', flCall((_e, view) => fl.song(view)));
 ipcMain.handle('fl:stop', flCall(() => fl.stop()));
 ipcMain.handle('fl:install', flCall(() => installScript(app.getPath('documents'))));
 ipcMain.handle('fl:scriptDir', () => scriptDir(app.getPath('documents')));
+// Which link in the chain is broken: script file, FL process, MIDI ports, replies.
+ipcMain.handle('fl:diag', async () => {
+  const file = path.join(scriptDir(app.getPath('documents')), 'device_FLTutorialRecorder.py');
+  const bundled = fs.readFileSync(path.join(__dirname, 'fl-script', 'device_FLTutorialRecorder.py'), 'utf8');
+  let installed = false, upToDate = false;
+  try { const cur = fs.readFileSync(file, 'utf8'); installed = true; upToDate = cur === bundled; } catch (e) {}
+  const flRunning = await new Promise((resolve) => {
+    const [cmd, args] = process.platform === 'win32' ? ['tasklist', []] : ['ps', ['-axo', 'comm']];
+    execFile(cmd, args, (err, out) => resolve(!err && /FL Studio|FL64\.exe|OsxFL/i.test(out)));
+  });
+  return { installed, upToDate, flRunning, ...fl.status() };
+});
 ipcMain.handle('fl:revealScript', () => {
   const dir = scriptDir(app.getPath('documents'));
   return shell.openPath(fs.existsSync(dir) ? dir : path.dirname(dir));
 });
 
+// ---------- updates ----------
+let updater = null;
+const sendUpdate = (s) => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('update:state', s); };
+ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('update:state', () => updater ? updater.state : null);
+ipcMain.handle('update:check', () => updater ? updater.check() : null);
+ipcMain.handle('update:install', () => updater ? updater.installAndRestart() : false);
+ipcMain.handle('update:page', () => shell.openExternal('https://github.com/ayosavvageloops-create/workspace-master/releases/tag/fl-recorder-latest'));
+
 app.whenReady().then(() => {
   installDisplayMediaHandler();
   fl.open();
+  updater = createUpdater({ app, net, onState: sendUpdate });
+  setTimeout(() => updater.check(), 5000);
+  setInterval(() => updater.check(), 2 * 60 * 60 * 1000);
   createMain();
   app.on('activate', () => { if (!mainWin) createMain(); });
 });
-app.on('will-quit', () => { globalShortcut.unregisterAll(); fl.close(); });
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  fl.close();
+  // A downloaded update gets applied quietly when the app is closed normally.
+  if (updater && updater.state.status === 'ready' && !updater.state.installing) {
+    const dest = bundlePath(process.execPath);
+    if (dest) scheduleSwap(dest + '.update', dest, process.pid, false);
+  }
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

@@ -103,23 +103,37 @@ async function selectSource(id) {
 
 // ---------- FL Studio connection ----------
 let flStatus = { connected: false };
-let flProject = null;          // { bpm, patterns, channels }
-api.fl.onStatus((s) => { const was = flStatus.connected; flStatus = s; renderFlStatus(); if (s.connected && !was) loadPatterns(); });
+let flProject = null;          // { bpm, patterns, channels, blind? }
+api.fl.onStatus((s) => {
+  const was = flStatus.connected; flStatus = s;
+  if (s.connected && !was) loadPatterns();
+  else if (!s.connected && (!flProject || !flProject.blind)) useBlindProject();
+  renderFlStatus();
+});
+
+// FL takes commands but can't answer (its MIDI Output isn't linked): drive it by pattern number.
+function useBlindProject() {
+  if (!flStatus.ports) { flProject = null; return; }
+  const n = plan.blindCount || 6;
+  flProject = {
+    blind: true, bpm: plan.blindBpm || 140, channels: [],
+    patterns: Array.from({ length: n }, (_, i) => ({ index: i + 1, name: `Pattern ${i + 1}`, empty: false })),
+  };
+  mergePlan();
+}
 
 function renderFlStatus() {
   const pill = $('flPill'), text = $('flText');
-  pill.className = 'pill ' + (flStatus.connected ? 'ok' : 'bad');
-  pill.textContent = flStatus.connected ? '● подключено' : '● не подключено';
+  const blind = !flStatus.connected && flStatus.ports;
+  pill.className = 'pill ' + (flStatus.connected ? 'ok' : blind ? 'warn' : 'bad');
+  pill.textContent = flStatus.connected ? '● подключено' : blind ? '● без ответа' : '● не подключено';
   text.innerHTML = flStatus.connected
     ? 'Приложение само переключает паттерны, открывает нужное окно и запускает воспроизведение.'
     : flStatus.error
     ? `Нет связи: ${flStatus.error}. Нажми «Подключить FL Studio».`
-    : 'Нужна разовая настройка: приложение будет само управлять FL. Нажми «Подключить FL Studio».';
+    : 'FL не отвечает. Нажми «Подключить FL Studio»: там проверка по шагам и тест. Записывать можно и так, по номерам паттернов.';
   $('flSetup').textContent = flStatus.connected ? 'Помощь по подключению' : 'Подключить FL Studio';
   $('flSetup').classList.toggle('primary', !flStatus.connected);
-  if ($('setupStatus')) {
-    $('setupStatus').textContent = flStatus.connected ? '✅ Связь с FL Studio есть. Можно закрыть это окно.' : '⏳ Жду ответа от FL Studio…';
-  }
   renderPlan();
   updateRecButton();
 }
@@ -133,32 +147,59 @@ async function loadPatterns() {
 }
 $('flRefresh').onclick = () => flStatus.connected ? loadPatterns() : api.fl.reconnect();
 
+// ---------- setup: one-time wizard with live checks ----------
+let diagTimer = 0;
 $('flSetup').onclick = async () => {
   const dir = await api.fl.scriptDir();
   const win = platform === 'win32';
+  const inName = win ? 'FLTR to FL' : 'FL Tutorial Recorder';
+  const outName = win ? 'FLTR from FL' : 'FL Tutorial Recorder';
   $('modal').classList.remove('hidden');
-  $('modalTitle').textContent = 'Подключение к FL Studio (один раз)';
-  const b = $('modalBody');
-  b.innerHTML = `<div class="setup"><ol>
-    ${win ? `<li>Установи бесплатную программу <b>loopMIDI</b> (tobias-erichsen.de) и создай в ней два порта с именами <code>FLTR to FL</code> и <code>FLTR from FL</code>.</li>` : ''}
-    <li>Установи скрипт для FL: <button id="setupInstall" class="primary">Установить скрипт</button> <span id="setupInstalled" class="hint"></span></li>
-    <li>Перезапусти FL Studio, чтобы он увидел скрипт. Порядок важен: <b>сначала это приложение, потом FL</b>. Если FL уже открыт, в MIDI settings нажми <b>Rescan devices</b>.</li>
-    <li>Во FL открой <b>Options → MIDI settings</b>.<br>
-      В <b>Input</b> выбери <code>${win ? 'FLTR to FL' : 'FL Tutorial Recorder'}</code>, внизу в <b>Controller type</b> выбери <code>FL Tutorial Recorder</code>, в <b>Port</b> поставь <code>10</code>, включи <b>Enable</b>.<br>
-      В <b>Output</b> выбери <code>${win ? 'FLTR from FL' : 'FL Tutorial Recorder'}</code> и тоже поставь <b>Port</b> <code>10</code>.</li>
-  </ol>
-  <div id="setupStatus" class="status"></div>
-  <div class="row" style="margin-top:12px"><button id="setupRetry">Проверить ещё раз</button><button id="setupFolder">Открыть папку скрипта</button><button id="setupClose" class="primary">Готово</button></div>
-  <p class="hint">Папка скрипта: ${dir.replace(/</g, '&lt;')}</p></div>`;
-  $('setupInstall').onclick = async () => {
-    const r = await api.fl.install();
-    $('setupInstalled').textContent = r.ok ? '✓ установлен' : 'ошибка: ' + r.error;
-  };
-  $('setupRetry').onclick = () => api.fl.reconnect();
+  $('modalTitle').textContent = 'Подключение к FL Studio';
+  $('modalBody').innerHTML = `<div class="setup">
+    <div id="diag" class="diag"></div>
+    <div class="row" style="margin:10px 0 14px"><button id="setupInstall" class="primary">Установить скрипт</button><button id="setupTest">Тест: FL должен заиграть</button><button id="setupFolder">Папка скрипта</button></div>
+    <div id="testResult" class="hint"></div>
+    <details><summary>Как настроить во FL (Options → MIDI settings)</summary><ol>
+      ${win ? `<li>Установи <b>loopMIDI</b> и создай два порта: <code>FLTR to FL</code> и <code>FLTR from FL</code>.</li>` : ''}
+      <li><b>Input</b>: выдели <code>${inName}</code> → внизу <b>Controller type</b>: <code>FL Tutorial Recorder (user)</code> → <b>Port</b>: <code>10</code> → <b>Enable</b>.</li>
+      <li><b>Output</b>: выдели <code>${outName}</code> → <b>Port</b>: <code>10</code> (тот же номер, что у Input).</li>
+      <li>Если <code>FL Tutorial Recorder (user)</code> нет в списке Controller type: нажми «Установить скрипт» и перезапусти FL.</li>
+      <li>Если порта нет в списках: FL надо запускать <b>после</b> этого приложения, или нажми <b>Rescan devices</b>.</li>
+    </ol></details>
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button id="setupClose" class="primary">Готово</button></div>
+    <p class="hint">Папка скрипта: ${dir.replace(/</g, '&lt;')}</p></div>`;
+  $('setupInstall').onclick = async () => { const r = await api.fl.install(); $('testResult').textContent = r.ok ? '✓ Скрипт установлен. Перезапусти FL Studio.' : 'Ошибка: ' + r.error; refreshDiag(); };
   $('setupFolder').onclick = () => api.fl.revealScript();
-  $('setupClose').onclick = closeModal;
-  renderFlStatus();
+  $('setupTest').onclick = runTest;
+  $('setupClose').onclick = () => { clearInterval(diagTimer); closeModal(); };
+  refreshDiag();
+  clearInterval(diagTimer);
+  diagTimer = setInterval(() => $('diag') ? refreshDiag() : clearInterval(diagTimer), 1500);
 };
+async function refreshDiag() {
+  const d = await api.fl.diag();
+  const box = $('diag'); if (!box) return;
+  const line = (ok, text, fix) => `<div class="diag-row ${ok ? 'ok' : 'bad'}"><span>${ok ? '✓' : '✗'}</span><div>${text}${!ok && fix ? `<div class="hint">${fix}</div>` : ''}</div></div>`;
+  box.innerHTML = [
+    line(d.installed && d.upToDate, d.installed && !d.upToDate ? 'Скрипт устарел' : 'Скрипт установлен в FL', 'Нажми «Установить скрипт» и перезапусти FL Studio.'),
+    line(d.flRunning, 'FL Studio запущен', 'Открой FL Studio (после этого приложения).'),
+    line(d.ports && !d.error, 'MIDI-порт приложения работает', d.error || 'Перезапусти приложение.'),
+    line(d.connected, 'FL отвечает', 'Нажми «Тест». Если FL заиграл, значит команды доходят и не настроен только Output (Port 10). Если не заиграл, проверь Input и Controller type. В строке подсказок FL должно быть «FL Tutorial Recorder: …».'),
+    d.connected && d.outputLinked === false ? line(false, 'Output во FL', 'Поставь Output «FL Tutorial Recorder» на тот же Port, что и Input.') : '',
+  ].join('');
+}
+async function runTest() {
+  $('testResult').textContent = '▶ Отправил команду «играть паттерн 1»…';
+  const r = await api.fl.play(1, 'none', -1);
+  if (!r.ok) { $('testResult').textContent = 'Ошибка: ' + r.error; return; }
+  setTimeout(async () => {
+    await api.fl.stop();
+    $('testResult').innerHTML = flStatus.connected
+      ? '✓ Всё работает.'
+      : 'FL заиграл? <b>Да</b>: команды доходят, осталось настроить Output (Port 10), а записывать можно уже сейчас по номерам паттернов. <b>Нет</b>: во FL не выбран Input «FL Tutorial Recorder» с Controller type «FL Tutorial Recorder (user)».';
+  }, 2000);
+}
 
 // ---------- plan: which patterns to record ----------
 // Saved per pattern name so choices survive between sessions.
@@ -185,8 +226,8 @@ function mergePlan() {
     const drums = DRUMS.test(p.name);
     return {
       index: p.index, name: p.name, empty: p.empty, on: !p.empty,
-      label: p.name.toLowerCase(), view: drums ? 'rack' : 'piano',
-      ch: drums ? -1 : guessChannel(p.name), bars: 2,
+      label: flProject.blind ? '' : p.name.toLowerCase(), view: flProject.blind ? 'none' : drums ? 'rack' : 'piano',
+      ch: drums || flProject.blind ? -1 : guessChannel(p.name), bars: 2,
     };
   });
   savePlan();
@@ -195,17 +236,24 @@ const barSec = () => 4 * 60 / ((flProject && flProject.bpm) || 140);
 
 function renderPlan() {
   const box = $('plan'); box.innerHTML = '';
-  if (!flStatus.connected || !flProject) {
+  if (!flProject) {
     box.append(el('div', { class: 'plan-empty' }, flStatus.connected ? 'Загружаю паттерны из FL…' : 'Когда FL подключится, здесь появятся паттерны из проекта: выбираешь нужные и жмёшь «Записать».'));
     $('planTotal').textContent = '';
     return;
+  }
+  if (flProject.blind) {
+    box.append(el('div', { class: 'blind' },
+      el('div', {}, 'FL не присылает список, поэтому паттерны идут по номерам, как в FL. Впиши подписи (kick, hi-hat…) и сними галочки с лишних.'),
+      el('div', { class: 'row' },
+        el('label', {}, 'Паттернов'), el('input', { type: 'number', min: 1, max: 99, value: flProject.patterns.length, onchange: (e) => { plan.blindCount = clamp(+e.target.value || 1, 1, 99); savePlan(); useBlindProject(); renderPlan(); } }),
+        el('label', {}, 'BPM'), el('input', { type: 'number', min: 40, max: 300, value: flProject.bpm, onchange: (e) => { plan.blindBpm = clamp(+e.target.value || 140, 40, 300); flProject.bpm = plan.blindBpm; savePlan(); renderTotal(); } }))));
   }
   box.append(el('div', { class: 'plan-head' }, el('span'), el('span', {}, 'Паттерн → подпись в видео'), el('span', {}, 'Что показать'), el('span', {}, 'Инструмент'), el('span', {}, 'Тактов')));
   plan.items.forEach((it) => {
     const r = el('div', { class: 'plan-row' + (it.on ? '' : ' off') });
     const cb = el('input', { type: 'checkbox', ...(it.on ? { checked: '' } : {}), onchange: (e) => { it.on = e.target.checked; savePlan(); renderPlan(); } });
     const name = el('div', {},
-      el('input', { type: 'text', value: it.label, oninput: (e) => { it.label = e.target.value; savePlan(); } }),
+      el('input', { type: 'text', value: it.label, placeholder: 'подпись, напр. kick', oninput: (e) => { it.label = e.target.value; savePlan(); } }),
       el('div', { class: 'pn' }, `#${it.index} ${it.name}${it.empty ? ' · пустой' : ''}`));
     const view = el('select', { onchange: (e) => { it.view = e.target.value; savePlan(); renderPlan(); } });
     for (const [v, l] of [['piano', 'Piano roll'], ['rack', 'Channel rack'], ['playlist', 'Playlist'], ['none', 'Не трогать']]) {
@@ -214,7 +262,7 @@ function renderPlan() {
     const ch = el('select', { onchange: (e) => { it.ch = +e.target.value; savePlan(); } });
     ch.append(new Option('выбранный', '-1'));
     for (const c of flProject.channels) { const o = new Option(c.name, c.index); o.selected = it.ch === c.index; ch.append(o); }
-    ch.disabled = it.view !== 'piano';
+    ch.disabled = it.view !== 'piano' || flProject.blind;
     const bars = el('input', { type: 'number', min: 1, step: 1, value: it.bars, oninput: (e) => { it.bars = Math.max(1, +e.target.value || 1); savePlan(); renderTotal(); } });
     r.append(cb, name, view, ch, bars);
     box.append(r);
@@ -253,7 +301,7 @@ function renderMarkers() {
   });
 }
 
-const autoReady = () => flStatus.connected && flProject && (plan.items.some(i => i.on) || plan.final.on);
+const autoReady = () => (flStatus.connected || flStatus.ports) && flProject && (plan.items.some(i => i.on) || plan.final.on);
 function updateRecButton() {
   const b = $('recBtn');
   b.disabled = !liveStream && !recorder;
@@ -334,10 +382,10 @@ async function autoRecord() {
     await waitFor(0.6);
     for (const it of queue) {
       if (autoRun.cancelled) break;
-      showNow(it.label);
+      showNow(it.label || it.name);
       const r = await api.fl.play(it.index, it.view, it.ch);
       if (!r.ok) return fail(`Паттерн «${it.name}»: ${r.error}`);
-      markers.push({ t: +recNow().toFixed(2), key: it.index, label: it.label, dur: it.bars * barSec(), auto: true });
+      markers.push({ t: +recNow().toFixed(2), key: it.index, label: it.label || it.name.toLowerCase(), dur: it.bars * barSec(), auto: true });
       renderMarkers(); tickRec();
       await waitFor(it.bars * barSec());
     }
@@ -1019,13 +1067,28 @@ document.addEventListener('paste', async (e) => {
   P.overlays.push(o); changed(true); selectOverlay(o);
 });
 
+// ---------- updates from the cloud ----------
+async function initUpdates() {
+  $('appVersion').textContent = 'v' + await api.version();
+  api.update.onState(renderUpdate);
+  renderUpdate(await api.update.state());
+}
+function renderUpdate(st) {
+  const box = $('updateBox'); box.innerHTML = '';
+  if (!st) return;
+  if (st.status === 'downloading') box.append(el('span', { class: 'upd' }, `⬇ Скачиваю обновление ${st.latest}… ${Math.round((st.progress || 0) * 100)}%`));
+  else if (st.status === 'ready') box.append(el('button', { class: 'primary upd-btn', onclick: () => api.update.install() }, `Обновление ${st.latest} готово — перезапустить`));
+  else if (st.status === 'error') box.append(el('button', { class: 'upd-btn', title: st.error, onclick: () => api.update.check() }, '↻ Проверить обновления'));
+}
+
 // ---------- boot ----------
 (async () => {
   platform = await api.platform();
   renderLabels();
   flStatus = await api.fl.status();
+  if (flStatus.connected) loadPatterns(); else useBlindProject();
   renderFlStatus();
-  if (flStatus.connected) loadPatterns();
+  initUpdates();
   await refreshSources();
   renderRecent();
 })();

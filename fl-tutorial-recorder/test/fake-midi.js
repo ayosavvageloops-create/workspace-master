@@ -15,7 +15,8 @@ function sim() {
     let i;
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-      if (line) for (const inp of inputs) inp.emit('message', 0, [...Buffer.from(line, 'hex')]);
+      // FL_SIM_MUTE: FL hears commands but its Output isn't linked, so nothing comes back
+      if (line && !process.env.FL_SIM_MUTE) for (const inp of inputs) inp.emit('message', 0, [...Buffer.from(line, 'hex')]);
     }
   });
   return proc;

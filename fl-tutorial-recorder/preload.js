@@ -45,7 +45,17 @@ contextBridge.exposeInMainWorld('api', {
     install: invoke('fl:install'),
     scriptDir: invoke('fl:scriptDir'),
     revealScript: invoke('fl:revealScript'),
+    diag: invoke('fl:diag'),
     onStatus: listen('fl:status'),
+  },
+
+  version: invoke('app:version'),
+  update: {
+    state: invoke('update:state'),
+    check: invoke('update:check'),
+    install: invoke('update:install'),
+    page: invoke('update:page'),
+    onState: listen('update:state'),
   },
 
   showHud: invoke('hud:show'),

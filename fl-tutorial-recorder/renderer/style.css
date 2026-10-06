@@ -121,3 +121,20 @@ input[type=color] { width: 34px; height: 28px; padding: 0 2px; background: var(-
 .ov { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .ov .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ov.sel .nm { color: var(--accent); }
+
+/* updates + diagnostics */
+.update { display: flex; align-items: center; gap: 8px; }
+.upd { font-size: 12px; color: var(--muted); }
+.upd-btn { padding: 4px 10px; font-size: 12px; }
+#projTitle { margin-left: auto; }
+.pill.warn { background: rgba(255, 195, 92, .15); color: #ffc35c; }
+.diag { display: flex; flex-direction: column; gap: 8px; }
+.diag-row { display: flex; gap: 10px; align-items: flex-start; }
+.diag-row > span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; flex: none; }
+.diag-row.ok > span { background: rgba(95, 212, 176, .15); color: #5fd4b0; }
+.diag-row.bad > span { background: rgba(255, 107, 128, .12); color: #ff8fa3; }
+.setup details summary { cursor: pointer; color: var(--muted); margin-top: 6px; }
+.modal-box { max-width: 640px; }
+.blind { background: rgba(255, 195, 92, .08); border: 1px solid rgba(255, 195, 92, .3); border-radius: 10px; padding: 10px; font-size: 12px; margin-bottom: 8px; }
+.blind .row { margin: 8px 0 0; }
+.blind .row label { min-width: auto; }

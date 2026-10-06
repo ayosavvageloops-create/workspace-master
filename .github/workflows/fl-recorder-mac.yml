@@ -29,6 +29,9 @@ jobs:
 
       - run: npm ci
 
+      # Build number becomes the app version; the app compares it with latest.json to self-update.
+      - run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version
+
       - run: npm test
 
       - name: Build app
@@ -46,6 +49,30 @@ jobs:
           cp -R "$APP" dmgroot/
           ln -s /Applications dmgroot/Applications
           hdiutil create -volname "FL Tutorial Recorder" -srcfolder dmgroot -ov -format UDZO FL-Tutorial-Recorder-arm64.dmg
+          VERSION=$(node -p "require('./package.json').version")
+          SHA=$(shasum -a 256 FL-Tutorial-Recorder-arm64.dmg | cut -d' ' -f1)
+          printf '{"version":"%s","dmg":"FL-Tutorial-Recorder-arm64.dmg","sha256":"%s"}\n' "$VERSION" "$SHA" > latest.json
+          cat latest.json
+
+      # Exercise the self-update path on a real Mac: stage from the DMG, swap an "installed" copy.
+      - name: Test self-update install
+        run: |
+          mkdir -p /tmp/apps
+          ditto "dist/mac-arm64/FL Tutorial Recorder.app" "/tmp/apps/FL Tutorial Recorder.app"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.0.1" "/tmp/apps/FL Tutorial Recorder.app/Contents/Info.plist"
+          node -e "
+            const u = require('./updater');
+            u.stageFromDmg('FL-Tutorial-Recorder-arm64.dmg', '/tmp/apps/FL Tutorial Recorder.app').then((staged) => {
+              const c = u.scheduleSwap(staged, '/tmp/apps/FL Tutorial Recorder.app', 999999, false);
+              c.on('exit', (code) => process.exit(code));
+            }).catch((e) => { console.error(e); process.exit(1); });
+          "
+          sleep 2
+          GOT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "/tmp/apps/FL Tutorial Recorder.app/Contents/Info.plist")
+          echo "installed version: $GOT"
+          test "$GOT" = "$(node -p "require('./package.json').version")"
+          test ! -e "/tmp/apps/FL Tutorial Recorder.app.update"
+          codesign --verify --deep --strict "/tmp/apps/FL Tutorial Recorder.app"
 
       # Same scheme as the repo's other apps: one fixed tag, replaced on every build,
       # so the download link never changes.
@@ -54,7 +81,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete fl-recorder-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create fl-recorder-latest FL-Tutorial-Recorder-arm64.dmg --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+          gh release create fl-recorder-latest FL-Tutorial-Recorder-arm64.dmg latest.json --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --latest=false \
             --title "FL Tutorial Recorder (Mac, Apple Silicon)" \
             --notes "Открой .dmg и перетащи FL Tutorial Recorder в «Программы». Если macOS не даёт открыть: «Системные настройки» → «Конфиденциальность и безопасность» → «Всё равно открыть»."

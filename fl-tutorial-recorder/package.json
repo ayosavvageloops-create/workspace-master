@@ -25,6 +25,7 @@
       "main.js",
       "preload.js",
       "fl-bridge.js",
+      "updater.js",
       "hud.html",
       "renderer/**",
       "fl-script/**"

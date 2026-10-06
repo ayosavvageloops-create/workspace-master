@@ -25,7 +25,7 @@ function decode(bytes) {
 
 function createBridge({ onStatus, onMessage }) {
   let out = null, inp = null, error = null;
-  let lastHello = 0, version = null;
+  let lastHello = 0, version = null, outputLinked = null;
   const waiters = [];
   let heartbeat = 0;
 
@@ -74,7 +74,7 @@ function createBridge({ onStatus, onMessage }) {
 
   const connected = () => Date.now() - lastHello < 4000;
   function status() {
-    const s = { connected: connected(), version, error, ports: !!out, platform: process.platform };
+    const s = { connected: connected(), version, error, ports: !!out, outputLinked, platform: process.platform };
     onStatus && onStatus(s);
     return s;
   }
@@ -85,7 +85,7 @@ function createBridge({ onStatus, onMessage }) {
     const f = text.split('|');
     if (f[0] === 'hello') {
       const was = connected();
-      lastHello = Date.now(); version = f[1];
+      lastHello = Date.now(); version = f[1]; outputLinked = f[2] == null ? null : f[2] === '1';
       if (!was) status();
     }
     for (let i = waiters.length - 1; i >= 0; i--) {
@@ -124,7 +124,12 @@ function createBridge({ onStatus, onMessage }) {
   }
 
   const okOrErr = (cmd) => (r) => (r[0] === 'ok' && r[1] === cmd) || (r[0] === 'err' && r[1] === cmd);
+  // Without replies from FL (its MIDI Output not set up) commands still go out "blind".
   async function command(fields) {
+    if (!connected()) {
+      if (!send(...fields)) throw new Error('Нет MIDI-порта');
+      return true;
+    }
     const f = await request(fields, okOrErr(fields[0]));
     if (f[0] === 'err') throw new Error(f.slice(2).join(' '));
     return true;
