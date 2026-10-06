@@ -85,8 +85,14 @@ async function selectSource(id) {
   try {
     liveStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
   } catch (e) {
-    liveStream = null;
-    $('previewEmpty').textContent = 'Не удалось захватить окно: ' + e.message;
+    // System audio can be unavailable (older macOS, no permission): fall back to picture only.
+    try {
+      liveStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+    } catch (e2) {
+      liveStream = null;
+      $('previewEmpty').textContent = 'Не удалось захватить окно: ' + e2.message +
+        (platform === 'darwin' ? '. Разреши запись экрана: Системные настройки → Конфиденциальность и безопасность → Запись экрана.' : '');
+    }
   }
   $('livePreview').srcObject = liveStream;
   if (liveStream) $('livePreview').play().catch(() => {});
@@ -95,7 +101,7 @@ async function selectSource(id) {
   const hasAudio = liveStream && liveStream.getAudioTracks().length > 0;
   $('audioNote').textContent = hasAudio
     ? '🔊 Звук компьютера пишется'
-    : platform === 'win32' ? '🔇 Звук не захвачен' : '🔇 Звук системы пишется только на Windows (на Mac нужен BlackHole)';
+    : platform === 'darwin' ? '🔇 Звук не захвачен: нужен macOS 13+ и разрешение на запись экрана и звука' : '🔇 Звук не захвачен';
 }
 $('refreshSources').onclick = refreshSources;
 

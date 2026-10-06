@@ -8,6 +8,11 @@ const { pathToFileURL } = require('url');
 const FFMPEG = require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
 const PROJECTS_DIR = () => path.join(app.getPath('videos'), 'FL Tutorial Recorder');
 
+// macOS 13+: let ScreenCaptureKit hand over system audio together with the window.
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride');
+}
+
 let mainWin = null;
 let hudWin = null;
 let sourceCache = new Map(); // desktopCapturer source id -> source
@@ -26,13 +31,13 @@ function createMain() {
 }
 
 // getDisplayMedia() in the renderer is answered with whatever source the user picked.
-// On Windows the system mix ("loopback") comes along, which is how FL Studio's sound gets in.
+// The system mix ("loopback") comes along on Windows and macOS 13+, which is how FL Studio's sound gets in.
 function installDisplayMediaHandler() {
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     const src = sourceCache.get(selectedSourceId);
     if (!src) return callback({});
     const streams = { video: src };
-    if (process.platform === 'win32') streams.audio = 'loopback';
+    if (request.audioRequested && (process.platform === 'win32' || process.platform === 'darwin')) streams.audio = 'loopback';
     callback(streams);
   });
 }
@@ -168,10 +173,10 @@ function sendAll(channel, payload) {
 ipcMain.handle('hotkeys:enable', () => {
   globalShortcut.unregisterAll();
   for (let k = 0; k <= 9; k++) {
-    globalShortcut.register(`CommandOrControl+Shift+${k}`, () => sendAll('hotkey', { key: k }));
+    globalShortcut.register(`Control+Shift+${k}`, () => sendAll('hotkey', { key: k }));
   }
-  globalShortcut.register('CommandOrControl+Shift+R', () => sendAll('hotkey', { key: 'stop' }));
-  globalShortcut.register('CommandOrControl+Shift+Z', () => sendAll('hotkey', { key: 'undo' }));
+  globalShortcut.register('Control+Shift+R', () => sendAll('hotkey', { key: 'stop' }));
+  globalShortcut.register('Control+Shift+Z', () => sendAll('hotkey', { key: 'undo' }));
   return true;
 });
 ipcMain.handle('hotkeys:disable', () => { globalShortcut.unregisterAll(); return true; });
