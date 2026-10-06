@@ -1,0 +1,59 @@
+# Builds FL Tutorial Recorder for Apple Silicon on a real Mac and publishes the DMG as a release.
+# Latest DMG: https://github.com/<owner>/<repo>/releases/latest/download/FL-Tutorial-Recorder-arm64.dmg
+name: FL Tutorial Recorder (macOS)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'fl-tutorial-recorder/**'
+      - '.github/workflows/fl-recorder-mac.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: fl-tutorial-recorder
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fl-tutorial-recorder/package-lock.json
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Build app
+        run: npx electron-builder --mac dir --arm64 -c.mac.identity=null
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # No Apple Developer ID here: an ad-hoc signature is what lets the app run on Apple Silicon.
+      - name: Sign ad-hoc and pack DMG
+        run: |
+          APP="dist/mac-arm64/FL Tutorial Recorder.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          mkdir dmgroot
+          cp -R "$APP" dmgroot/
+          ln -s /Applications dmgroot/Applications
+          hdiutil create -volname "FL Tutorial Recorder" -srcfolder dmgroot -ov -format UDZO FL-Tutorial-Recorder-arm64.dmg
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: fl-recorder-v${{ github.run_number }}
+          name: FL Tutorial Recorder ${{ github.run_number }} (Mac, Apple Silicon)
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            Скачай **FL-Tutorial-Recorder-arm64.dmg**, открой и перетащи приложение в «Программы».
+            Первый запуск: если macOS не даёт открыть, зайди в «Системные настройки» → «Конфиденциальность и безопасность» и нажми «Всё равно открыть».
+          files: fl-tutorial-recorder/FL-Tutorial-Recorder-arm64.dmg
