@@ -205,11 +205,13 @@ function timeline() {
   segs.push({ type: 'final', start: t, dur: S.final.dur }); t += S.final.dur;
   return { segs, total: t };
 }
-function segAt(t) {
+function locate(t) {
   const { segs } = timeline();
-  for (const s of segs) if (t < s.start + s.dur) return s;
-  return segs[segs.length - 1];
+  let idx = segs.findIndex(s => t < s.start + s.dur);
+  if (idx < 0) idx = segs.length - 1;
+  return { segs, idx, seg: segs[idx] };
 }
+const segAt = (t) => locate(t).seg;
 const srcOf = (seg) => seg.type === 'step' ? S.steps[seg.i] : seg.type === 'final' ? S.final : null;
 
 // ---------- drawing ----------
@@ -387,9 +389,8 @@ function audioElOf(m) {
 }
 
 function syncMedia(t, isPlaying) {
-  const seg = segAt(t), local = t - seg.start, src = srcOf(seg);
-  const { segs } = timeline();
-  const idx = segs.indexOf(seg);
+  const { segs, idx, seg } = locate(t);
+  const local = t - seg.start, src = srcOf(seg);
   const active = src ? clipEl(mediaOf(src.media), idx) : null;
   const audioEl = audioElOf(mediaOf(S.audio.media));
 

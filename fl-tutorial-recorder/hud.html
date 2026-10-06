@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; font: 600 15px/1.2 system-ui, "Segoe UI", sans-serif; }
+  .bar { margin: 6px; height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+         background: rgba(14, 12, 40, .92); color: #fff; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,.35); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #ff3b5c; animation: blink 1s infinite; flex: none; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .time { font-variant-numeric: tabular-nums; color: #c9c6ff; }
+  .cur { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cur b { color: #8f88ff; }
+  .hint { color: #8d8aa8; font-weight: 500; font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="dot"></div>
+    <div class="time" id="time">0:00</div>
+    <div class="cur" id="cur">Жми Ctrl+Shift+1…9, чтобы отметить слой</div>
+    <div class="hint">Ctrl+Shift+R — стоп</div>
+  </div>
+<script>
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  api.onHudState((st) => {
+    document.getElementById('time').textContent = fmt(st.time || 0);
+    if (st.current) document.getElementById('cur').innerHTML = `Сейчас: <b></b> · меток: ${st.count}`;
+    if (st.current) document.querySelector('#cur b').textContent = st.current;
+  });
+</script>
+</body>
+</html>

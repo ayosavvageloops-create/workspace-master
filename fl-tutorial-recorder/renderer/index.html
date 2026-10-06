@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: blob: mediastream:">
+<title>FL Tutorial Recorder</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">FL Tutorial Recorder</div>
+  <nav>
+    <button class="tab active" data-view="record">1. Запись</button>
+    <button class="tab" data-view="edit" disabled>2. Монтаж</button>
+  </nav>
+  <div id="projTitle" class="muted"></div>
+</header>
+
+<section id="view-record" class="view active">
+  <div class="col">
+    <h2>Что записываем</h2>
+    <p class="hint" id="srcHint">Ищу окно FL Studio…</p>
+    <div id="sources" class="sources"></div>
+    <button id="refreshSources">Обновить список окон</button>
+
+    <h2>Метки</h2>
+    <p class="hint">Во время записи переключись в FL Studio. Включи слой (solo или mute) и нажми его клавишу. С этой секунды запись становится шагом с этим названием. <b>Ctrl+Shift+0</b> отмечает начало полного бита.</p>
+    <div id="labels"></div>
+  </div>
+
+  <div class="col wide">
+    <div class="preview-wrap">
+      <video id="livePreview" muted playsinline></video>
+      <div id="previewEmpty" class="empty">Выбери окно слева</div>
+    </div>
+    <div class="rec-bar">
+      <button id="recBtn" class="rec" disabled><span class="dot"></span> Начать запись</button>
+      <span id="recTime" class="time">0:00</span>
+      <span id="audioNote" class="hint"></span>
+    </div>
+    <div id="markerList" class="markers"></div>
+
+    <h2>Последние проекты</h2>
+    <div id="recent" class="recent"></div>
+  </div>
+</section>
+
+<section id="view-edit" class="view">
+  <aside id="panel"></aside>
+  <main class="stage">
+    <canvas id="cv" width="1080" height="1920"></canvas>
+    <div class="transport">
+      <button id="play" class="icon" title="Пробел">▶</button>
+      <input type="range" id="seek" min="0" step="0.01" value="0">
+      <span id="time" class="time">0:00.0</span>
+      <button id="exportBtn" class="primary">Экспорт MP4</button>
+    </div>
+    <div class="strip-wrap">
+      <div class="strip-head"><span>Запись и шаги: тащи блок, чтобы выбрать момент записи</span><span id="stripTime" class="muted"></span></div>
+      <canvas id="strip" height="96"></canvas>
+    </div>
+    <div class="hint center">На превью тексты и фото перетаскиваются мышкой. Колесо меняет размер, Alt + колесо меняет ширину букв.</div>
+  </main>
+</section>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div id="modalTitle" class="modal-title"></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div id="cropModal" class="modal hidden">
+  <div class="modal-box crop-box">
+    <div class="modal-title">Область кадра: что попадёт в видео</div>
+    <div class="crop-stage" id="cropStage">
+      <video id="cropVideo" muted playsinline></video>
+      <div id="cropRect" class="crop-rect"><div class="handle"></div></div>
+    </div>
+    <div class="row">
+      <input type="range" id="cropScrub" min="0" step="0.01">
+      <button id="cropReset">По умолчанию</button>
+      <button id="cropAll">Применить ко всем шагам</button>
+      <button id="cropCancel">Отмена</button>
+      <button id="cropOk" class="primary">Готово</button>
+    </div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
