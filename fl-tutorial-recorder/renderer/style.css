@@ -59,7 +59,7 @@ button.rec.on .dot { border-radius: 2px; }
 .recent button { text-align: left; display: flex; justify-content: space-between; }
 
 /* edit */
-#panel { width: 400px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 4px 16px 60px; }
+#panel { width: 360px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 4px 16px 60px; }
 .stage { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px; }
 #cv { flex: 1; min-height: 0; max-width: 100%; aspect-ratio: 9/16; background: #fff; border-radius: 8px; box-shadow: 0 6px 30px rgba(0,0,0,.4); touch-action: none; }
 .transport { display: flex; align-items: center; gap: 10px; width: min(100%, 720px); }
@@ -89,3 +89,14 @@ button.rec.on .dot { border-radius: 2px; }
 .crop-rect { position: absolute; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,.55); cursor: move; }
 .crop-rect .handle { position: absolute; right: -8px; bottom: -8px; width: 16px; height: 16px; background: var(--accent); border-radius: 4px; cursor: nwse-resize; }
 #cropScrub { flex: 1; }
+
+/* inspector */
+#inspector { width: 300px; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 4px 14px 40px; }
+#inspector .role { font-weight: 600; margin-bottom: 10px; }
+#inspector .row > label { min-width: 74px; }
+#inspector input[type=number] { width: 64px; }
+#inspector select { flex: 1; }
+input[type=color] { width: 34px; height: 28px; padding: 0 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; }
+.ov { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.ov .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov.sel .nm { color: var(--accent); }

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: blob: mediastream:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: blob: mediastream:; font-src 'self' file: data:">
 <title>FL Tutorial Recorder</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -59,8 +59,9 @@
       <div class="strip-head"><span>Запись и шаги: тащи блок, чтобы выбрать момент записи</span><span id="stripTime" class="muted"></span></div>
       <canvas id="strip" height="96"></canvas>
     </div>
-    <div class="hint center">На превью тексты и фото перетаскиваются мышкой. Колесо меняет размер, Alt + колесо меняет ширину букв.</div>
+    <div class="hint center">Клик по тексту или картинке на превью открывает настройки справа. Перетаскивай мышкой; колесо меняет размер, Alt + колесо меняет ширину букв.</div>
   </main>
+  <aside id="inspector"></aside>
 </section>
 
 <div id="modal" class="modal hidden">

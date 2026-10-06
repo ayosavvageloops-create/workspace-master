@@ -208,7 +208,7 @@ function buildProject(marks, duration) {
     } else {
       n++;
       p.steps.push({
-        label: `step ${n}:`, name: m.label, crop: null,
+        id: Engine.uid(), label: `step ${n}:`, name: m.label, crop: null,
         offset: +clamp(m.t + lead, 0, Math.max(0, duration - 1)).toFixed(2), dur: +clamp(len, 1, 6).toFixed(2),
         note: n === 1 ? '(full beat at the end)' : '', noteFrom: 1.5, noteTo: 3.5,
       });
@@ -240,7 +240,9 @@ let P = null, projDir = null, saveTimer = 0;
 
 async function openProject(dir) {
   projDir = dir;
-  P = await api.loadProject(dir);
+  P = Engine.migrate(await api.loadProject(dir));
+  await Promise.all(P.fonts.map(loadFont));
+  sel = null; engine.select(null); renderInspector();
   engine.setRecording(await api.fileUrl(P.recording));
   engine.setProject(P);
   engine.seek(0);
@@ -367,7 +369,7 @@ function renderPanel() {
   panel.append(row(null, el('button', {
     onclick: () => {
       const n = P.steps.length + 1;
-      P.steps.push({ label: `step ${n}:`, name: 'layer', offset: 0, dur: 4, crop: null, note: '', noteFrom: 1.5, noteTo: 3.5 });
+      P.steps.push({ id: Engine.uid(), label: `step ${n}:`, name: 'layer', offset: 0, dur: 4, crop: null, note: '', noteFrom: 1.5, noteTo: 3.5 });
       changed(true);
     },
   }, '+ шаг'), el('button', { onclick: () => { renumber(); changed(true); } }, 'Перенумеровать')));
@@ -395,22 +397,191 @@ function renderPanel() {
   panel.append(fc);
 
   // style
-  panel.append(el('h2', {}, 'Стиль и звук'));
+  // free overlays
+  panel.append(el('h2', {}, 'Свои надписи и картинки'),
+    el('p', { class: 'hint' }, 'Ник, «link in bio», логотип… Поверх любой части видео. Клик по элементу открывает его настройки справа.'));
+  P.overlays.forEach((o, i) => {
+    const name = o.kind === 'text' ? (o.text || '—') : (o.file ? o.file.split(/[\\/]/).pop().replace(/^\d+-/, '') : 'картинка');
+    panel.append(el('div', { class: 'ov' + (sel && sel.ref === o ? ' sel' : '') },
+      el('span', {}, o.kind === 'text' ? 'T' : '🖼'),
+      el('span', { class: 'nm' }, name),
+      el('span', { class: 'hint' }, whereLabel(o.where)),
+      el('button', { class: 'icon', onclick: () => selectOverlay(o) }, '✎'),
+      el('button', { class: 'icon danger', onclick: () => { P.overlays.splice(i, 1); if (sel && sel.ref === o) { sel = null; engine.select(null); renderInspector(); } changed(true); } }, '✕')));
+  });
+  panel.append(row(null,
+    el('button', { onclick: () => { const o = { id: Engine.uid(), kind: 'text', text: '@yourname', where: 'all', from: 0, to: null, x: 540, y: 1760, size: 110, sx: 0.5, align: 'center', anim: 'none' }; P.overlays.push(o); changed(true); selectOverlay(o); } }, '+ надпись'),
+    el('button', { onclick: async () => { const [f] = await pickImages(false); if (!f) return; const o = { id: Engine.uid(), kind: 'image', file: f, where: 'all', from: 0, to: null, x: 760, y: 1560, w: 260, h: 260, anim: 'none' }; P.overlays.push(o); changed(true); selectOverlay(o); } }, '+ картинка')));
+
+  // visuals
+  const bs = P.bandStyle;
+  panel.append(el('h2', {}, 'Визуал'));
+  const fontSel = fontSelect(P, 'font', false);
   panel.append(
+    row('Шрифт', fontSel),
+    row(null, el('button', { onclick: addFont }, '+ свой шрифт (.ttf / .otf)')),
     row('Цвета', el('input', { type: 'color', value: P.ink, oninput: (e) => { P.ink = e.target.value; changed(); } }), hint('текст'),
       el('input', { type: 'color', value: P.bg, oninput: (e) => { P.bg = e.target.value; changed(); } }), hint('фон')),
-    row('Полоса', hint('Y'), num(P.band, 'y', 5, 0), hint('высота'), num(P.band, 'h', 5, 100)),
+    row('Фон', el('button', { onclick: async () => { const [f] = await pickImages(false); if (f) { P.bgImage = f; changed(true); } } }, P.bgImage ? '🖼 заменить' : 'картинка на фон'),
+      P.bgImage ? el('button', { class: 'danger', onclick: () => { P.bgImage = null; changed(true); } }, 'убрать') : null),
+    el('div', { class: 'hint' }, 'Полоса с записью FL'),
+    row('Место', hint('Y'), num(P.band, 'y', 5, 0), hint('высота'), num(P.band, 'h', 5, 100)),
+    row('Форма', hint('отступ'), num(bs, 'margin', 2, 0, 400), hint('скругл.'), num(bs, 'radius', 2, 0)),
+    row('Рамка', num(bs, 'border', 1, 0), el('input', { type: 'color', value: bs.borderColor, oninput: (e) => { bs.borderColor = e.target.value; changed(); } })),
+    row('Яркость', num(bs, 'brightness', 0.05, 0, 3), hint('контраст'), num(bs, 'contrast', 0.05, 0, 3)),
+    row('Насыщ.', num(bs, 'saturate', 0.05, 0, 3)),
+    el('div', { class: 'hint' }, 'Звук'),
     row('Громкость', num(P, 'clipVol', 0.1, 0)),
     row(null, el('button', {
       onclick: () => {
         const d = Engine.defaults();
-        P.layout = d.layout; P.band = d.band;
+        P.layout = d.layout; P.band = d.band; P.bandStyle = d.bandStyle;
         P.intro.items.forEach((it, i) => { const di = d.intro.items[i]; if (di && di.kind === it.kind) Object.assign(it, { x: di.x, y: di.y, size: di.size, sx: di.sx, w: di.w, h: di.h }); });
         changed(true);
       },
     }, 'Сбросить раскладку')),
   );
 }
+const whereLabel = (w) => {
+  if (!w || w === 'all') return 'везде';
+  if (w === 'intro') return 'интро';
+  if (w === 'steps') return 'все шаги';
+  if (w === 'final') return 'финал';
+  const i = P.steps.findIndex(s => `step:${s.id}` === w);
+  return i >= 0 ? `шаг ${i + 1}` : 'шаг удалён';
+};
+function whereSelect(o) {
+  const opts = [['all', 'Везде'], ['intro', 'Интро'], ['steps', 'Все шаги'], ...P.steps.map((s, i) => [`step:${s.id}`, `Шаг ${i + 1}: ${s.name}`]), ['final', 'Финал']];
+  const s = el('select', { onchange: (e) => { o.where = e.target.value; changed(true); } });
+  for (const [v, l] of opts) { const op = el('option', { value: v }, l); if ((o.where || 'all') === v) op.selected = true; s.append(op); }
+  return s;
+}
+function selectOverlay(o) {
+  sel = { ref: o, kind: o.kind, role: o.kind === 'text' ? 'Своя надпись' : 'Своя картинка', owner: { obj: o, key: o.kind === 'text' ? 'text' : 'file' } };
+  engine.select(o);
+  const seg = engine.timeline().segs.find(sg => {
+    const w = o.where || 'all';
+    return w === 'all' || w === sg.type || (w === 'steps' && sg.type === 'step') || (sg.type === 'step' && w === `step:${P.steps[sg.i].id}`);
+  });
+  if (seg) { if (engine.playing) engine.stop(); engine.seek(seg.start + Math.max(0.01, (o.from || 0) + 0.5)); }
+  renderInspector(); renderPanel();
+}
+
+// ---------- fonts ----------
+const SYSTEM_FONTS = ['Arial', 'Arial Narrow', 'Impact', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Segoe UI', 'Georgia', 'Times New Roman', 'Courier New', 'Comic Sans MS'];
+async function loadFont(f) {
+  try {
+    const face = new FontFace(f.family, `url("${await api.fileUrl(f.file)}")`);
+    await face.load();
+    document.fonts.add(face);
+    engine.requestDraw();
+  } catch (e) { console.warn('font', f.family, e); }
+}
+async function addFont() {
+  const inp = el('input', { type: 'file', accept: '.ttf,.otf,.woff,.woff2' });
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    const file = await api.importFile(projDir, api.pathForFile(f));
+    const fam = f.name.replace(/\.(ttf|otf|woff2?)$/i, '');
+    const entry = { family: fam, file };
+    await loadFont(entry);
+    P.fonts.push(entry);
+    P.font = fam;
+    changed(true); renderInspector();
+  };
+  inp.click();
+}
+// withDefault: element-level picker where "" means "use the project font"
+function fontSelect(o, key, withDefault = true) {
+  const s = el('select', { onchange: (e) => { o[key] = e.target.value || null; changed(true); } });
+  const all = [...P.fonts.map(f => f.family), ...SYSTEM_FONTS];
+  if (withDefault) s.append(el('option', { value: '' }, `По умолчанию (${P.font})`));
+  for (const f of all) {
+    const op = el('option', { value: f, style: `font-family:"${f}"` }, f);
+    if (o[key] === f) op.selected = true;
+    s.append(op);
+  }
+  return s;
+}
+
+// ---------- inspector ----------
+let sel = null;
+const ANIMS = [['none', 'Нет (резко, как в оригинале)'], ['pop', 'Pop с отскоком'], ['fade', 'Плавное появление'], ['slide', 'Выезд снизу'], ['zoom', 'Наезд'], ['type', 'Печатная машинка']];
+engine.on('select', (s) => { sel = s; renderInspector(); });
+engine.on('change', () => { if (sel) renderInspector(); });
+function color(o, key, fallback) {
+  return el('input', { type: 'color', value: o[key] || fallback, oninput: (e) => { o[key] = e.target.value; changed(); } });
+}
+function renderInspector() {
+  const box = $('inspector'); box.innerHTML = '';
+  box.append(el('h2', {}, 'Выбранный элемент'));
+  if (!sel || !P) {
+    box.append(el('p', { class: 'hint' }, 'Кликни по любому тексту или картинке на превью. Здесь появятся шрифт, цвет, обводка, тень, позиция и анимация.'));
+    return;
+  }
+  const o = sel.ref, isOverlay = P.overlays.includes(o);
+  box.append(el('div', { class: 'role' }, sel.role || ''));
+  if (sel.kind === 'text') {
+    if (sel.owner) box.append(row('Текст', el('input', {
+      type: 'text', value: sel.owner.obj[sel.owner.key] ?? '',
+      oninput: (e) => { sel.owner.obj[sel.owner.key] = e.target.value; changed(isOverlay); },
+    })));
+    box.append(
+      row('Шрифт', fontSelect(o, 'font')),
+      row('Размер', num(o, 'size', 2, 10), hint('ширина'), num(o, 'sx', 0.01, 0.05, 3)),
+      row('Цвет', color(o, 'color', P.ink), el('button', { onclick: () => { delete o.color; changed(); renderInspector(); } }, 'как у всех')),
+      row('Стиль', check(o, 'bold', 'жирный'), check(o, 'italic', 'курсив')),
+      row('Выравн.', (() => {
+        const s = el('select', { onchange: (e) => { o.align = e.target.value; delete o.center; changed(); } });
+        const cur = o.align || (o.center ? 'center' : 'left');
+        for (const [v, l] of [['left', 'от левого края'], ['center', 'по центру']]) { const op = el('option', { value: v }, l); if (cur === v) op.selected = true; s.append(op); }
+        return s;
+      })()),
+      row('Обводка', num(o, 'stroke', 1, 0), color(o, 'strokeColor', '#ffffff')),
+      row('Тень', num(o, 'shadow', 1, 0), color(o, 'shadowColor', '#000000')),
+    );
+  } else {
+    if (sel.owner && sel.owner.key === 'file') box.append(row(null, el('button', {
+      onclick: async () => { const [f] = await pickImages(false); if (f) { sel.owner.obj.file = f; changed(true); renderInspector(); } },
+    }, 'Заменить картинку')));
+    box.append(
+      row('Размер', hint('Ш'), num(o, 'w', 2, 10), hint('В'), num(o, 'h', 2, 10)),
+      row('Скругл.', num(o, 'radius', 2, 0)),
+      row('Рамка', num(o, 'border', 1, 0), color(o, 'borderColor', P.ink)),
+      row('Тень', num(o, 'shadow', 1, 0), color(o, 'shadowColor', '#000000')),
+    );
+  }
+  box.append(
+    row('Позиция', hint('X'), num(o, 'x', 1, -3000), hint('Y'), num(o, 'y', 1, -3000)),
+    row('Появление', (() => {
+      const s = el('select', { onchange: (e) => { o.anim = e.target.value; changed(); } });
+      for (const [v, l] of ANIMS) { if (v === 'type' && sel.kind !== 'text') continue; const op = el('option', { value: v }, l); if ((o.anim || 'none') === v) op.selected = true; s.append(op); }
+      return s;
+    })()),
+    row('Длит. анимации', Object.assign(num(o, 'animDur', 0.05, 0.05), { placeholder: '0.3' })),
+  );
+  if (isOverlay) {
+    box.append(el('h2', {}, 'Где показывать'),
+      row(null, whereSelect(o)),
+      row('Секунды', hint('с'), num(o, 'from', 0.1, 0), hint('до'), el('input', {
+        type: 'number', step: 0.1, min: 0, value: o.to ?? '', placeholder: 'конец',
+        oninput: (e) => { const v = parseFloat(e.target.value); o.to = isNaN(v) ? null : v; changed(); },
+      })),
+      el('p', { class: 'hint' }, 'Секунды считаются от начала каждой части, где элемент показан.'),
+      row(null, el('button', { class: 'danger', onclick: () => { P.overlays.splice(P.overlays.indexOf(o), 1); sel = null; engine.select(null); renderInspector(); changed(true); } }, 'Удалить элемент')));
+  }
+  if (sel.kind === 'text') {
+    box.append(el('h2', {}, 'Стиль на всё'), row(null, el('button', {
+      onclick: () => {
+        const keys = ['font', 'color', 'bold', 'italic', 'stroke', 'strokeColor', 'shadow', 'shadowColor', 'anim', 'animDur'];
+        const texts = [...P.intro.items.filter(i => i.kind === 'text'), P.layout.label, P.layout.name, P.layout.note, P.layout.finalTitle, ...P.overlays.filter(v => v.kind === 'text')];
+        for (const t of texts) if (t !== o) for (const k of keys) { if (o[k] === undefined) delete t[k]; else t[k] = o[k]; }
+        changed();
+      },
+    }, 'Применить этот стиль ко всем текстам')));
+  }
+}
+
 function renumber() { P.steps.forEach((s, i) => { if (/^step \d+:$/.test(s.label)) s.label = `step ${i + 1}:`; }); }
 let lastCardKey = '';
 function highlightCard(seg) {
@@ -513,7 +684,7 @@ async function openCrop(target) {
   cropDraft = target.crop ? { ...target.crop } : defaultCrop();
   layoutCrop();
 }
-const bandAspect = () => 1080 / P.band.h;
+const bandAspect = () => (1080 - 2 * (P.bandStyle.margin || 0)) / P.band.h;
 function defaultCrop() {
   const vw = cropVideo.videoWidth, vh = cropVideo.videoHeight, a = bandAspect();
   let h = vh, w = h * a;

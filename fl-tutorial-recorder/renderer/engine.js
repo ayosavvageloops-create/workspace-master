@@ -8,7 +8,12 @@
     return {
       ink: '#0b063b',
       bg: '#ffffff',
+      bgImage: null,
+      font: 'Arial',
+      fonts: [],                    // custom fonts: [{ family, file }]
       band: { y: 420, h: 1035 },
+      bandStyle: { margin: 0, radius: 0, border: 0, borderColor: '#0b063b', brightness: 1, contrast: 1, saturate: 1 },
+      overlays: [],                 // free texts/images: { id, kind, where, from, to, ...style }
       clipVol: 1,
       intro: {
         enabled: true,
@@ -35,6 +40,22 @@
     };
   }
 
+  // Older project files lack newer fields; fill them in without touching what's there.
+  function migrate(p) {
+    const d = defaults();
+    for (const k of Object.keys(d)) if (p[k] === undefined) p[k] = d[k];
+    p.bandStyle = { ...d.bandStyle, ...p.bandStyle };
+    p.steps.forEach(s => { if (!s.id) s.id = uid(); });
+    p.overlays.forEach(o => { if (!o.id) o.id = uid(); });
+    return p;
+  }
+  const uid = () => Math.random().toString(36).slice(2, 9);
+
+  const ease = {
+    out: (k) => 1 - Math.pow(1 - k, 3),
+    back: (k) => { const c = 1.70158; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); },
+  };
+
   function create(canvas) {
     const ctx = canvas.getContext('2d');
     let P = null;                 // project
@@ -44,9 +65,9 @@
     const images = new Map();     // file path -> HTMLImageElement
     const bandCache = document.createElement('canvas');
     let bandCacheOk = false;
-    let hits = [], hover = null, exporting = false;
+    let hits = [], hover = null, selected = null, exporting = false;
     let T = 0, playing = false, last = 0, raf = 0, onEnd = null, drawQueued = false;
-    const listeners = { time: [], change: [] };
+    const listeners = { time: [], change: [], select: [] };
 
     // ---------- media ----------
     function setRecording(url) {
@@ -114,46 +135,99 @@
     }
 
     // ---------- drawing ----------
-    function text(str, o, bold = false) {
+    const family = (f) => `"${f || P.font}", ${FONT}`;
+
+    // Appear animation: returns {alpha, scale, dy, chars} for an element `age` seconds after it shows up.
+    function anim(o, age) {
+      const type = o.anim || 'none', dur = Math.max(0.05, o.animDur || 0.3);
+      const k = Math.max(0, Math.min(1, age / dur));
+      switch (type) {
+        case 'pop': return { alpha: Math.min(1, k * 3), scale: 0.6 + 0.4 * ease.back(k), dy: 0 };
+        case 'fade': return { alpha: ease.out(k), scale: 1, dy: 0 };
+        case 'slide': return { alpha: ease.out(k), scale: 1, dy: (1 - ease.out(k)) * 90 };
+        case 'zoom': return { alpha: ease.out(k), scale: 1.35 - 0.35 * ease.out(k), dy: 0 };
+        case 'type': return { alpha: 1, scale: 1, dy: 0, chars: k };
+        default: return { alpha: 1, scale: 1, dy: 0 };
+      }
+    }
+
+    // Text: o.x/o.y = left edge (or centre if align=center) / baseline, o.sx = horizontal stretch.
+    // `owner` names where the words come from when o is a shared style (step label, title…).
+    function text(str, o, age = 99, owner = null, role = '') {
+      if (str == null || str === '') return;
+      const a = anim(o, age);
+      const shown = a.chars != null ? str.slice(0, Math.ceil(str.length * a.chars)) : str;
       ctx.save();
-      ctx.fillStyle = P.ink;
-      ctx.font = `${bold ? 700 : 400} ${o.size}px ${FONT}`;
+      ctx.font = `${o.italic ? 'italic ' : ''}${o.bold ? 700 : 400} ${o.size}px ${family(o.font)}`;
       const w = ctx.measureText(str).width * o.sx;
-      const x = o.center ? o.x - w / 2 : o.x;
-      ctx.translate(x, o.y);
+      const center = o.align === 'center' || (o.align == null && o.center);
+      const x = center ? o.x - w / 2 : o.x;
+      const top = o.y - o.size * 0.74, h = o.size * 0.95;
+      ctx.globalAlpha = a.alpha;
+      // scale around the text's middle so "pop"/"zoom" grow from the centre
+      ctx.translate(x + w / 2, top + h / 2 + a.dy);
+      ctx.scale(a.scale, a.scale);
+      ctx.translate(-w / 2, -h / 2 + o.size * 0.74);
       ctx.scale(o.sx, 1);
-      ctx.fillText(str, 0, 0);
+      if (o.shadow) { ctx.shadowColor = o.shadowColor || 'rgba(0,0,0,.5)'; ctx.shadowBlur = o.shadow; ctx.shadowOffsetY = o.shadow * 0.3; }
+      if (o.stroke) {
+        ctx.lineJoin = 'round'; ctx.lineWidth = o.stroke * 2; ctx.strokeStyle = o.strokeColor || '#ffffff';
+        ctx.strokeText(shown, 0, 0);
+        ctx.shadowColor = 'transparent';
+      }
+      ctx.fillStyle = o.color || P.ink;
+      ctx.fillText(shown, 0, 0);
       ctx.restore();
-      hits.push({ ref: o, x, y: o.y - o.size * 0.74, w, h: o.size * 0.95 });
+      hits.push({ ref: o, kind: 'text', role, owner, x, y: top, w, h });
+    }
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      if (r > 0) ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2)); else ctx.rect(x, y, w, h);
     }
     function cover(img, x, y, w, h, scale = 1) {
-      const iw = img.naturalWidth, ih = img.naturalHeight;
+      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
       const s = Math.max(w / iw, h / ih) * scale, dw = iw * s, dh = ih * s;
-      ctx.save();
-      ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
       ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
-      ctx.restore();
     }
-    function photo(o, file, scale = 1, blur = 0) {
+    // Picture in a box with optional rounded corners, border, shadow and appear animation.
+    function photo(o, file, age = 99, extraScale = 1, blur = 0, owner = null, role = '') {
       const img = image(file);
-      if (img) {
-        if (blur > 0.3) ctx.filter = `blur(${blur}px)`;
-        cover(img, o.x, o.y, o.w, o.h, scale);
-        ctx.filter = 'none';
-      } else if (!exporting) {
+      const a = anim(o, age);
+      ctx.save();
+      ctx.globalAlpha = a.alpha;
+      const cx = o.x + o.w / 2, cy = o.y + o.h / 2 + a.dy;
+      ctx.translate(cx, cy); ctx.scale(a.scale, a.scale); ctx.translate(-o.w / 2, -o.h / 2);
+      if (o.shadow) {
         ctx.save();
-        ctx.fillStyle = '#d9d9e3'; ctx.fillRect(o.x, o.y, o.w, o.h);
-        ctx.fillStyle = '#8a8aa0'; ctx.font = `500 ${Math.round(o.w / 7)}px system-ui, sans-serif`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('фото', o.x + o.w / 2, o.y + o.h / 2);
+        ctx.shadowColor = o.shadowColor || 'rgba(0,0,0,.45)'; ctx.shadowBlur = o.shadow; ctx.shadowOffsetY = o.shadow * 0.35;
+        roundRect(0, 0, o.w, o.h, o.radius || 0); ctx.fillStyle = P.bg; ctx.fill();
         ctx.restore();
       }
-      hits.push({ ref: o, x: o.x, y: o.y, w: o.w, h: o.h });
+      ctx.save();
+      roundRect(0, 0, o.w, o.h, o.radius || 0); ctx.clip();
+      if (img) {
+        if (blur > 0.3) ctx.filter = `blur(${blur}px)`;
+        cover(img, 0, 0, o.w, o.h, extraScale);
+      } else if (!exporting) {
+        ctx.fillStyle = '#d9d9e3'; ctx.fillRect(0, 0, o.w, o.h);
+        ctx.fillStyle = '#8a8aa0'; ctx.font = `500 ${Math.round(o.w / 7)}px system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('фото', o.w / 2, o.h / 2);
+      }
+      ctx.restore();
+      if (o.border) {
+        roundRect(o.border / 2, o.border / 2, o.w - o.border, o.h - o.border, Math.max(0, (o.radius || 0) - o.border / 2));
+        ctx.lineWidth = o.border; ctx.strokeStyle = o.borderColor || P.ink; ctx.stroke();
+      }
+      ctx.restore();
+      hits.push({ ref: o, kind: 'image', role, owner, x: o.x, y: o.y, w: o.w, h: o.h });
     }
 
     // Crop is stored as fractions of the recording: {x, y, w}; height follows the band's aspect.
+    function bandW() { return W - 2 * (P.bandStyle.margin || 0); }
     function cropRect(v, crop) {
-      const vw = v.videoWidth, vh = v.videoHeight, aspect = W / P.band.h;
+      const vw = v.videoWidth, vh = v.videoHeight, aspect = bandW() / P.band.h;
       let w, h, x, y;
       if (crop) { w = crop.w * vw; h = w / aspect; x = crop.x * vw; y = crop.y * vh; }
       else { h = vh; w = h * aspect; if (w > vw) { w = vw; h = w / aspect; } x = 0; y = (vh - h) / 2; }
@@ -161,51 +235,90 @@
       x = Math.max(0, Math.min(vw - w, x)); y = Math.max(0, Math.min(vh - h, y));
       return { x, y, w, h };
     }
+    // The cropped recording goes into bandCache first; styling (corners, border, colour) is applied
+    // when the cache is drawn, so a frame held during a seek looks identical.
     function band(src, v) {
-      const { y, h } = P.band;
+      const { y, h } = P.band, bs = P.bandStyle, m = bs.margin || 0, bw = bandW();
       if (v && v.readyState >= 2 && v.videoWidth) {
         const r = cropRect(v, src.crop);
-        ctx.drawImage(v, r.x, r.y, r.w, r.h, 0, y, W, h);
-        bandCache.width = W; bandCache.height = h;
-        bandCache.getContext('2d').drawImage(canvas, 0, y, W, h, 0, 0, W, h);
+        if (bandCache.width !== bw || bandCache.height !== h) { bandCache.width = bw; bandCache.height = h; }
+        bandCache.getContext('2d').drawImage(v, r.x, r.y, r.w, r.h, 0, 0, bw, h);
         bandCacheOk = true;
-      } else if (bandCacheOk) {
-        ctx.drawImage(bandCache, 0, y); // hold the last frame while the player seeks
-      } else {
-        ctx.fillStyle = '#1f2333'; ctx.fillRect(0, y, W, h);
       }
+      ctx.save();
+      roundRect(m, y, bw, h, bs.radius || 0); ctx.clip();
+      if (bandCacheOk) {
+        const f = [];
+        if (bs.brightness !== 1) f.push(`brightness(${bs.brightness})`);
+        if (bs.contrast !== 1) f.push(`contrast(${bs.contrast})`);
+        if (bs.saturate !== 1) f.push(`saturate(${bs.saturate})`);
+        if (f.length) ctx.filter = f.join(' ');
+        ctx.drawImage(bandCache, m, y, bw, h);
+      } else {
+        ctx.fillStyle = '#1f2333'; ctx.fillRect(m, y, bw, h);
+      }
+      ctx.restore();
+      if (bs.border) {
+        ctx.save();
+        roundRect(m + bs.border / 2, y + bs.border / 2, bw - bs.border, h - bs.border, Math.max(0, (bs.radius || 0) - bs.border / 2));
+        ctx.lineWidth = bs.border; ctx.strokeStyle = bs.borderColor || P.ink; ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function overlayVisible(o, seg) {
+      const w = o.where || 'all';
+      if (w === 'all') return true;
+      if (w === 'intro' || w === 'final') return seg.type === w;
+      if (w === 'steps') return seg.type === 'step';
+      if (w.startsWith('step:')) return seg.type === 'step' && P.steps[seg.i] && P.steps[seg.i].id === w.slice(5);
+      return false;
     }
 
     function draw(t, v) {
       hits = [];
       const seg = segAt(t), local = t - seg.start;
       ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
+      if (P.bgImage) { const bi = image(P.bgImage); if (bi) cover(bi, 0, 0, W, H); }
       if (seg.type === 'intro') {
         for (const it of P.intro.items) {
           if (local < it.at) continue;
-          if (it.kind === 'text') text(it.text, it, it.bold); else photo(it, it.file);
+          if (it.kind === 'text') text(it.text, it, local - it.at, { obj: it, key: 'text' }, 'Текст интро');
+          else photo(it, it.file, local - it.at, 1, 0, { obj: it, key: 'file' }, 'Фото интро');
         }
       } else if (seg.type === 'step') {
         const st = P.steps[seg.i], L = P.layout;
         band(st, v);
-        text(st.label, L.label);
-        text(st.name, L.name);
-        if (st.note && local >= st.noteFrom && local < st.noteTo) text(st.note, L.note);
+        text(st.label, L.label, local, { obj: st, key: 'label' }, 'Номер шага (стиль общий для всех шагов)');
+        text(st.name, L.name, local, { obj: st, key: 'name' }, 'Название слоя (стиль общий для всех шагов)');
+        if (st.note && local >= st.noteFrom && local < st.noteTo) text(st.note, L.note, local - st.noteFrom, { obj: st, key: 'note' }, 'Подпись');
       } else {
         const f = P.final, L = P.layout;
         band(f, v);
-        text(f.title, L.finalTitle);
+        text(f.title, L.finalTitle, local, { obj: f, key: 'title' }, 'Заголовок финала');
         const n = f.images.length;
+        const interval = 60 / Math.max(1, f.bpm) * Math.max(0.25, f.beatsPer);
         if (n) {
-          const interval = 60 / Math.max(1, f.bpm) * Math.max(0.25, f.beatsPer);
           const idx = Math.floor(local / interval) % n;
-          const k = Math.min(1, (local % interval) / 0.15), e = 1 - Math.pow(1 - k, 3);
-          photo(L.finalImg, f.images[idx], f.pop ? 1.1 - 0.1 * e : 1, f.pop ? (1 - e) * 10 : 0);
-        } else photo(L.finalImg, null);
+          const k = Math.min(1, (local % interval) / 0.15), e = ease.out(k);
+          photo(L.finalImg, f.images[idx], local, f.pop ? 1.1 - 0.1 * e : 1, f.pop ? (1 - e) * 10 : 0, null, 'Обложки финала');
+        } else photo(L.finalImg, null, local, 1, 0, null, 'Обложки финала');
       }
-      if (!exporting && hover) {
-        ctx.save(); ctx.strokeStyle = '#6b5cff'; ctx.setLineDash([12, 8]); ctx.lineWidth = 4;
-        ctx.strokeRect(hover.x - 6, hover.y - 6, hover.w + 12, hover.h + 12); ctx.restore();
+      for (const o of P.overlays) {
+        if (!overlayVisible(o, seg)) continue;
+        const from = o.from || 0;
+        if (local < from || (o.to != null && o.to !== '' && local >= o.to)) continue;
+        if (o.kind === 'text') text(o.text, o, local - from, { obj: o, key: 'text' }, 'Своя надпись');
+        else photo(o, o.file, local - from, 1, 0, { obj: o, key: 'file' }, 'Своя картинка');
+      }
+      if (!exporting) {
+        const sel = selected && hits.find(h => h.ref === selected);
+        for (const [h, dash] of [[hover, true], [sel, false]]) {
+          if (!h) continue;
+          ctx.save(); ctx.strokeStyle = '#6b5cff'; ctx.lineWidth = 4;
+          if (dash) ctx.setLineDash([12, 8]);
+          ctx.strokeRect(h.x - 6, h.y - 6, h.w + 12, h.h + 12); ctx.restore();
+        }
       }
     }
 
@@ -272,9 +385,16 @@
     const toFrame = (e) => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
     const hitAt = (p) => { for (let i = hits.length - 1; i >= 0; i--) { const h = hits[i]; if (p.x >= h.x && p.x <= h.x + h.w && p.y >= h.y && p.y <= h.y + h.h) return h; } return null; };
     const changed = () => listeners.change.forEach(fn => fn());
+    function select(h) {
+      selected = h ? h.ref : null;
+      listeners.select.forEach(fn => fn(h ? { ref: h.ref, kind: h.kind, role: h.role, owner: h.owner } : null));
+      requestDraw();
+    }
     canvas.addEventListener('pointerdown', (e) => {
       const p = toFrame(e), h = hitAt(p);
-      if (!h || exporting) return;
+      if (exporting) return;
+      select(h);
+      if (!h) return;
       if (playing) stop();
       drag = { ref: h.ref, sx: p.x, sy: p.y, ox: h.ref.x, oy: h.ref.y };
       canvas.setPointerCapture(e.pointerId);
@@ -311,7 +431,7 @@
       if (playing) stop();
       const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
       const mime = types.find(t => MediaRecorder.isTypeSupported(t));
-      exporting = true; hover = null;
+      exporting = true; hover = null; select(null);
       T = 0; frame(false);
       await settle();
       const stream = canvas.captureStream(30);
@@ -335,6 +455,7 @@
     return {
       W, H,
       setProject(p) { P = p; T = Math.min(T, timeline().total); requestDraw(); },
+      select(ref) { selected = ref; requestDraw(); },
       setRecording,
       timeline, segAt, seek, play, stop, record, requestDraw, ensureAudio,
       get time() { return T; },
@@ -344,5 +465,5 @@
     };
   }
 
-  window.Engine = { create, defaults, W, H };
+  window.Engine = { create, defaults, migrate, uid, W, H };
 })();
