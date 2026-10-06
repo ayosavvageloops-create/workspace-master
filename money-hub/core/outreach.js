@@ -54,6 +54,18 @@ class Outreach {
     };
   }
 
+  state() {
+    return this.call('GET', '/api/state', null, 5000);
+  }
+
+  refreshProfiles() {
+    return this.call('POST', '/api/profiles/refresh', {}, 30000);
+  }
+
+  selectProfiles(ids) {
+    return this.call('POST', '/api/profiles/select', { ids });
+  }
+
   setToken(token) {
     return this.call('POST', '/api/config', { dolphin: { token } });
   }
@@ -63,8 +75,8 @@ class Outreach {
     return this.call('POST', '/api/templates', { templates });
   }
 
-  setMethods(methods) {
-    return this.call('POST', '/api/config', { extension: { methods } });
+  setExtension({ methods, name }) {
+    return this.call('POST', '/api/config', { extension: { methods, ...(name ? { name } : {}) } });
   }
 
   importCsv(text) {

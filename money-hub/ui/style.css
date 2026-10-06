@@ -108,3 +108,10 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 .tpl .prev { display: block; font-size: 12px; color: var(--mute); margin-top: 4px; }
 #stageRun .card { border-color: #2a4a3b; }
 .tpl textarea { width: 100%; }
+
+.profs { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+.prof { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+.prof.on { border-color: var(--acc); }
+.prof input { accent-color: var(--acc); }
+.prof small { color: var(--mute); }
+.prof small.warn-text { color: var(--bad); }

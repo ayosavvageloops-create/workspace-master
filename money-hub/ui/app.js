@@ -34,7 +34,7 @@ function moduleButtons(m) {
       if (m.outreach?.running) out.push(b('outreach-stop', '⏹ Остановить рассылку', 'danger'));
       else out.push(b('outreach-start', '▶ Запустить рассылку', 'pri'));
       out.push(b('import-leads', 'Перенести лиды'), b('panel', 'Открыть панель'));
-      if (!m.external) out.push(b('stop', 'Выключить'));
+      if (!m.external && !m.embedded) out.push(b('stop', 'Выключить'));
     } else out.push(b('start', 'Включить', 'pri'));
   } else if (m.kind === 'process') {
     out.push(m.status === 'running' ? b('stop', 'Остановить', 'danger') : b('start', 'Запустить', 'pri'));
@@ -180,6 +180,7 @@ function renderStage() {
   if (stageLoaded) return;
   stageLoaded = true;
   $('#s_seed').value = s.stage1.seed || '';
+  $('#s_ext').value = s.extensionName || 'IG Sender Pro';
   for (const k of NUM) $(`#s_${k}`).value = s.stage1[k] ?? '';
   $('#s_filterFollowers').checked = Boolean(s.stage1.filterFollowers);
   for (const k of ['dm', 'story', 'post']) $(`#m_${k}`).checked = Boolean(s.methods[k]);
@@ -192,7 +193,7 @@ async function saveStage() {
   for (const k of NUM) stage1[k] = Number($(`#s_${k}`).value) || 0;
   const templates = [...document.querySelectorAll('#tplList textarea')].map((t) => t.value.trim()).filter(Boolean);
   const methods = { dm: $('#m_dm').checked, story: $('#m_story').checked, post: $('#m_post').checked };
-  await window.hub.saveSettings({ stage1, templates, methods });
+  await window.hub.saveSettings({ stage1, templates, methods, extensionName: $('#s_ext').value.trim() || 'IG Sender Pro' });
   stageDirty = false;
   $('#saveState').textContent = 'сохранено ✓';
 }
@@ -200,6 +201,32 @@ async function saveStage() {
 document.querySelectorAll('#stage1 input').forEach((i) => i.addEventListener('input', markDirty));
 $('#tplAdd').onclick = () => { $('#tplList').append(tplRow('')); markDirty(); };
 $('#saveStage').onclick = () => saveStage().catch((e) => toast(e.message, true));
+
+// ---------- этап 1: профили Dolphin ----------
+function renderProfiles(list) {
+  if (!list.length) {
+    $('#profList').innerHTML = '<span class="note">Профилей пока нет. Нажми «Загрузить из Dolphin» (нужен токен в Настройках).</span>';
+    return;
+  }
+  $('#profList').innerHTML = list.map((p) => `
+    <label class="prof ${p.selected ? 'on' : ''}">
+      <input type="checkbox" data-prof="${esc(p.id)}" ${p.selected ? 'checked' : ''}>
+      <span>${esc(p.name)}</span>
+      <small class="${p.blockedToday ? 'warn-text' : ''}">${p.blockedToday ? 'ограничение сегодня' : `сегодня ${p.sentToday}/25`}</small>
+    </label>`).join('');
+  const n = list.filter((p) => p.selected).length;
+  $('#profState').textContent = n ? `выбрано: ${n}` : 'ни один профиль не выбран';
+}
+async function loadProfiles(refresh) {
+  $('#profState').textContent = refresh ? 'загружаю…' : '';
+  try { renderProfiles(await window.hub.profiles(refresh)); } catch (e) { $('#profState').textContent = ''; toast(e.message, true); }
+}
+$('#profLoad').onclick = () => loadProfiles(true);
+$('#profList').addEventListener('change', async () => {
+  const ids = [...document.querySelectorAll('#profList input:checked')].map((i) => i.dataset.prof);
+  try { renderProfiles(await window.hub.selectProfiles(ids)); } catch (e) { toast(e.message, true); }
+});
+setTimeout(() => loadProfiles(false), 1500);
 
 // ---------- настройки ----------
 function renderSettings() {

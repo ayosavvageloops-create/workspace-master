@@ -14,7 +14,7 @@ const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class Hub extends EventEmitter {
-  constructor({ store, processes, outreach, platform = process.platform } = {}) {
+  constructor({ store, processes, outreach, embedded, platform = process.platform } = {}) {
     super();
     this.store = store;
     this.platform = platform;
@@ -22,6 +22,8 @@ class Hub extends EventEmitter {
     this.outreach = outreach || new Outreach(() => this.store.get('outreachPort'));
     this.finder = new Finder(() => this.store.get('finderPort'));
     this.found = null; // последние найденные артисты (этап 1)
+    this.embedded = embedded || null; // запуск встроенного Dolphin Outreach
+    this.embeddedServer = null;
     this.runs = {}; // id сценария -> { running, steps: [{status, note}] }
     this.procs.on('change', () => this.emit('change'));
     this.procs.on('log', (id) => this.emit('log', id));
@@ -54,10 +56,11 @@ class Hub extends EventEmitter {
     if (m.kind === 'server' && m.id === 'dolphin-outreach') {
       const alive = await this.outreach.alive();
       const own = this.procs.state(m.id);
+      if (this.embedded) Object.assign(base, { found: true, embedded: true, dir: null });
       const st = { ...base, status: alive ? 'running' : own.status === 'running' ? 'starting' : own.status === 'failed' ? 'failed' : 'idle' };
       if (alive) {
         try { st.outreach = await this.outreach.summary(); } catch { /* панель отвечает не сразу */ }
-        if (own.status !== 'running') st.external = true;
+        if (own.status !== 'running' && !this.embedded) st.external = true;
       }
       return st;
     }
@@ -112,7 +115,14 @@ class Hub extends EventEmitter {
 
   async startServer(m) {
     let res = 'уже работает';
-    if (!(await this.outreach.alive())) {
+    if (!(await this.outreach.alive()) && this.embedded) {
+      if (!this.embeddedServer) {
+        this.embeddedServer = await this.embedded(this.store.get('outreachPort')).catch((e) => {
+          throw new Error(`Встроенный Dolphin Outreach не запустился: ${e.message}`);
+        });
+      }
+      res = 'запущен (встроенный)';
+    } else if (!(await this.outreach.alive())) {
       this.procs.start(m.id, m.cmd, this.ensureDir(m));
       if (!(await this.outreach.waitAlive(45000))) {
         throw new Error('Dolphin Outreach не ответил за 45 секунд. Открой лог программы.');
@@ -238,7 +248,7 @@ class Hub extends EventEmitter {
     await this.outreach.setTemplates(templates);
     const methods = this.store.get('methods');
     if (!methods.dm && !methods.story && !methods.post) throw new Error('Не выбран ни один способ отправки');
-    await this.outreach.setMethods(methods);
+    await this.outreach.setExtension({ methods, name: this.store.get('extensionName') });
     const on = [methods.dm && 'директ', methods.story && 'сторис', methods.post && 'пост'].filter(Boolean).join(', ');
     return `шаблонов: ${templates.length}; способы: ${on}`;
   }
@@ -252,6 +262,28 @@ class Hub extends EventEmitter {
     this.store.set({ usedHandles: [...used].slice(-20000) });
     const dup = r.duplicates?.length ? `, уже были в базе: ${r.duplicates.length}` : '';
     return `в очередь добавлено ${r.added ?? 0}${dup}`;
+  }
+
+  // ---------- профили Dolphin ----------
+
+  async profiles({ refresh = false } = {}) {
+    await this.startServer(this.module('dolphin-outreach'));
+    if (refresh) {
+      if (!this.store.get('dolphinToken')) throw new Error('Сначала вставь Dolphin API токен в Настройках');
+      await this.outreach.refreshProfiles();
+    }
+    const s = await this.outreach.state();
+    const selected = new Set((s.selected || []).map(String));
+    return (s.profiles || []).map((p) => ({
+      id: String(p.id), name: p.name || String(p.id), selected: selected.has(String(p.id)),
+      sentToday: p.sentToday || 0, blockedToday: Boolean(p.blockedToday),
+    }));
+  }
+
+  async selectProfiles(ids) {
+    await this.outreach.selectProfiles(ids);
+    this.emit('change');
+    return this.profiles();
   }
 
   async runStep(step, progress = () => {}) {

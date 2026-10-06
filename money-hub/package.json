@@ -23,6 +23,7 @@
       "main.js",
       "preload.js",
       "core/**/*",
+      "outreach/**/*",
       "ui/**/*",
       "build/icon.png",
       "package.json"

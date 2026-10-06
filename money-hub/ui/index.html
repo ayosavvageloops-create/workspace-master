@@ -34,10 +34,19 @@
       <p class="note">Тех, кому уже писали через Money Hub, Artist Finder повторно не вернёт. Уже отдано в рассылку: <b id="usedCount">0</b></p>
     </div>
     <div class="card">
+      <h3>Профили Dolphin</h3>
+      <p class="sub">Отметь, с каких профилей писать. Артисты делятся между ними поровну, максимум 25 в день на профиль. Открытый профиль Money Hub сам перезапустит в режиме автоматизации.</p>
+      <div id="profList" class="profs"><span class="note">Нажми «Загрузить из Dolphin».</span></div>
+      <div class="row"><button class="btn" id="profLoad">Загрузить из Dolphin</button><span id="profState" class="note"></span></div>
+    </div>
+    <div class="card">
       <h3>Опенеры</h3>
       <p class="sub">Каждому артисту выбирается случайный шаблон. <code>{Yo|Ayo}</code> — случайное слово, <code>{{first_name:bro}}</code> — имя (или «bro», если имени нет), <code>{{track}}</code> — его трек, <code>{{name}}</code> — полное имя.</p>
       <div id="tplList"></div>
       <div class="row"><button class="btn" id="tplAdd">+ Шаблон</button></div>
+      <h3>Расширение авторассылки</h3>
+      <p class="sub">Сейчас работает с <b>IG Sender Pro</b> (режим «2026»): Money Hub находит его в профиле по названию, загружает туда артистов с опенерами и жмёт «Запустить». Расширение должно быть установлено и включено в профиле.</p>
+      <div class="row"><input id="s_ext" class="inp wide"></div>
       <h3>Как отправлять</h3>
       <div class="row">
         <label class="chk"><input type="checkbox" id="m_dm"> В директ</label>

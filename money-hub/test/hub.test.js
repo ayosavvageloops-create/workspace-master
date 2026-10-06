@@ -159,3 +159,53 @@ test('Этап 1: Artist Finder → шаблоны и способы → имп�
   assert.deepStrictEqual(store.get('usedHandles').sort(), ['jay.wave', 'old.one', 'rnb.mia']);
   assert.strictEqual((await hub.snapshot()).settings.usedCount, 3);
 });
+
+test('встроенный Dolphin Outreach (настоящий код): профили, шаблоны, опенер каждому артисту', async (t) => {
+  const http = require('node:http');
+  const { startEmbeddedOutreach } = require('../core/embedded');
+  const { root, store } = setup();
+  const port = PORT + 200;
+  const finder = http.createServer(async (req, res) => {
+    for await (const _ of req) { /* тело не нужно */ }
+    const json = (o) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+    if (req.url === '/health') return json({ ok: true });
+    if (req.url === '/discover') return json({ ok: true, jobId: 'j' });
+    return json({ ok: true, state: 'done', want: 2, found: 2, rows: [
+      { name: 'Jay Wave', igHandle: 'jay.wave', track: 'Night Drive' },
+      { name: '', igHandle: 'nobody.x', track: '' },
+    ] });
+  });
+  await new Promise((r) => finder.listen(0, '127.0.0.1', r));
+  const hub = new Hub({ store, platform: 'linux', embedded: (p) => startEmbeddedOutreach({ dataDir: path.join(root, 'do'), port: p }) });
+  hub.finder.discover = ((orig) => (p, o) => orig.call(hub.finder, p, { ...o, pollMs: 10 }))(hub.finder.discover);
+  t.after(() => { hub.embeddedServer?.close(); finder.close(); });
+  store.set({
+    outreachPort: port, finderPort: finder.address().port, dolphinToken: 'tok-1', extensionName: 'Savage Reach',
+    workspaceDir: '/nonexistent', // папка не нужна — Outreach встроенный
+    disabledSteps: { stage1: [2, 6] }, // без Dolphin Anty и без реального старта профилей
+    templates: ['Yo {{first_name:bro}}, "{{track:your latest}}" goes hard'],
+    methods: { dm: true, story: false, post: true },
+  });
+
+  await hub.runScenario('stage1');
+  assert.deepStrictEqual(hub.runs.stage1.steps.map((s) => s.status), ['ok', 'ok', 'off', 'ok', 'ok', 'ok', 'off'], JSON.stringify(hub.runs.stage1.steps));
+
+  const base = `http://127.0.0.1:${port}`;
+  const artists = (await (await fetch(`${base}/api/artists`)).json()).items;
+  const op = Object.fromEntries(artists.map((a) => [a.username, a.opener]));
+  assert.strictEqual(op['jay.wave'], 'Yo Jay, "Night Drive" goes hard');
+  assert.strictEqual(op['nobody.x'], 'Yo bro, "your latest" goes hard');
+  const st = await (await fetch(`${base}/api/state`)).json();
+  assert.deepStrictEqual(st.config.extension.methods, { dm: true, story: false, post: true });
+  assert.strictEqual(st.config.extension.name, 'Savage Reach');
+  assert.strictEqual(st.config.dolphin.tokenHint, '…ok-1'); // токен дошёл
+
+  // профили: выбор из Money Hub
+  await fetch(`${base}/api/profiles/manual`, { method: 'POST', body: JSON.stringify({ id: '835678777', name: 'IG4' }) });
+  const list = await hub.selectProfiles(['835678777']);
+  assert.deepStrictEqual(list.map((p) => [p.name, p.selected]), [['IG4', true]]);
+  const mod = await hub.moduleState(hub.module('dolphin-outreach'));
+  assert.strictEqual(mod.status, 'running');
+  assert.strictEqual(mod.embedded, true);
+  assert.strictEqual(mod.external, undefined);
+});

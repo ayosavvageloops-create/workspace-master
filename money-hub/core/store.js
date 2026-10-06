@@ -13,7 +13,7 @@ const DEFAULTS = {
   // Этап 1: поиск артистов в Artist Finder
   stage1: {
     seed: 'Tory Lanez', // референс: имя артиста или ссылка Spotify
-    count: 100,
+    count: 30,
     minListeners: 1600,
     maxListeners: 24000,
     filterFollowers: false, // фильтр по подписчикам Instagram (медленнее)
@@ -25,6 +25,7 @@ const DEFAULTS = {
     '{Yo|Ayo|Yo yo} {{first_name:bro}}! {Just came across|Been bumping|Caught} "{{track:your latest}}" — real ones only. Working with artists in your lane right now, {wanted to link|had to reach out|thought I should hit you}.',
   ],
   methods: { dm: true, story: true, post: true }, // способы отправки в расширении
+  extensionName: 'IG Sender Pro', // как называется расширение авторассылки в профилях Dolphin
   usedHandles: [], // кому уже отдали в рассылку — Artist Finder их не вернёт повторно
   paths: {}, // id программы -> своя папка
   disabledSteps: {}, // id сценария -> [номера выключенных шагов]
