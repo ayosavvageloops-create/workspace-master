@@ -1,5 +1,5 @@
 # Builds FL Tutorial Recorder for Apple Silicon on a real Mac and publishes the DMG as a release.
-# Latest DMG: https://github.com/<owner>/<repo>/releases/latest/download/FL-Tutorial-Recorder-arm64.dmg
+# DMG: https://github.com/<owner>/<repo>/releases/download/fl-recorder-latest/FL-Tutorial-Recorder-arm64.dmg
 name: FL Tutorial Recorder (macOS)
 
 on:
@@ -47,13 +47,14 @@ jobs:
           ln -s /Applications dmgroot/Applications
           hdiutil create -volname "FL Tutorial Recorder" -srcfolder dmgroot -ov -format UDZO FL-Tutorial-Recorder-arm64.dmg
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: fl-recorder-v${{ github.run_number }}
-          name: FL Tutorial Recorder ${{ github.run_number }} (Mac, Apple Silicon)
-          target_commitish: ${{ github.sha }}
-          make_latest: true
-          body: |
-            Скачай **FL-Tutorial-Recorder-arm64.dmg**, открой и перетащи приложение в «Программы».
-            Первый запуск: если macOS не даёт открыть, зайди в «Системные настройки» → «Конфиденциальность и безопасность» и нажми «Всё равно открыть».
-          files: fl-tutorial-recorder/FL-Tutorial-Recorder-arm64.dmg
+      # Same scheme as the repo's other apps: one fixed tag, replaced on every build,
+      # so the download link never changes.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete fl-recorder-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create fl-recorder-latest FL-Tutorial-Recorder-arm64.dmg --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --latest=false \
+            --title "FL Tutorial Recorder (Mac, Apple Silicon)" \
+            --notes "Открой .dmg и перетащи FL Tutorial Recorder в «Программы». Если macOS не даёт открыть: «Системные настройки» → «Конфиденциальность и безопасность» → «Всё равно открыть»."
