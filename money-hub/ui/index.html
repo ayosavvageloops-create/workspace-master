@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>Money Hub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside>
+  <div class="brand"><img src="../build/icon.png" alt=""><span>Money Hub</span></div>
+  <nav>
+    <button data-view="home" class="on">Программы</button>
+    <button data-view="scenarios">Сценарии</button>
+    <button data-view="settings">Настройки</button>
+  </nav>
+  <div class="foot" id="clock"></div>
+</aside>
+<main>
+  <section id="home" class="on">
+    <header><h1>Программы</h1><p class="sub">Запуск, статус и управление твоим софтом</p></header>
+    <div id="modules" class="grid"></div>
+  </section>
+
+  <section id="scenarios">
+    <header><h1>Сценарии</h1><p class="sub">Несколько программ по цепочке одной кнопкой. Ненужный шаг можно выключить галочкой.</p></header>
+    <div id="scenarioList"></div>
+  </section>
+
+  <section id="settings">
+    <header><h1>Настройки</h1></header>
+    <div class="card">
+      <h3>Папка с инструментами</h3>
+      <p class="sub">Папка, куда склонирован репозиторий workspace-master (в ней лежат dolphin-outreach, fl-tutorial-recorder…).</p>
+      <div class="row"><code id="wsDir"></code><button class="btn" id="pickWs">Выбрать…</button></div>
+      <h3>Папка «Загрузки»</h3>
+      <p class="sub">Сюда Type Beat Leads сохраняет type-beat-leads-*.csv.</p>
+      <div class="row"><code id="dlDir"></code><button class="btn" id="pickDl">Выбрать…</button></div>
+      <h3>Порт Dolphin Outreach</h3>
+      <div class="row"><input id="port" type="number" class="inp"><button class="btn" id="savePort">Сохранить</button></div>
+    </div>
+    <div class="card">
+      <h3>Своя папка для программы</h3>
+      <p class="sub">Если программа лежит не в общей папке.</p>
+      <div id="pathList"></div>
+    </div>
+  </section>
+</main>
+
+<div id="drawer" class="drawer">
+  <div class="drawer-head"><b id="drawerTitle"></b><button class="btn" id="drawerClose">Закрыть</button></div>
+  <pre id="drawerLog"></pre>
+</div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

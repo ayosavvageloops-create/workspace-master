@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2fe08a"/>
+      <stop offset="0.55" stop-color="#14a85a"/>
+      <stop offset="1" stop-color="#0a6b39"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.15" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="0" y1="240" x2="0" y2="790">
+      <stop offset="0" stop-color="#fffbe6"/>
+      <stop offset="0.5" stop-color="#ffe9a3"/>
+      <stop offset="1" stop-color="#f4c74f"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#043d1f" flood-opacity="0.55"/>
+    </filter>
+    <filter id="outer" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <g filter="url(#outer)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#glow)"/>
+    <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="3"/>
+  </g>
+  <circle cx="512" cy="512" r="300" fill="#ffffff" fill-opacity="0.08"/>
+  <g filter="url(#sh)" fill="none" stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="512" y1="248" x2="512" y2="776" stroke-width="56"/>
+    <path d="M652 380 C 640 320, 585 296, 512 296 C 420 296, 366 340, 366 404 C 366 470, 420 494, 512 512 C 604 530, 658 556, 658 622 C 658 690, 600 728, 512 728 C 430 728, 376 700, 362 640" stroke-width="72"/>
+  </g>
+</svg>

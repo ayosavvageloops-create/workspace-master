@@ -1,0 +1,47 @@
+{
+  "name": "money-hub",
+  "productName": "Money Hub",
+  "version": "1.0.0",
+  "description": "Командный центр: запуск софта для продаж битов и сценарии, где программы работают по цепочке.",
+  "main": "main.js",
+  "author": "Money Hub",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist:mac": "electron-builder --mac dmg --arm64"
+  },
+  "build": {
+    "appId": "app.moneyhub.desktop",
+    "productName": "Money Hub",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "core/**/*",
+      "ui/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "publish": null,
+    "dmg": {
+      "artifactName": "Money-Hub-${version}-mac-arm64.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  }
+}

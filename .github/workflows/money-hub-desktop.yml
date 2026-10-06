@@ -1,0 +1,41 @@
+name: Money Hub desktop
+
+# Собирает Money Hub на настоящем Маке и публикует .dmg в релизе "money-hub-latest".
+on:
+  push:
+    branches: [main, master, claude/confident-mccarthy-519y53]
+    paths: ['money-hub/**', '.github/workflows/money-hub-desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: money-hub-desktop
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: money-hub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm run dist:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release delete money-hub-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create money-hub-latest dist/*.dmg --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Money Hub (macOS)" \
+            --notes "Открой .dmg и перетащи Money Hub в «Программы». Первый раз: правый клик по приложению → «Открыть»."
