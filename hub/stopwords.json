@@ -1,0 +1,68 @@
+{
+  "_comment": "НЕ официальный список Instagram — у Meta нет публичного списка спам-слов. Это категории риска из практики: они чаще всего уводят первое сообщение в Hidden Requests / Spam. Пополняй сам по результатам тестов. level: high = убрать из первого сообщения, medium = только после ответа собеседника.",
+  "categories": [
+    {
+      "id": "links",
+      "title": "Ссылки и домены",
+      "level": "high",
+      "why": "Ссылка в первом сообщении от незнакомца — главный сигнал спама/скама.",
+      "patterns": ["https?://", "www\\.", "\\b[a-z0-9-]+\\.(com|net|io|me|co|ly|link|store|shop|app|ru)\\b", "bit\\.ly", "linktr\\.ee", "beacons", "link in bio", "ссылк"]
+    },
+    {
+      "id": "money",
+      "title": "Деньги, цены, оплата",
+      "level": "high",
+      "why": "Цены и платёжки в первом касании = продажа незнакомцу, типичный паттерн скама.",
+      "patterns": ["\\$\\s?\\d", "\\d+\\s?\\$", "\\busd\\b", "\\bprice\\b", "\\bpricing\\b", "\\bcheap\\b", "\\bdiscount\\b", "\\bsale\\b", "% ?off", "\\bpromo\\b", "\\bcoupon\\b", "\\bpay(ment|pal)?\\b", "cash ?app", "\\bvenmo\\b", "\\bzelle\\b", "\\bbuy\\b", "\\bpurchase\\b", "цен[аы]", "скидк", "оплат", "купи"]
+    },
+    {
+      "id": "free_win",
+      "title": "Free / giveaway / win",
+      "level": "high",
+      "why": "Классика скам-рассылок («free», «you won», «giveaway»).",
+      "patterns": ["\\bfree\\b", "\\bgiveaway\\b", "\\byou (won|win)\\b", "\\bwinner\\b", "\\bprize\\b", "\\bgift\\b", "бесплатн", "розыгрыш"]
+    },
+    {
+      "id": "offplatform",
+      "title": "Увод с платформы и контакты",
+      "level": "high",
+      "why": "Telegram/WhatsApp/почта/телефон в первом сообщении — сильный скам-сигнал.",
+      "patterns": ["\\btelegram\\b", "\\bwhats ?app\\b", "\\bsnapchat\\b", "\\bdiscord\\b", "\\be-?mail\\b", "@[a-z0-9.-]+\\.[a-z]{2,}", "\\+?\\d[\\d\\s().-]{8,}\\d", "\\btext me\\b", "телеграм", "ватсап", "почт"]
+    },
+    {
+      "id": "growth_promo",
+      "title": "Продвижение, подписчики, «промо»",
+      "level": "high",
+      "why": "Самая заспамленная ниша в музыкальных DM — промо-аккаунты и накрутка.",
+      "patterns": ["\\bfollowers?\\b", "\\bpromot(e|ion)\\b", "\\bfeature (your|you)\\b", "\\bgo viral\\b", "\\bstreams?\\b.*\\b(boost|grow)", "\\bplaylist placement\\b", "\\bmanagement\\b", "\\bsign(ed)? (you|to)\\b", "\\blabel deal\\b", "подписчик", "продвижен", "раскрут"]
+    },
+    {
+      "id": "earn_invest",
+      "title": "Заработок, инвестиции, крипта",
+      "level": "high",
+      "why": "Прямо входит в скам-словарь, который Instagram добавил в фильтр запросов.",
+      "patterns": ["\\bcrypto\\b", "\\bbitcoin\\b", "\\binvest(ment|ing)?\\b", "\\bprofit\\b", "\\bearn\\b", "\\bpassive income\\b", "\\bmake money\\b", "\\bforex\\b", "\\bopportunity\\b", "крипт", "инвест", "заработ"]
+    },
+    {
+      "id": "urgency",
+      "title": "Срочность и давление",
+      "level": "medium",
+      "why": "«Only today», «limited» — маркетинговый тон, режет ответы и выглядит как рассылка.",
+      "patterns": ["\\blimited\\b", "\\bonly today\\b", "\\btoday only\\b", "\\bact now\\b", "\\burgent\\b", "\\bhurry\\b", "\\blast chance\\b", "\\bexclusive offer\\b", "срочно", "только сегодня", "последний шанс"]
+    },
+    {
+      "id": "salesy",
+      "title": "Явная продажа услуг",
+      "level": "medium",
+      "why": "Питч в первом сообщении. По твоей же DM-воронке: первое сообщение = вопрос, не оффер.",
+      "patterns": ["\\bcheck out my\\b", "\\bmy (beats|services|beat pack|loop kit)\\b", "\\bi (sell|offer)\\b", "\\bhire me\\b", "\\bdm me\\b", "\\bbook a call\\b", "\\bcalendly\\b", "мои биты", "мои услуги"]
+    },
+    {
+      "id": "offensive",
+      "title": "Мат и агрессивная лексика",
+      "level": "high",
+      "why": "Встроенный список оскорбительных слов Instagram — ровно то, что фильтр Hidden Words ловит по умолчанию. Сленг в продюсерском комьюнити тоже может триггерить.",
+      "patterns": ["\\bf+u+c+k", "\\bsh[i1]t\\b", "\\bb[i1]tch", "\\bn[i1]gg", "\\bh[o0]e\\b", "бля", "хуй", "пизд"]
+    }
+  ]
+}

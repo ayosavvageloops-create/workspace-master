@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beat Hub</title>
+<style>
+:root{--bg:#f6f6f4;--card:#fff;--ink:#1b1b1b;--mute:#6b6b6b;--line:#e3e3df;--acc:#3b5bdb;--ok:#2b8a3e;--warn:#e67700;--bad:#c92a2a}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--card:#1e1e1e;--ink:#ececec;--mute:#9a9a9a;--line:#2e2e2e;--acc:#748ffc;--ok:#69db7c;--warn:#ffa94d;--bad:#ff6b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{display:flex;gap:16px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+h1{font-size:18px;margin:0}
+nav button{background:none;border:0;color:var(--mute);font:inherit;padding:6px 10px;border-radius:6px;cursor:pointer}
+nav button.on{color:var(--ink);background:var(--card);box-shadow:0 0 0 1px var(--line)}
+main{max-width:980px;margin:0 auto;padding:20px 16px}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:200px}
+.mute{color:var(--mute);font-size:13px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:6px 12px;font:inherit;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.pill{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.running{color:var(--acc)}.ok{color:var(--ok)}.failed{color:var(--bad)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:260px;overflow:auto;font-size:12px;white-space:pre-wrap;margin:10px 0 0}
+h2{font-size:15px;margin:18px 0 8px;color:var(--mute);font-weight:600}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--acc)}
+.cnt{display:flex;align-items:center;gap:6px}
+.cnt input{width:72px;text-align:center;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{width:100%;min-height:110px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.high{color:var(--bad)}.medium{color:var(--warn)}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.kpi b{display:block;font-size:22px}
+label.f{display:flex;flex-direction:column;font-size:13px;color:var(--mute);gap:4px}
+label.f input{padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;width:120px}
+table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid var(--line)}td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header>
+  <h1>Beat Hub</h1>
+  <nav>
+    <button data-tab="run" class="on">Пульт</button>
+    <button data-tab="day">День</button>
+    <button data-tab="check">Проверка текста</button>
+    <button data-tab="plan">План $10k</button>
+  </nav>
+</header>
+<main>
+
+<section id="run" class="on"><div id="tasks"></div></section>
+
+<section id="day">
+  <div class="row"><input type="date" id="dayPick" class="btn"><span class="mute grow" id="dayHint"></span></div>
+  <div id="checklist"></div>
+  <h2>Месяц</h2>
+  <div class="kpi" id="monthKpi"></div>
+</section>
+
+<section id="check">
+  <div class="card">
+    <div class="mute">Вставь первое сообщение (шаблон). Плейсхолдеры вида {name}, {track} считаются персонализацией.</div>
+    <textarea id="msg">Yo {name}, saw your track {track} — that hook goes crazy. You working on a project right now?</textarea>
+    <div class="row" style="margin-top:8px"><button class="btn pri" id="checkBtn">Проверить</button><span id="score"></span></div>
+    <div id="checkOut"></div>
+  </div>
+  <p class="mute">Это эвристика, а не официальный список Instagram. Финальная проверка — тест на своих аккаунтах-получателях (см. plan/10k-plan.md).</p>
+</section>
+
+<section id="plan">
+  <div class="card">
+    <div class="row">
+      <label class="f">Цель, $/мес<input id="p_goal" type="number" value="10000"></label>
+      <label class="f">High ticket, $<input id="p_ht" type="number" value="1000"></label>
+      <label class="f">Доля HT в выручке, %<input id="p_share" type="number" value="70"></label>
+      <label class="f">Low ticket, $<input id="p_lt" type="number" value="50"></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Close rate на звонке, %<input id="p_close" type="number" value="25"></label>
+      <label class="f">Show rate, %<input id="p_show" type="number" value="70"></label>
+      <label class="f">Диалог → звонок, %<input id="p_book" type="number" value="10"></label>
+      <label class="f">Reply rate холодных DM, %<input id="p_reply" type="number" value="6"></label>
+      <label class="f">Рабочих дней<input id="p_days" type="number" value="24"></label>
+    </div>
+  </div>
+  <div class="card"><table id="planOut"></table></div>
+</section>
+
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const api=(u,b)=>fetch(u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:{}).then(r=>r.json());
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let tab='run';
+try{tab=localStorage.getItem('tab')||'run'}catch(e){}
+function show(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===t));try{localStorage.setItem('tab',t)}catch(e){}if(t==='day')loadDay();if(t==='plan')calc()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+
+// ---- пульт
+const openLogs=new Set();
+async function loadTasks(){
+  const ts=await api('/api/tasks');const groups={};
+  ts.forEach(t=>(groups[t.group||'Задачи']=groups[t.group||'Задачи']||[]).push(t));
+  let h='';
+  for(const g in groups){h+=`<h2>${esc(g)}</h2>`;for(const t of groups[g]){
+    const st={idle:'',running:'идёт…',ok:'готово',failed:`ошибка (код ${t.rc})`}[t.status];
+    h+=`<div class="card"><div class="row"><div class="grow"><b>${esc(t.title)}</b><div class="mute">${esc(t.cmd)}</div></div>
+    <span class="pill ${t.status}">${st||'не запускалась'}</span>
+    ${t.status==='running'?`<button class="btn" onclick="stopT('${t.id}')">Стоп</button>`:`<button class="btn pri" onclick="runT('${t.id}',${!!t.confirm})">Запустить</button>`}
+    ${t.log?`<button class="btn" onclick="toggleLog('${t.id}')">Лог</button>`:''}</div>
+    ${openLogs.has(t.id)?`<pre id="log-${t.id}"></pre>`:''}</div>`}}
+  $('#tasks').innerHTML=h;
+  for(const id of openLogs){const r=await api('/api/log/'+id);const el=$('#log-'+id);if(el){el.textContent=r.text;el.scrollTop=1e9}}
+}
+async function runT(id,c){if(c&&!confirm('Запустить?'))return;const r=await api('/api/run/'+id,{});if(r.error)alert(r.error);openLogs.add(id);loadTasks()}
+async function stopT(id){await api('/api/stop/'+id,{});loadTasks()}
+function toggleLog(id){openLogs.has(id)?openLogs.delete(id):openLogs.add(id);loadTasks()}
+setInterval(()=>{if(tab==='run')loadTasks()},2000);loadTasks();
+
+// ---- день
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+$('#dayPick').value=today();$('#dayPick').onchange=loadDay;
+let actions=[];
+async function loadDay(){
+  if(!actions.length)actions=(await api('/api/daily')).actions;
+  const day=$('#dayPick').value,c=await api('/api/day/'+day);
+  let h='',blk='',done=0,need=0;
+  for(const a of actions){
+    if(a.block!==blk){blk=a.block;h+=`<h2>${esc(blk)}</h2>`}
+    const v=c[a.id]||0,p=a.target?Math.min(100,v/a.target*100):0;
+    if(a.target){need++;if(v>=a.target)done++}
+    h+=`<div class="card"><div class="row"><div class="grow">${esc(a.title)} ${a.target?`<span class="mute">· норма ${a.target}</span>`:''}</div>
+    <div class="cnt"><button class="btn" onclick="bump('${a.id}',-1)">−</button><input value="${v}" onchange="setv('${a.id}',this.value)"><button class="btn" onclick="bump('${a.id}',1)">+</button></div></div>
+    ${a.target?`<div class="bar"><i style="width:${p}%"></i></div>`:''}</div>`;
+  }
+  $('#checklist').innerHTML=h;$('#dayHint').textContent=`Норм выполнено: ${done}/${need}`;
+  const m=await api('/api/month/'+day.slice(0,7)),t=m.total,rev=(t.ht_sales||0)+(t.lt_sales||0);
+  $('#monthKpi').innerHTML=[['Выручка',`$${rev}`],['До $10k',`$${Math.max(0,10000-rev)}`],['Дней отмечено',m.days_logged],['DM отправлено',t.outbound_dm||0],['Звонков проведено',t.calls_done||0]].map(([k,v])=>`<div><span class="mute">${k}</span><b>${v}</b></div>`).join('');
+}
+async function setv(id,v){await api('/api/day/'+$('#dayPick').value,{id,value:+v||0});loadDay()}
+async function bump(id,d){const c=await api('/api/day/'+$('#dayPick').value);setv(id,(c[id]||0)+d)}
+
+// ---- проверка
+$('#checkBtn').onclick=async()=>{
+  const r=await api('/api/check',{text:$('#msg').value});
+  const col=r.score<20?'ok':r.score<50?'medium':'high';
+  $('#score').innerHTML=`<b class="${col}">${r.score}/100 — ${esc(r.verdict)}</b>`;
+  $('#checkOut').innerHTML=r.hits.map(h=>`<p><b class="${h.level}">${esc(h.category)}</b>: ${h.matches.map(esc).join(', ')}<br><span class="mute">${esc(h.why)}</span></p>`).join('')+r.notes.map(n=>`<p class="${n.level}">${esc(n.text)}</p>`).join('');
+};
+
+// ---- план
+function calc(){
+  const g=id=>+$('#p_'+id).value||0;
+  const htRev=g('goal')*g('share')/100,ltRev=g('goal')-htRev;
+  const htDeals=Math.ceil(htRev/g('ht')),ltDeals=Math.ceil(ltRev/g('lt'));
+  const callsDone=Math.ceil(htDeals/(g('close')/100)),booked=Math.ceil(callsDone/(g('show')/100));
+  const convos=Math.ceil(booked/(g('book')/100)),dms=Math.ceil(convos/(g('reply')/100)),d=g('days');
+  const rows=[['High ticket сделок / мес',htDeals],['Low ticket продаж / мес',ltDeals],['Проведённых звонков / мес',callsDone],['Забронированных звонков / мес',booked],['Квалифицирующих диалогов / мес',convos],['Холодных DM / мес (если все лиды из холодки)',dms],['— в день: DM',Math.ceil(dms/d)],['— в день: диалогов',Math.ceil(convos/d)],['— в день: бронирований звонков',(booked/d).toFixed(1)],['— в день: low ticket продаж',(ltDeals/30).toFixed(1)]];
+  $('#planOut').innerHTML=rows.map(([k,v])=>`<tr><td>${k}</td><td><b>${v}</b></td></tr>`).join('');
+}
+document.querySelectorAll('#plan input').forEach(i=>i.oninput=calc);
+show(tab);
+</script>
+</body>
+</html>

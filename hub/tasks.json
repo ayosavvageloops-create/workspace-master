@@ -1,0 +1,43 @@
+{
+  "_comment": "Каждая задача = кнопка в хабе. cmd — команда, которую ты обычно запускаешь в терминале. cwd — папка, из которой запускать. Пути ниже — примеры, замени на свои.",
+  "tasks": [
+    {
+      "id": "dolphin-outbound",
+      "title": "Рассылка по профилям Dolphin (артисты, high ticket)",
+      "group": "Outbound",
+      "cmd": "python3 send_dms.py --campaign artists",
+      "cwd": "~/Projects/dolphin-outreach",
+      "confirm": true
+    },
+    {
+      "id": "dolphin-loops",
+      "title": "Рассылка лупов (продюсеры)",
+      "group": "Outbound",
+      "cmd": "python3 send_loops.py --campaign producers",
+      "cwd": "~/Projects/dolphin-outreach",
+      "confirm": true
+    },
+    {
+      "id": "dolphin-followups",
+      "title": "Фоллоу-апы тем, кто не ответил 48ч+",
+      "group": "Outbound",
+      "cmd": "python3 send_dms.py --campaign followups",
+      "cwd": "~/Projects/dolphin-outreach",
+      "confirm": true
+    },
+    {
+      "id": "open-dolphin",
+      "title": "Открыть Dolphin Anty",
+      "group": "Приложения",
+      "cmd": "open -a 'Dolphin Anty'",
+      "cwd": "~"
+    },
+    {
+      "id": "demo",
+      "title": "Тест хаба (проверить, что запуск работает)",
+      "group": "Сервис",
+      "cmd": "echo 'хаб работает'; date; sleep 2; echo 'готово'",
+      "cwd": "~"
+    }
+  ]
+}

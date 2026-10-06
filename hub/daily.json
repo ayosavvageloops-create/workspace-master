@@ -1,0 +1,16 @@
+{
+  "_comment": "Ежедневные целевые действия. target — норма на день. Цифры выведены из plan/10k-plan.md; поменяешь цены/конверсии — пересчитай и поправь здесь.",
+  "actions": [
+    {"id": "outbound_dm",   "title": "Холодные DM артистам (через Dolphin)",            "target": 150, "block": "Утро"},
+    {"id": "loops_sent",    "title": "Рассылка лупов продюсерам",                        "target": 50,  "block": "Утро"},
+    {"id": "content",       "title": "Рилс/шортс с CTA «напиши START»",                  "target": 1,   "block": "Утро"},
+    {"id": "stories",       "title": "Сторис (процесс, кейсы, CTA)",                     "target": 4,   "block": "Утро"},
+    {"id": "replies",       "title": "Ответить на все ответы и keyword-DM (< 2 часов)", "target": 20,  "block": "День"},
+    {"id": "followups",     "title": "Фоллоу-апы вручную (тёплые диалоги)",              "target": 15,  "block": "День"},
+    {"id": "calls_booked",  "title": "Забронировано звонков",                            "target": 2,   "block": "День"},
+    {"id": "calls_done",    "title": "Проведено звонков (discovery / sales)",            "target": 1,   "block": "День"},
+    {"id": "beats",         "title": "Битов / луп-паков сделано",                         "target": 2,   "block": "Вечер"},
+    {"id": "ht_sales",      "title": "Продажи high ticket ($)",                          "target": 0,   "block": "Итог", "money": true},
+    {"id": "lt_sales",      "title": "Продажи low ticket ($)",                           "target": 0,   "block": "Итог", "money": true}
+  ]
+}
