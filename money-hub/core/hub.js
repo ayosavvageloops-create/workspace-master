@@ -7,6 +7,8 @@ const { MODULES, SCENARIOS } = require('./modules');
 const { Processes } = require('./processes');
 const { Outreach } = require('./outreach');
 const leads = require('./leads');
+const { Finder, toOutreachRows } = require('./finder');
+const { toCsv } = require('./csv');
 
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -18,6 +20,8 @@ class Hub extends EventEmitter {
     this.platform = platform;
     this.procs = processes || new Processes();
     this.outreach = outreach || new Outreach(() => this.store.get('outreachPort'));
+    this.finder = new Finder(() => this.store.get('finderPort'));
+    this.found = null; // последние найденные артисты (этап 1)
     this.runs = {}; // id сценария -> { running, steps: [{status, note}] }
     this.procs.on('change', () => this.emit('change'));
     this.procs.on('log', (id) => this.emit('log', id));
@@ -59,6 +63,10 @@ class Hub extends EventEmitter {
     }
     if (m.kind === 'process') return { ...base, status: this.procs.state(m.id).status };
     if (m.kind === 'app') return { ...base, found: true, status: (await this.appRunning(m.appName)) ? 'running' : 'idle' };
+    if (m.kind === 'finder') {
+      const alive = await this.finder.alive();
+      return { ...base, found: true, status: alive ? 'running' : 'idle', foundCount: this.found ? this.found.length : null };
+    }
     if (m.kind === 'chrome') {
       const latest = leads.findLatestExport(this.store.get('downloadsDir'));
       return { ...base, status: 'tool', latestExport: latest && { name: latest.name, mtimeMs: latest.mtimeMs, imported: this.isImported(latest) } };
@@ -129,8 +137,8 @@ class Hub extends EventEmitter {
   }
 
   publicSettings() {
-    const { dolphinToken, ...rest } = this.store.data;
-    return { ...rest, hasDolphinToken: Boolean(dolphinToken) };
+    const { dolphinToken, usedHandles, ...rest } = this.store.data;
+    return { ...rest, hasDolphinToken: Boolean(dolphinToken), usedCount: usedHandles.length };
   }
 
   async action(id, act) {
@@ -140,6 +148,7 @@ class Hub extends EventEmitter {
         if (m.kind === 'server') return this.startServer(m);
         if (m.kind === 'process') return this.procs.start(m.id, m.cmd, this.ensureDir(m));
         if (m.kind === 'app') return this.openApp(m);
+        if (m.kind === 'finder') return this.startFinder();
         return this.openUrl(m.url, m.kind === 'chrome');
       case 'stop':
         if (m.kind === 'app') return this.procs.run(`osascript -e ${q(`quit app "${m.appName}"`)}`);
@@ -180,7 +189,7 @@ class Hub extends EventEmitter {
     const key = `${latest.name}|${Math.round(latest.mtimeMs)}`;
     this.store.set({ imported: [...this.store.get('imported').filter((k) => k !== key), key].slice(-50) });
     this.emit('change');
-    const dup = r.duplicates ? `, уже были в базе: ${r.duplicates}` : '';
+    const dup = r.duplicates?.length ? `, уже были в базе: ${r.duplicates.length}` : '';
     return { note: `${latest.name}: 🔥 ${prep.counts.hot}, тёплых ${prep.counts.warm} → новых в очереди: ${r.added ?? 0}${dup}` };
   }
 
@@ -195,8 +204,66 @@ class Hub extends EventEmitter {
     this.emit('change');
   }
 
-  async runStep(step) {
+  async startFinder() {
+    if (await this.finder.alive()) return 'уже открыт';
+    await this.openApp(this.module('artist-finder'));
+    if (!(await this.finder.waitAlive(60000))) {
+      throw new Error('Artist Finder открылся, но его API (порт 8763) не ответил за минуту. Обнови Artist Finder до версии с «control server».');
+    }
+    return 'открыт';
+  }
+
+  async discover(progress) {
+    const p = this.store.get('stage1');
+    const seed = String(p.seed || '').trim();
+    if (!seed) throw new Error('Не задан референс-артист (вкладка «Этап 1»)');
+    const job = await this.finder.discover({
+      seed,
+      count: Math.min(500, Math.max(1, Number(p.count) || 100)),
+      minListeners: Number(p.minListeners) || 0,
+      maxListeners: Number(p.maxListeners) || 0,
+      filterFollowers: Boolean(p.filterFollowers),
+      minFollowers: Number(p.minFollowers) || 0,
+      maxFollowers: Number(p.maxFollowers) || 0,
+      exclude: this.store.get('usedHandles'),
+    }, { onProgress: (found, want, state) => progress(`${state === 'resolving' ? 'ищу референс…' : 'ищу'} найдено ${found} из ${want}`) });
+    this.found = toOutreachRows(job.rows);
+    if (!this.found.length) return { skipped: true, note: `${job.seedName || seed}: никого не нашлось под эти фильтры` };
+    return `${job.seedName || seed}: найдено ${this.found.length} артистов с Instagram`;
+  }
+
+  async prepareOutreach() {
+    const templates = (this.store.get('templates') || []).map((t) => String(t).trim()).filter(Boolean);
+    if (!templates.length) throw new Error('Нет ни одного шаблона опенера (вкладка «Этап 1»)');
+    await this.outreach.setTemplates(templates);
+    const methods = this.store.get('methods');
+    if (!methods.dm && !methods.story && !methods.post) throw new Error('Не выбран ни один способ отправки');
+    await this.outreach.setMethods(methods);
+    const on = [methods.dm && 'директ', methods.story && 'сторис', methods.post && 'пост'].filter(Boolean).join(', ');
+    return `шаблонов: ${templates.length}; способы: ${on}`;
+  }
+
+  async importFound() {
+    if (!this.found || !this.found.length) throw new Error('Нет найденных артистов: сначала шаг поиска');
+    const csv = toCsv(this.found, ['username', 'name', 'track', 'listeners', 'ig_followers', 'spotify_url']);
+    const r = await this.outreach.importCsv(csv);
+    const used = new Set(this.store.get('usedHandles'));
+    for (const a of this.found) used.add(a.username);
+    this.store.set({ usedHandles: [...used].slice(-20000) });
+    const dup = r.duplicates?.length ? `, уже были в базе: ${r.duplicates.length}` : '';
+    return `в очередь добавлено ${r.added ?? 0}${dup}`;
+  }
+
+  async runStep(step, progress = () => {}) {
     switch (step.type) {
+      case 'startFinder':
+        return this.startFinder();
+      case 'discover':
+        return this.discover(progress);
+      case 'prepareOutreach':
+        return this.prepareOutreach();
+      case 'importFound':
+        return this.importFound();
       case 'openApp': {
         const m = this.module(step.module);
         if (await this.appRunning(m.appName)) return 'уже открыт';
@@ -248,7 +315,7 @@ class Hub extends EventEmitter {
       run.steps[i].status = 'active';
       this.emit('change');
       try {
-        const res = await this.runStep(sc.steps[i]);
+        const res = await this.runStep(sc.steps[i], (note) => { run.steps[i].note = note; this.emit('change'); });
         if (res && res.skipped) Object.assign(run.steps[i], { status: 'skip', note: res.note });
         else Object.assign(run.steps[i], { status: 'ok', note: typeof res === 'string' ? res : '' });
       } catch (e) {

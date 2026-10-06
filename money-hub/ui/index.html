@@ -10,14 +10,47 @@
 <aside>
   <div class="brand"><img src="../build/icon.png" alt=""><span>Money Hub</span></div>
   <nav>
-    <button data-view="home" class="on">Программы</button>
+    <button data-view="stage1" class="on">Этап 1</button>
+    <button data-view="home">Программы</button>
     <button data-view="scenarios">Сценарии</button>
     <button data-view="settings">Настройки</button>
   </nav>
   <div class="foot" id="clock"></div>
 </aside>
 <main>
-  <section id="home" class="on">
+  <section id="stage1" class="on">
+    <header><h1>Этап 1: лиды → рассылка</h1><p class="sub">Референс → Artist Finder находит похожих → делим по профилям Dolphin → каждому свой опенер → рассылка расширением.</p></header>
+    <div class="card">
+      <h3>Кого ищем</h3>
+      <div class="form">
+        <label class="f wide">Референс-артист (имя или ссылка Spotify)<input id="s_seed" class="inp"></label>
+        <label class="f">Сколько артистов<input id="s_count" type="number" min="1" max="500" class="inp"></label>
+        <label class="f">Слушателей в месяц, от<input id="s_minListeners" type="number" class="inp"></label>
+        <label class="f">до<input id="s_maxListeners" type="number" class="inp"></label>
+        <label class="f chk"><input id="s_filterFollowers" type="checkbox"> Фильтр по подписчикам Instagram (медленнее)</label>
+        <label class="f">Подписчиков IG, от<input id="s_minFollowers" type="number" class="inp"></label>
+        <label class="f">до<input id="s_maxFollowers" type="number" class="inp"></label>
+      </div>
+      <p class="note">Тех, кому уже писали через Money Hub, Artist Finder повторно не вернёт. Уже отдано в рассылку: <b id="usedCount">0</b></p>
+    </div>
+    <div class="card">
+      <h3>Опенеры</h3>
+      <p class="sub">Каждому артисту выбирается случайный шаблон. <code>{Yo|Ayo}</code> — случайное слово, <code>{{first_name:bro}}</code> — имя (или «bro», если имени нет), <code>{{track}}</code> — его трек, <code>{{name}}</code> — полное имя.</p>
+      <div id="tplList"></div>
+      <div class="row"><button class="btn" id="tplAdd">+ Шаблон</button></div>
+      <h3>Как отправлять</h3>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="m_dm"> В директ</label>
+        <label class="chk"><input type="checkbox" id="m_story"> Ответ на сторис</label>
+        <label class="chk"><input type="checkbox" id="m_post"> Ответ на пост</label>
+      </div>
+      <p class="note">Расширение выбирает способ для каждого артиста среди отмеченных. Профили Dolphin отмечаются в панели Dolphin Outreach (по 25 артистов на профиль в день).</p>
+      <div class="row"><button class="btn" id="saveStage">Сохранить</button><span id="saveState" class="note"></span></div>
+    </div>
+    <div id="stageRun"></div>
+  </section>
+
+  <section id="home">
     <header><h1>Программы</h1><p class="sub">Запуск, статус и управление твоим софтом</p></header>
     <div id="modules" class="grid"></div>
   </section>

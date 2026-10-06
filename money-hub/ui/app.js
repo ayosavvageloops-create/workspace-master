@@ -102,7 +102,13 @@ $('#modules').addEventListener('click', async (e) => {
 const STEP = { wait: 'ждёт', active: 'выполняется…', ok: 'готово', fail: 'ошибка', skip: 'пропущен', off: 'выключен', cancel: 'не выполнялся' };
 
 function renderScenarios() {
-  $('#scenarioList').innerHTML = snap.scenarios.map((s) => {
+  $('#scenarioList').innerHTML = snap.scenarios.filter((s) => s.id !== 'stage1').map(scenarioCard).join('');
+  const st = snap.scenarios.find((s) => s.id === 'stage1');
+  if (st) $('#stageRun').innerHTML = scenarioCard(st);
+}
+
+function scenarioCard(s) {
+  {
     const run = s.run;
     const steps = s.steps.map((st, i) => {
       const r = run?.steps[i];
@@ -121,19 +127,79 @@ function renderScenarios() {
       </div>
       <ol class="steps">${steps}</ol>
     </div>`;
-  }).join('');
+  }
 }
 
-$('#scenarioList').addEventListener('click', async (e) => {
-  const btn = e.target.closest('button[data-run]');
-  if (btn) {
-    try { await window.hub.runScenario(btn.dataset.run); } catch (err) { toast(err.message, true); }
+for (const box of ['#scenarioList', '#stageRun']) {
+  $(box).addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-run]');
+    if (!btn) return;
+    try {
+      if (btn.dataset.run === 'stage1' && stageDirty) await saveStage();
+      await window.hub.runScenario(btn.dataset.run);
+    } catch (err) { toast(err.message, true); }
+  });
+  $(box).addEventListener('change', async (e) => {
+    const c = e.target;
+    if (c.dataset.sc) await window.hub.setStep(c.dataset.sc, Number(c.dataset.i), c.checked);
+  });
+}
+
+// ---------- этап 1: форма ----------
+const NUM = ['count', 'minListeners', 'maxListeners', 'minFollowers', 'maxFollowers'];
+let stageLoaded = false;
+let stageDirty = false;
+
+function spinPreview(text) {
+  const vars = { first_name: 'Jay', name: 'Jay Wave', track: 'Night Drive', username: 'jay.wave' };
+  let out = String(text).replace(/\{\{\s*([\w.-]+)\s*(?::([^}]*))?\}\}/g, (_, k, fb) => vars[k] || fb || '');
+  for (let i = 0; i < 200 && /\{[^{}]*\|[^{}]*\}/.test(out); i++) {
+    out = out.replace(/\{([^{}]*\|[^{}]*)\}/, (_, b) => { const o = b.split('|'); return o[Math.floor(Math.random() * o.length)]; });
   }
-});
-$('#scenarioList').addEventListener('change', async (e) => {
-  const c = e.target;
-  if (c.dataset.sc) await window.hub.setStep(c.dataset.sc, Number(c.dataset.i), c.checked);
-});
+  return out;
+}
+
+function tplRow(text) {
+  const d = document.createElement('div');
+  d.className = 'tpl';
+  d.innerHTML = `<div style="flex:1"><textarea></textarea><span class="prev"></span></div><button class="btn danger" title="Удалить">✕</button>`;
+  const ta = d.querySelector('textarea');
+  ta.value = text;
+  const prev = () => (d.querySelector('.prev').textContent = ta.value.trim() ? `Пример: ${spinPreview(ta.value)}` : '');
+  ta.oninput = () => { prev(); markDirty(); };
+  d.querySelector('button').onclick = () => { d.remove(); markDirty(); };
+  prev();
+  return d;
+}
+
+function markDirty() { stageDirty = true; $('#saveState').textContent = 'есть несохранённые изменения'; }
+
+function renderStage() {
+  const s = snap.settings;
+  $('#usedCount').textContent = s.usedCount ?? 0;
+  if (stageLoaded) return;
+  stageLoaded = true;
+  $('#s_seed').value = s.stage1.seed || '';
+  for (const k of NUM) $(`#s_${k}`).value = s.stage1[k] ?? '';
+  $('#s_filterFollowers').checked = Boolean(s.stage1.filterFollowers);
+  for (const k of ['dm', 'story', 'post']) $(`#m_${k}`).checked = Boolean(s.methods[k]);
+  $('#tplList').innerHTML = '';
+  for (const t of s.templates) $('#tplList').append(tplRow(t));
+}
+
+async function saveStage() {
+  const stage1 = { seed: $('#s_seed').value.trim(), filterFollowers: $('#s_filterFollowers').checked };
+  for (const k of NUM) stage1[k] = Number($(`#s_${k}`).value) || 0;
+  const templates = [...document.querySelectorAll('#tplList textarea')].map((t) => t.value.trim()).filter(Boolean);
+  const methods = { dm: $('#m_dm').checked, story: $('#m_story').checked, post: $('#m_post').checked };
+  await window.hub.saveSettings({ stage1, templates, methods });
+  stageDirty = false;
+  $('#saveState').textContent = 'сохранено ✓';
+}
+
+document.querySelectorAll('#stage1 input').forEach((i) => i.addEventListener('input', markDirty));
+$('#tplAdd').onclick = () => { $('#tplList').append(tplRow('')); markDirty(); };
+$('#saveStage').onclick = () => saveStage().catch((e) => toast(e.message, true));
 
 // ---------- настройки ----------
 function renderSettings() {
@@ -197,6 +263,7 @@ async function refresh() {
     renderModules();
     renderScenarios();
     renderSettings();
+    renderStage();
   } catch (err) {
     toast(err.message, true);
   } finally {

@@ -94,3 +94,17 @@ code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
 .note.warn-text { color: var(--bad); }
 .inp.wide { width: 360px; }
 .ok-text { color: var(--acc); }
+
+.form { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px 14px; margin: 10px 0; }
+.f { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--mute); }
+.f .inp { width: 100%; }
+.f.wide { grid-column: 1 / -1; }
+.f.wide .inp { font-size: 15px; padding: 8px 10px; }
+.chk { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
+.chk input { accent-color: var(--acc); }
+.f.chk { grid-column: 1 / -1; }
+.tpl { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.tpl textarea { flex: 1; min-height: 64px; background: var(--bg); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 8px 10px; font: inherit; resize: vertical; }
+.tpl .prev { display: block; font-size: 12px; color: var(--mute); margin-top: 4px; }
+#stageRun .card { border-color: #2a4a3b; }
+.tpl textarea { width: 100%; }

@@ -30,7 +30,8 @@ http.createServer(async (req, res) => {
     log: [{ text: 'готов' }],
   });
   if (req.url === '/api/artists/import') { state.imported.push(body.text); save(); return json({ added: 2, duplicates: 0 }); }
-  if (req.url === '/api/config') { state.config = body; save(); return json({ ok: true }); }
+  if (req.url === '/api/config') { state.config = { ...state.config, ...body }; save(); return json({ ok: true }); }
+  if (req.url === '/api/templates') { state.templates = body.templates; save(); return json(body.templates); }
   if (req.url === '/api/run/start') { state.started = body; state.running = true; save(); return json({ ok: true }); }
   res.writeHead(404); res.end('{}');
 }).listen(Number(process.env.PORT), '127.0.0.1');
@@ -103,4 +104,58 @@ test('нет папки программы — понятная ошибка и 
   assert.strictEqual(steps[1].status, 'fail');
   assert.match(steps[1].note, /не найдена.*Настройках/);
   assert.deepStrictEqual(steps.slice(2).map((s) => s.status), ['cancel', 'cancel']);
+});
+
+test('Этап 1: Artist Finder → шаблоны и способы → импорт → рассылка', async (t) => {
+  const http = require('node:http');
+  const { out, store } = setup();
+  let discoverBody = null;
+  let polls = 0;
+  const finder = http.createServer(async (req, res) => {
+    let raw = ''; for await (const c of req) raw += c;
+    const json = (o) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+    if (req.url === '/health') return json({ ok: true, app: 'artist-finder' });
+    if (req.url === '/discover') { discoverBody = JSON.parse(raw); return json({ ok: true, jobId: 'j1' }); }
+    if (req.url === '/discover/j1') {
+      polls++;
+      if (polls < 2) return json({ ok: true, state: 'walking', want: 3, found: 1, rows: [] });
+      return json({ ok: true, state: 'done', seedName: 'Tory Lanez', want: 3, found: 3, rows: [
+        { name: 'Jay Wave', igHandle: 'jay.wave', track: 'Night Drive', monthlyListeners: 5000, spotifyUrl: 'https://open.spotify.com/artist/1' },
+        { name: 'Mia', igHandle: '@Rnb.Mia', track: 'Slow', monthlyListeners: 3000 },
+        { name: 'No IG', igHandle: '', track: 'x' },
+      ] });
+    }
+    res.writeHead(404); res.end('{}');
+  });
+  await new Promise((r) => finder.listen(0, '127.0.0.1', r));
+  const hub = new Hub({ store, platform: 'linux' });
+  hub.finder.discover = ((orig) => (p, o) => orig.call(hub.finder, p, { ...o, pollMs: 20 }))(hub.finder.discover);
+  t.after(() => { hub.shutdown(); finder.close(); });
+  store.set({
+    finderPort: finder.address().port,
+    disabledSteps: { stage1: [2] }, // Dolphin Anty в тесте не открываем
+    usedHandles: ['old.one'],
+    stage1: { seed: 'Tory Lanez', count: 3, minListeners: 1600, maxListeners: 24000, filterFollowers: false, minFollowers: 3000, maxFollowers: 50000 },
+    templates: ['Yo {{first_name:bro}}, "{{track}}" hits', '  '],
+    methods: { dm: true, story: true, post: false },
+  });
+
+  await hub.runScenario('stage1');
+  const run = hub.runs.stage1;
+  assert.deepStrictEqual(run.steps.map((s) => s.status), ['ok', 'ok', 'off', 'ok', 'ok', 'ok', 'ok'], JSON.stringify(run.steps));
+  assert.match(run.steps[1].note, /найдено 2 артистов/);
+
+  assert.strictEqual(discoverBody.seed, 'Tory Lanez');
+  assert.strictEqual(discoverBody.count, 3);
+  assert.strictEqual(discoverBody.minListeners, 1600);
+  assert.deepStrictEqual(discoverBody.exclude, ['old.one']);
+
+  const mock = JSON.parse(fs.readFileSync(out, 'utf8'));
+  assert.deepStrictEqual(mock.templates.map((x) => x.text), ['Yo {{first_name:bro}}, "{{track}}" hits']);
+  assert.deepStrictEqual(mock.config.extension.methods, { dm: true, story: true, post: false });
+  const imported = parseCsv(mock.imported[0]);
+  assert.deepStrictEqual(imported.map((r) => [r.username, r.name, r.track]), [['jay.wave', 'Jay Wave', 'Night Drive'], ['rnb.mia', 'Mia', 'Slow']]);
+  assert.ok(mock.started);
+  assert.deepStrictEqual(store.get('usedHandles').sort(), ['jay.wave', 'old.one', 'rnb.mia']);
+  assert.strictEqual((await hub.snapshot()).settings.usedCount, 3);
 });

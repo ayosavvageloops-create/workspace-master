@@ -4,6 +4,13 @@
 
 const MODULES = [
   {
+    id: 'artist-finder',
+    title: 'Artist Finder',
+    role: 'Поиск артистов по референсу (Spotify)',
+    kind: 'finder',
+    appName: 'Artist Finder',
+  },
+  {
     id: 'dolphin-anty',
     title: 'Dolphin Anty',
     role: 'Браузер с профилями Instagram',
@@ -52,6 +59,20 @@ const MODULES = [
 ];
 
 const SCENARIOS = [
+  {
+    id: 'stage1',
+    title: 'Этап 1: лиды → рассылка',
+    about: 'Artist Finder находит артистов по референсу → Dolphin Outreach делит их между профилями, пишет каждому опенер по шаблонам и запускает расширение (директ / сторис / пост).',
+    steps: [
+      { type: 'startFinder', title: 'Открыть Artist Finder' },
+      { type: 'discover', title: 'Найти похожих артистов по референсу' },
+      { type: 'openApp', module: 'dolphin-anty', title: 'Открыть Dolphin Anty', waitSec: 10 },
+      { type: 'startServer', module: 'dolphin-outreach', title: 'Запустить Dolphin Outreach (+ токен)' },
+      { type: 'prepareOutreach', title: 'Передать шаблоны опенеров и способы отправки' },
+      { type: 'importFound', title: 'Загрузить найденных артистов (опенер каждому)' },
+      { type: 'startOutreach', title: 'Запустить рассылку по профилям Dolphin' },
+    ],
+  },
   {
     id: 'morning-outreach',
     title: 'Утренняя рассылка',

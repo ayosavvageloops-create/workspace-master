@@ -9,6 +9,23 @@ const DEFAULTS = {
   downloadsDir: path.join(os.homedir(), 'Downloads'),
   outreachPort: 4747,
   dolphinToken: '', // хранится только в этом файле на Маке
+  finderPort: 8763,
+  // Этап 1: поиск артистов в Artist Finder
+  stage1: {
+    seed: 'Tory Lanez', // референс: имя артиста или ссылка Spotify
+    count: 100,
+    minListeners: 1600,
+    maxListeners: 24000,
+    filterFollowers: false, // фильтр по подписчикам Instagram (медленнее)
+    minFollowers: 3000,
+    maxFollowers: 50000,
+  },
+  // Шаблоны опенеров: {a|b} — случайный вариант, {{first_name:bro}}, {{track}}, {{name}}
+  templates: [
+    '{Yo|Ayo|Yo yo} {{first_name:bro}}! {Just came across|Been bumping|Caught} "{{track:your latest}}" — real ones only. Working with artists in your lane right now, {wanted to link|had to reach out|thought I should hit you}.',
+  ],
+  methods: { dm: true, story: true, post: true }, // способы отправки в расширении
+  usedHandles: [], // кому уже отдали в рассылку — Artist Finder их не вернёт повторно
   paths: {}, // id программы -> своя папка
   disabledSteps: {}, // id сценария -> [номера выключенных шагов]
   imported: [], // уже перенесённые экспорты лидов: "имя|mtime"

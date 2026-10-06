@@ -58,6 +58,15 @@ class Outreach {
     return this.call('POST', '/api/config', { dolphin: { token } });
   }
 
+  setTemplates(texts) {
+    const templates = texts.map((text, i) => ({ name: `Money Hub ${i + 1}`, text }));
+    return this.call('POST', '/api/templates', { templates });
+  }
+
+  setMethods(methods) {
+    return this.call('POST', '/api/config', { extension: { methods } });
+  }
+
   importCsv(text) {
     return this.call('POST', '/api/artists/import', { text });
   }
