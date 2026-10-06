@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   revealProject: invoke('project:reveal'),
   fileUrl: invoke('file:url'),
   importFile: invoke('file:import'),
+  importBytes: invoke('file:importBytes'),
   pathForFile: (file) => webUtils.getPathForFile(file),
 
   openStream: invoke('stream:open'),
@@ -33,6 +34,19 @@ contextBridge.exposeInMainWorld('api', {
   enableHotkeys: invoke('hotkeys:enable'),
   disableHotkeys: invoke('hotkeys:disable'),
   onHotkey: listen('hotkey'),
+
+  fl: {
+    status: invoke('fl:status'),
+    reconnect: invoke('fl:reconnect'),
+    list: invoke('fl:list'),
+    play: invoke('fl:play'),
+    song: invoke('fl:song'),
+    stop: invoke('fl:stop'),
+    install: invoke('fl:install'),
+    scriptDir: invoke('fl:scriptDir'),
+    revealScript: invoke('fl:revealScript'),
+    onStatus: listen('fl:status'),
+  },
 
   showHud: invoke('hud:show'),
   hideHud: invoke('hud:hide'),

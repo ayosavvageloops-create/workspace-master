@@ -17,31 +17,49 @@
 </header>
 
 <section id="view-record" class="view active">
-  <div class="col">
-    <h2>Что записываем</h2>
-    <p class="hint" id="srcHint">Ищу окно FL Studio…</p>
-    <div id="sources" class="sources"></div>
-    <button id="refreshSources">Обновить список окон</button>
+  <div class="rec-wrap">
+    <div class="rec-col">
+      <div class="card step-card">
+        <div class="step-head"><span class="num">1</span><span>FL Studio</span><span id="flPill" class="pill">…</span></div>
+        <p id="flText" class="hint"></p>
+        <div class="row"><button id="flSetup" class="primary">Подключить FL Studio</button><button id="flRefresh">Обновить паттерны</button></div>
+      </div>
 
-    <h2>Метки</h2>
-    <p class="hint">Во время записи переключись в FL Studio. Включи слой (solo или mute) и нажми его клавишу. С этой секунды запись становится шагом с этим названием. <b>Ctrl+Shift+0</b> отмечает начало полного бита.</p>
-    <div id="labels"></div>
-  </div>
-
-  <div class="col wide">
-    <div class="preview-wrap">
-      <video id="livePreview" muted playsinline></video>
-      <div id="previewEmpty" class="empty">Выбери окно слева</div>
+      <div class="card step-card">
+        <div class="step-head"><span class="num">2</span><span>Что записать</span><span id="planTotal" class="muted small"></span></div>
+        <div id="plan"></div>
+        <details id="manualBox">
+          <summary>Ручной режим: без связи с FL, метки горячими клавишами</summary>
+          <p class="hint">Во время записи сам включай паттерн во FL и жми его клавишу. <b>Ctrl+Shift+0</b> отмечает полный бит, <b>Ctrl+Shift+Z</b> отменяет метку, <b>Ctrl+Shift+R</b> останавливает запись.</p>
+          <div id="labels"></div>
+        </details>
+      </div>
     </div>
-    <div class="rec-bar">
-      <button id="recBtn" class="rec" disabled><span class="dot"></span> Начать запись</button>
-      <span id="recTime" class="time">0:00</span>
-      <span id="audioNote" class="hint"></span>
-    </div>
-    <div id="markerList" class="markers"></div>
 
-    <h2>Последние проекты</h2>
-    <div id="recent" class="recent"></div>
+    <div class="rec-col wide">
+      <div class="card step-card">
+        <div class="step-head"><span class="num">3</span><span>Запись</span>
+          <select id="srcSelect" title="Что захватывать"></select>
+          <button id="refreshSources" class="icon" title="Обновить список окон">↻</button>
+        </div>
+        <div class="preview-wrap">
+          <video id="livePreview" muted playsinline></video>
+          <div id="previewEmpty" class="empty">Открой FL Studio. Окно найдётся само.</div>
+          <div id="nowPlaying" class="now hidden"></div>
+        </div>
+        <div class="rec-bar">
+          <button id="recBtn" class="rec" disabled><span class="dot"></span> <span id="recLabel">Записать</span></button>
+          <div class="rec-meta">
+            <span id="recTime" class="time big">0:00</span>
+            <span id="audioNote" class="hint"></span>
+          </div>
+        </div>
+        <div id="markerList" class="markers"></div>
+      </div>
+
+      <h2>Последние проекты</h2>
+      <div id="recent" class="recent"></div>
+    </div>
   </div>
 </section>
 

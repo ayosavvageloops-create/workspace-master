@@ -47,39 +47,36 @@ let sources = [], selectedId = null, liveStream = null;
 let recorder = null, recStreamId = null, recDir = null, recT0 = 0, recTimer = 0, recWrite = Promise.resolve();
 let markers = [];
 let platform = 'win32';
+let autoRun = null;            // { cancelled, current } while the automatic sequence runs
 
 const isFL = (name) => /FL Studio|FL64|\bFL\b.*\.flp|Image-Line/i.test(name);
 
+// ---------- capture source ----------
 async function refreshSources() {
   sources = await api.listSources();
   const fl = sources.find(s => s.kind === 'window' && isFL(s.name));
   if (!selectedId || !sources.some(s => s.id === selectedId)) {
-    if (fl) selectSource(fl.id);
+    selectedId = fl ? fl.id : null;
+    if (selectedId) selectSource(selectedId);
   }
-  $('srcHint').innerHTML = !sources.length
-    ? 'Не вижу ни одного окна. Проверь, что приложению разрешена запись экрана, и нажми «Обновить».'
-    : fl
-    ?'Нашёл окно <b>FL Studio</b> и выбрал его. Можно выбрать другое окно или весь экран.'
-    : 'FL Studio не найден. Открой проект во FL и нажми «Обновить», или выбери окно/экран вручную.';
-  renderSources();
-}
-function renderSources() {
-  const box = $('sources'); box.innerHTML = '';
+  const sel = $('srcSelect'); sel.innerHTML = '';
+  if (!selectedId) sel.append(new Option('Выбери окно…', ''));
   for (const s of sources) {
-    const b = document.createElement('button');
-    b.className = 'src' + (s.id === selectedId ? ' sel' : '');
-    const img = document.createElement('img'); if (s.thumb) img.src = s.thumb; img.alt = '';
-    const nm = document.createElement('div'); nm.className = 'nm' + (isFL(s.name) ? ' fl' : '');
-    nm.textContent = (s.kind === 'screen' ? '🖥 ' : '') + s.name;
-    b.append(img, nm);
-    b.onclick = () => selectSource(s.id);
-    box.append(b);
+    const o = new Option((s.kind === 'screen' ? '🖥 ' : isFL(s.name) ? '🎹 ' : '') + s.name, s.id);
+    o.selected = s.id === selectedId;
+    sel.append(o);
   }
+  if (!sources.length) $('previewEmpty').textContent = platform === 'darwin'
+    ? 'Не вижу окон. Разреши запись экрана: Системные настройки → Конфиденциальность и безопасность → Запись экрана и системного звука, потом перезапусти приложение.'
+    : 'Не вижу окон. Проверь разрешение на запись экрана и нажми ↻.';
+  else if (!fl && !selectedId) $('previewEmpty').textContent = 'FL Studio не найден. Открой его и нажми ↻ или выбери окно в списке.';
 }
+$('srcSelect').onchange = (e) => e.target.value && selectSource(e.target.value);
+$('refreshSources').onclick = refreshSources;
+
 async function selectSource(id) {
   if (recorder) return;
   selectedId = id;
-  renderSources();
   await api.selectSource(id);
   if (liveStream) liveStream.getTracks().forEach(t => t.stop());
   try {
@@ -91,46 +88,181 @@ async function selectSource(id) {
     } catch (e2) {
       liveStream = null;
       $('previewEmpty').textContent = 'Не удалось захватить окно: ' + e2.message +
-        (platform === 'darwin' ? '. Разреши запись экрана: Системные настройки → Конфиденциальность и безопасность → Запись экрана.' : '');
+        (platform === 'darwin' ? '. Разреши запись экрана: Системные настройки → Конфиденциальность и безопасность → Запись экрана и системного звука.' : '');
     }
   }
   $('livePreview').srcObject = liveStream;
   if (liveStream) $('livePreview').play().catch(() => {});
   $('previewEmpty').style.display = liveStream ? 'none' : 'grid';
-  $('recBtn').disabled = !liveStream;
   const hasAudio = liveStream && liveStream.getAudioTracks().length > 0;
-  $('audioNote').textContent = hasAudio
-    ? '🔊 Звук компьютера пишется'
-    : platform === 'darwin' ? '🔇 Звук не захвачен: нужен macOS 13+ и разрешение на запись экрана и звука' : '🔇 Звук не захвачен';
+  $('audioNote').textContent = !liveStream ? '' : hasAudio
+    ? '🔊 Звук FL пишется'
+    : platform === 'darwin' ? '🔇 Без звука: нужен macOS 13+ и разрешение «Запись экрана и системного звука»' : '🔇 Звук не захвачен';
+  updateRecButton();
 }
-$('refreshSources').onclick = refreshSources;
 
+// ---------- FL Studio connection ----------
+let flStatus = { connected: false };
+let flProject = null;          // { bpm, patterns, channels }
+api.fl.onStatus((s) => { const was = flStatus.connected; flStatus = s; renderFlStatus(); if (s.connected && !was) loadPatterns(); });
+
+function renderFlStatus() {
+  const pill = $('flPill'), text = $('flText');
+  pill.className = 'pill ' + (flStatus.connected ? 'ok' : 'bad');
+  pill.textContent = flStatus.connected ? '● подключено' : '● не подключено';
+  text.innerHTML = flStatus.connected
+    ? 'Приложение само переключает паттерны, открывает нужное окно и запускает воспроизведение.'
+    : flStatus.error
+    ? `Нет связи: ${flStatus.error}. Нажми «Подключить FL Studio».`
+    : 'Нужна разовая настройка: приложение будет само управлять FL. Нажми «Подключить FL Studio».';
+  $('flSetup').textContent = flStatus.connected ? 'Помощь по подключению' : 'Подключить FL Studio';
+  $('flSetup').classList.toggle('primary', !flStatus.connected);
+  if ($('setupStatus')) {
+    $('setupStatus').textContent = flStatus.connected ? '✅ Связь с FL Studio есть. Можно закрыть это окно.' : '⏳ Жду ответа от FL Studio…';
+  }
+  renderPlan();
+  updateRecButton();
+}
+
+async function loadPatterns() {
+  const r = await api.fl.list();
+  if (!r.ok) { $('flText').textContent = 'FL не отдал список паттернов: ' + r.error; return; }
+  flProject = r.value;
+  mergePlan();
+  renderPlan();
+}
+$('flRefresh').onclick = () => flStatus.connected ? loadPatterns() : api.fl.reconnect();
+
+$('flSetup').onclick = async () => {
+  const dir = await api.fl.scriptDir();
+  const win = platform === 'win32';
+  $('modal').classList.remove('hidden');
+  $('modalTitle').textContent = 'Подключение к FL Studio (один раз)';
+  const b = $('modalBody');
+  b.innerHTML = `<div class="setup"><ol>
+    ${win ? `<li>Установи бесплатную программу <b>loopMIDI</b> (tobias-erichsen.de) и создай в ней два порта с именами <code>FLTR to FL</code> и <code>FLTR from FL</code>.</li>` : ''}
+    <li>Установи скрипт для FL: <button id="setupInstall" class="primary">Установить скрипт</button> <span id="setupInstalled" class="hint"></span></li>
+    <li>Перезапусти FL Studio, чтобы он увидел скрипт. Порядок важен: <b>сначала это приложение, потом FL</b>. Если FL уже открыт, в MIDI settings нажми <b>Rescan devices</b>.</li>
+    <li>Во FL открой <b>Options → MIDI settings</b>.<br>
+      В <b>Input</b> выбери <code>${win ? 'FLTR to FL' : 'FL Tutorial Recorder'}</code>, внизу в <b>Controller type</b> выбери <code>FL Tutorial Recorder</code>, в <b>Port</b> поставь <code>10</code>, включи <b>Enable</b>.<br>
+      В <b>Output</b> выбери <code>${win ? 'FLTR from FL' : 'FL Tutorial Recorder'}</code> и тоже поставь <b>Port</b> <code>10</code>.</li>
+  </ol>
+  <div id="setupStatus" class="status"></div>
+  <div class="row" style="margin-top:12px"><button id="setupRetry">Проверить ещё раз</button><button id="setupFolder">Открыть папку скрипта</button><button id="setupClose" class="primary">Готово</button></div>
+  <p class="hint">Папка скрипта: ${dir.replace(/</g, '&lt;')}</p></div>`;
+  $('setupInstall').onclick = async () => {
+    const r = await api.fl.install();
+    $('setupInstalled').textContent = r.ok ? '✓ установлен' : 'ошибка: ' + r.error;
+  };
+  $('setupRetry').onclick = () => api.fl.reconnect();
+  $('setupFolder').onclick = () => api.fl.revealScript();
+  $('setupClose').onclick = closeModal;
+  renderFlStatus();
+};
+
+// ---------- plan: which patterns to record ----------
+// Saved per pattern name so choices survive between sessions.
+let plan = { items: [], final: { on: true, label: 'full beat', bars: 8 } };
+try { const saved = JSON.parse(localStorage.getItem('plan') || 'null'); if (saved) plan = { ...plan, ...saved }; } catch (e) {}
+function savePlan() { try { localStorage.setItem('plan', JSON.stringify(plan)); } catch (e) {} }
+
+const DRUMS = /kick|snare|clap|hat|hh|\boh\b|\bch\b|perc|rim|shaker|crash|ride|drum|tom|cymb|snap/i;
+function guessChannel(name) {
+  const words = name.toLowerCase().split(/[^a-zа-я0-9]+/).filter(w => w.length > 1);
+  let best = -1, score = 0;
+  for (const c of flProject.channels) {
+    const cn = c.name.toLowerCase();
+    const sc = words.filter(w => cn.includes(w)).length;
+    if (sc > score) { score = sc; best = c.index; }
+  }
+  return best;
+}
+function mergePlan() {
+  const old = new Map(plan.items.map(i => [i.name, i]));
+  plan.items = flProject.patterns.map(p => {
+    const prev = old.get(p.name);
+    if (prev) return { ...prev, index: p.index, empty: p.empty };
+    const drums = DRUMS.test(p.name);
+    return {
+      index: p.index, name: p.name, empty: p.empty, on: !p.empty,
+      label: p.name.toLowerCase(), view: drums ? 'rack' : 'piano',
+      ch: drums ? -1 : guessChannel(p.name), bars: 2,
+    };
+  });
+  savePlan();
+}
+const barSec = () => 4 * 60 / ((flProject && flProject.bpm) || 140);
+
+function renderPlan() {
+  const box = $('plan'); box.innerHTML = '';
+  if (!flStatus.connected || !flProject) {
+    box.append(el('div', { class: 'plan-empty' }, flStatus.connected ? 'Загружаю паттерны из FL…' : 'Когда FL подключится, здесь появятся паттерны из проекта: выбираешь нужные и жмёшь «Записать».'));
+    $('planTotal').textContent = '';
+    return;
+  }
+  box.append(el('div', { class: 'plan-head' }, el('span'), el('span', {}, 'Паттерн → подпись в видео'), el('span', {}, 'Что показать'), el('span', {}, 'Инструмент'), el('span', {}, 'Тактов')));
+  plan.items.forEach((it) => {
+    const r = el('div', { class: 'plan-row' + (it.on ? '' : ' off') });
+    const cb = el('input', { type: 'checkbox', ...(it.on ? { checked: '' } : {}), onchange: (e) => { it.on = e.target.checked; savePlan(); renderPlan(); } });
+    const name = el('div', {},
+      el('input', { type: 'text', value: it.label, oninput: (e) => { it.label = e.target.value; savePlan(); } }),
+      el('div', { class: 'pn' }, `#${it.index} ${it.name}${it.empty ? ' · пустой' : ''}`));
+    const view = el('select', { onchange: (e) => { it.view = e.target.value; savePlan(); renderPlan(); } });
+    for (const [v, l] of [['piano', 'Piano roll'], ['rack', 'Channel rack'], ['playlist', 'Playlist'], ['none', 'Не трогать']]) {
+      const o = new Option(l, v); o.selected = it.view === v; view.append(o);
+    }
+    const ch = el('select', { onchange: (e) => { it.ch = +e.target.value; savePlan(); } });
+    ch.append(new Option('выбранный', '-1'));
+    for (const c of flProject.channels) { const o = new Option(c.name, c.index); o.selected = it.ch === c.index; ch.append(o); }
+    ch.disabled = it.view !== 'piano';
+    const bars = el('input', { type: 'number', min: 1, step: 1, value: it.bars, oninput: (e) => { it.bars = Math.max(1, +e.target.value || 1); savePlan(); renderTotal(); } });
+    r.append(cb, name, view, ch, bars);
+    box.append(r);
+  });
+  const f = plan.final;
+  const fr = el('div', { class: 'plan-row final' + (f.on ? '' : ' off') },
+    el('input', { type: 'checkbox', ...(f.on ? { checked: '' } : {}), onchange: (e) => { f.on = e.target.checked; savePlan(); renderPlan(); } }),
+    el('div', {}, el('input', { type: 'text', value: f.label, oninput: (e) => { f.label = e.target.value; savePlan(); } }), el('div', { class: 'pn' }, 'весь бит в Song mode, в конце')),
+    el('span', { class: 'hint' }, 'Playlist'), el('span'),
+    el('input', { type: 'number', min: 1, step: 1, value: f.bars, oninput: (e) => { f.bars = Math.max(1, +e.target.value || 1); savePlan(); renderTotal(); } }));
+  box.append(fr);
+  renderTotal();
+}
+function renderTotal() {
+  if (!flProject) return;
+  const bars = plan.items.filter(i => i.on).reduce((a, i) => a + i.bars, 0) + (plan.final.on ? plan.final.bars : 0);
+  $('planTotal').textContent = `${flProject.bpm} BPM · ≈ ${fmt(bars * barSec() + 1)}`;
+}
+
+// ---------- manual labels ----------
 function renderLabels() {
   const box = $('labels'); box.innerHTML = '';
   for (const k of [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]) {
-    const row = document.createElement('div'); row.className = 'label-row' + (k === 0 ? ' final' : '');
-    const kbd = document.createElement('span'); kbd.className = 'kbd'; kbd.textContent = `Ctrl+Shift+${k}`;
-    const inp = document.createElement('input'); inp.type = 'text'; inp.value = labels[k];
-    inp.oninput = () => { labels[k] = inp.value; saveLabels(); };
-    if (k === 0) inp.title = 'Финальный полный бит';
-    row.append(kbd, inp);
+    const row = el('div', { class: 'label-row' + (k === 0 ? ' final' : '') },
+      el('span', { class: 'kbd' }, `Ctrl+Shift+${k}`),
+      el('input', { type: 'text', value: labels[k], oninput: (e) => { labels[k] = e.target.value; saveLabels(); } }));
     box.append(row);
   }
-  const help = document.createElement('p'); help.className = 'hint';
-  help.innerHTML = '<b>Ctrl+Shift+Z</b> убирает последнюю метку, <b>Ctrl+Shift+R</b> останавливает запись.';
-  box.append(help);
 }
 
 function renderMarkers() {
   const box = $('markerList'); box.innerHTML = '';
-  for (const m of markers) {
-    const c = document.createElement('span'); c.className = 'chip';
-    c.innerHTML = `${fmt(m.t)} · <b></b>`; c.querySelector('b').textContent = m.label;
+  markers.forEach((m, i) => {
+    const c = el('span', { class: 'chip' + (i === markers.length - 1 && recorder ? ' cur' : '') }, `${fmt(m.t)} · `, el('b', {}, m.label));
     box.append(c);
-  }
+  });
 }
 
-async function startRecording() {
+const autoReady = () => flStatus.connected && flProject && (plan.items.some(i => i.on) || plan.final.on);
+function updateRecButton() {
+  const b = $('recBtn');
+  b.disabled = !liveStream && !recorder;
+  b.classList.toggle('on', !!recorder);
+  $('recLabel').textContent = recorder ? 'Остановить' : autoReady() ? 'Записать автоматически' : 'Записать вручную';
+}
+
+// ---------- recording ----------
+async function startRecording(auto) {
   recDir = await api.createProject();
   recStreamId = await api.openStream(recDir + (recDir.includes('\\') ? '\\' : '/') + 'recording.webm');
   const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -145,9 +277,8 @@ async function startRecording() {
   recT0 = performance.now();
   await api.enableHotkeys();
   await api.showHud();
-  $('recBtn').classList.add('on');
-  $('recBtn').innerHTML = '<span class="dot"></span> Остановить';
   recTimer = setInterval(tickRec, 250);
+  updateRecButton();
 }
 const recNow = () => (performance.now() - recT0) / 1000;
 function tickRec() {
@@ -157,6 +288,7 @@ function tickRec() {
 }
 async function stopRecording() {
   if (!recorder) return;
+  if (autoRun) autoRun.cancelled = true;
   const duration = recNow();
   clearInterval(recTimer);
   await new Promise(r => { recorder.onstop = r; recorder.stop(); });
@@ -165,11 +297,11 @@ async function stopRecording() {
   await api.closeStream(recStreamId);
   await api.disableHotkeys();
   await api.hideHud();
-  $('recBtn').classList.remove('on');
-  $('recBtn').innerHTML = '<span class="dot"></span> Начать запись';
+  $('nowPlaying').classList.add('hidden');
+  updateRecButton();
 
-  modal('Готовлю запись', 'Перекодирую видео, чтобы по нему можно было быстро перематывать…', 0);
-  const off = api.onFinalizeProgress(f => modal('Готовлю запись', 'Перекодирую видео, чтобы по нему можно было быстро перематывать…', f));
+  modal('Собираю видео', 'Готовлю запись, это займёт немного времени…', 0);
+  const off = api.onFinalizeProgress(f => modal('Собираю видео', 'Готовлю запись, это займёт немного времени…', f));
   try {
     const file = await api.finalizeRecording(recDir, duration);
     off();
@@ -178,23 +310,83 @@ async function stopRecording() {
     await api.saveProject(recDir, p);
     closeModal();
     await openProject(recDir);
+    engine.seek(0); engine.play();
   } catch (e) {
     off();
     alertModal('Не получилось обработать запись', String(e.message || e).slice(-600));
   }
 }
-$('recBtn').onclick = () => recorder ? stopRecording() : startRecording();
+
+// Automatic take: FL plays each chosen pattern for N bars (opening its piano roll / channel rack),
+// then the whole song; every switch drops a marker, so the edit builds itself.
+function waitFor(sec) {
+  return new Promise(res => {
+    const end = performance.now() + sec * 1000;
+    const t = setInterval(() => { if (!autoRun || autoRun.cancelled || performance.now() >= end) { clearInterval(t); res(); } }, 50);
+  });
+}
+async function autoRecord() {
+  autoRun = { cancelled: false };
+  const queue = plan.items.filter(i => i.on).map(i => ({ ...i }));
+  await startRecording(true);
+  const fail = async (msg) => { await stopRecordingSilently(); alertModal('FL Studio не ответил', msg); };
+  try {
+    await waitFor(0.6);
+    for (const it of queue) {
+      if (autoRun.cancelled) break;
+      showNow(it.label);
+      const r = await api.fl.play(it.index, it.view, it.ch);
+      if (!r.ok) return fail(`Паттерн «${it.name}»: ${r.error}`);
+      markers.push({ t: +recNow().toFixed(2), key: it.index, label: it.label, dur: it.bars * barSec(), auto: true });
+      renderMarkers(); tickRec();
+      await waitFor(it.bars * barSec());
+    }
+    if (plan.final.on && !autoRun.cancelled) {
+      showNow(plan.final.label);
+      const r = await api.fl.song('playlist');
+      if (!r.ok) return fail('Song mode: ' + r.error);
+      markers.push({ t: +recNow().toFixed(2), key: 0, label: plan.final.label, dur: plan.final.bars * barSec(), auto: true });
+      renderMarkers(); tickRec();
+      await waitFor(plan.final.bars * barSec());
+    }
+  } finally {
+    await api.fl.stop();
+  }
+  const finished = !!recorder;
+  autoRun = null;
+  if (finished) await stopRecording();
+}
+async function stopRecordingSilently() {
+  if (autoRun) autoRun.cancelled = true;
+  autoRun = null;
+  if (!recorder) return;
+  clearInterval(recTimer);
+  await new Promise(r => { recorder.onstop = r; recorder.stop(); });
+  recorder = null;
+  await recWrite; await api.closeStream(recStreamId);
+  await api.disableHotkeys(); await api.hideHud();
+  $('nowPlaying').classList.add('hidden');
+  updateRecButton();
+}
+function showNow(label) {
+  const n = $('nowPlaying'); n.textContent = '▶ ' + label; n.classList.remove('hidden');
+}
+
+$('recBtn').onclick = () => {
+  if (recorder) return stopRecording();
+  if (autoReady()) autoRecord(); else startRecording(false);
+};
 
 api.onHotkey(({ key }) => {
   if (!recorder) return;
   if (key === 'stop') return stopRecording();
+  if (autoRun) return; // the automatic take places its own markers
   if (key === 'undo') { markers.pop(); renderMarkers(); tickRec(); return; }
   markers.push({ t: +recNow().toFixed(2), key, label: labels[key] || `layer ${key}` });
   renderMarkers(); tickRec();
 });
 
-// Markers → tutorial: each layer marker becomes a step that starts just after the key press;
-// the "full beat" marker (key 0) becomes the outro.
+// Markers → tutorial. Automatic markers carry their exact length; manual ones run to the next marker.
 function buildProject(marks, duration) {
   const p = Engine.defaults();
   p.title = `Бит ${new Date().toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}`;
@@ -204,23 +396,26 @@ function buildProject(marks, duration) {
   let n = 0, hasFinal = false;
   sorted.forEach((m, i) => {
     const end = i + 1 < sorted.length ? sorted[i + 1].t : duration;
-    const lead = 0.3;
-    const len = Math.max(0.5, end - m.t - lead);
+    const lead = m.auto ? 0.25 : 0.3;            // FL needs a moment to switch and start
+    const room = Math.max(0.5, end - m.t - lead);
+    const len = m.auto ? Math.min(room, m.dur) : room;
+    const offset = +clamp(m.t + lead, 0, Math.max(0, duration - 1)).toFixed(2);
     if (m.key === 0) {
       hasFinal = true;
       p.final.title = m.label || 'full beat';
-      p.final.offset = +clamp(m.t + lead, 0, Math.max(0, duration - 1)).toFixed(2);
-      p.final.dur = +clamp(len, 2, 15).toFixed(2);
+      p.final.offset = offset;
+      p.final.dur = +clamp(len, 2, m.auto ? 60 : 15).toFixed(2);
     } else {
       n++;
       p.steps.push({
         id: Engine.uid(), label: `step ${n}:`, name: m.label, crop: null,
-        offset: +clamp(m.t + lead, 0, Math.max(0, duration - 1)).toFixed(2), dur: +clamp(len, 1, 6).toFixed(2),
+        offset, dur: +clamp(len, 1, m.auto ? 30 : 6).toFixed(2),
         note: n === 1 ? '(full beat at the end)' : '', noteFrom: 1.5, noteTo: 3.5,
       });
     }
   });
   if (!hasFinal) { p.final.dur = +Math.min(12, duration).toFixed(2); p.final.offset = +Math.max(0, duration - p.final.dur).toFixed(2); }
+  if (flProject && flProject.bpm) p.final.bpm = Math.round(flProject.bpm);
   return p;
 }
 
@@ -547,9 +742,10 @@ function renderInspector() {
       row('Тень', num(o, 'shadow', 1, 0), color(o, 'shadowColor', '#000000')),
     );
   } else {
-    if (sel.owner && sel.owner.key === 'file') box.append(row(null, el('button', {
-      onclick: async () => { const [f] = await pickImages(false); if (f) { sel.owner.obj.file = f; changed(true); renderInspector(); } },
-    }, 'Заменить картинку')));
+    const isCovers = !sel.owner && sel.ref === P.layout.finalImg;
+    box.append(row(null, el('button', { class: 'primary', onclick: () => pickFor(sel) },
+      isCovers ? '+ Добавить обложки' : sel.empty ? '+ Вставить фото' : 'Заменить фото')),
+      el('p', { class: 'hint' }, 'Или перетащи картинку прямо на превью, или скопируй её и нажми Cmd+V (Ctrl+V).'));
     box.append(
       row('Размер', hint('Ш'), num(o, 'w', 2, 10), hint('В'), num(o, 'h', 2, 10)),
       row('Скругл.', num(o, 'radius', 2, 0)),
@@ -768,10 +964,68 @@ $('exportBtn').onclick = async () => {
   }
 };
 
+// ---------- photos: click an empty slot, drop files, or paste ----------
+// Put a picture into whatever slot was hit: intro photo, overlay picture or the outro covers.
+async function fillSlot(hit, files) {
+  if (!hit || hit.kind !== 'image' || !files.length) return false;
+  if (hit.owner) { hit.owner.obj[hit.owner.key] = files[0]; }
+  else if (hit.ref === P.layout.finalImg) { P.final.images.push(...files); }
+  else return false;
+  changed(true); renderInspector();
+  return true;
+}
+async function pickFor(hit) {
+  const files = await pickImages(!hit.owner);
+  if (files.length) await fillSlot(hit, files);
+}
+let downAt = null;
+$('cv').addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+$('cv').addEventListener('click', (e) => {
+  if (engine.exporting || !P) return;
+  if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 5) return; // it was a drag
+  const h = engine.hitAtClient(e);
+  if (h && h.kind === 'image' && (h.empty || !h.owner && P.final.images.length === 0)) pickFor(h);
+});
+$('cv').addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+$('cv').addEventListener('drop', async (e) => {
+  e.preventDefault();
+  if (!P) return;
+  const imgs = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  if (!imgs.length) return;
+  const files = [];
+  for (const f of imgs) files.push(await api.importFile(projDir, api.pathForFile(f)));
+  const h = engine.hitAtClient(e);
+  if (await fillSlot(h, files)) return;
+  // dropped on empty space: covers in the outro, otherwise a new picture where it landed
+  if (engine.segAt(engine.time).type === 'final') { P.final.images.push(...files); changed(true); return; }
+  const p = engine.toFrame(e);
+  for (const file of files) {
+    const o = { id: Engine.uid(), kind: 'image', file, where: 'all', from: 0, to: null, x: Math.round(p.x - 130), y: Math.round(p.y - 130), w: 260, h: 260, anim: 'none' };
+    P.overlays.push(o);
+    selectOverlay(o);
+  }
+  changed(true);
+});
+document.addEventListener('paste', async (e) => {
+  if (!P || !$('view-edit').classList.contains('active')) return;
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) && e.target.type !== 'checkbox') return;
+  const items = [...e.clipboardData.files].filter(f => f.type.startsWith('image/'));
+  if (!items.length) return;
+  e.preventDefault();
+  const files = [];
+  for (const f of items) files.push(await api.importBytes(projDir, f.name || 'pasted.png', await f.arrayBuffer()));
+  if (sel && sel.kind === 'image' && await fillSlot(sel, files)) return;
+  const o = { id: Engine.uid(), kind: 'image', file: files[0], where: 'all', from: 0, to: null, x: 410, y: 1500, w: 260, h: 260, anim: 'none' };
+  P.overlays.push(o); changed(true); selectOverlay(o);
+});
+
 // ---------- boot ----------
 (async () => {
   platform = await api.platform();
   renderLabels();
+  flStatus = await api.fl.status();
+  renderFlStatus();
+  if (flStatus.connected) loadPatterns();
   await refreshSources();
   renderRecent();
 })();

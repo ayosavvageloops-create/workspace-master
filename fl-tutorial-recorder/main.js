@@ -1,8 +1,9 @@
-const { app, BrowserWindow, desktopCapturer, session, ipcMain, globalShortcut, dialog, shell, screen } = require('electron');
+const { app, BrowserWindow, desktopCapturer, session, ipcMain, globalShortcut, dialog, shell, screen, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
+const { createBridge, installScript, scriptDir } = require('./fl-bridge');
 
 // ffmpeg-static lives outside the asar archive once packaged.
 const FFMPEG = require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
@@ -25,7 +26,12 @@ function createMain() {
     title: 'FL Tutorial Recorder',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
-  mainWin.removeMenu();
+  // macOS needs an Edit menu for Cmd+C / Cmd+V to work in text fields.
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]));
+  } else {
+    mainWin.removeMenu();
+  }
   mainWin.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWin.on('closed', () => { mainWin = null; if (hudWin) hudWin.close(); });
 }
@@ -89,6 +95,11 @@ ipcMain.handle('project:list', () => {
 });
 ipcMain.handle('project:reveal', (_e, dir) => shell.openPath(dir));
 ipcMain.handle('file:url', (_e, p) => pathToFileURL(p).href);
+ipcMain.handle('file:importBytes', (_e, dir, name, buf) => {
+  const dest = path.join(dir, 'assets', `${Date.now()}-${name.replace(/[^\w.-]+/g, '_')}`);
+  fs.writeFileSync(dest, Buffer.from(buf));
+  return dest;
+});
 ipcMain.handle('file:import', (_e, dir, src) => {
   const dest = path.join(dir, 'assets', `${Date.now()}-${path.basename(src)}`);
   fs.copyFileSync(src, dest);
@@ -201,10 +212,37 @@ ipcMain.handle('hud:show', () => {
 ipcMain.handle('hud:hide', () => { if (hudWin && !hudWin.isDestroyed()) hudWin.close(); });
 ipcMain.on('hud:update', (_e, state) => { if (hudWin && !hudWin.isDestroyed()) hudWin.webContents.send('hud:state', state); });
 
+// ---------- FL Studio bridge ----------
+let lastFlStatus = null;
+const fl = createBridge({
+  onStatus: (s) => {
+    const key = JSON.stringify(s);
+    if (key === lastFlStatus) return;
+    lastFlStatus = key;
+    if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('fl:status', s);
+  },
+});
+const flCall = (fn) => async (...args) => {
+  try { return { ok: true, value: await fn(...args) }; } catch (e) { return { ok: false, error: e.message }; }
+};
+ipcMain.handle('fl:status', () => fl.status());
+ipcMain.handle('fl:reconnect', () => { fl.open(); return fl.status(); });
+ipcMain.handle('fl:list', flCall(() => fl.list()));
+ipcMain.handle('fl:play', flCall((_e, pattern, view, channel) => fl.play(pattern, view, channel)));
+ipcMain.handle('fl:song', flCall((_e, view) => fl.song(view)));
+ipcMain.handle('fl:stop', flCall(() => fl.stop()));
+ipcMain.handle('fl:install', flCall(() => installScript(app.getPath('documents'))));
+ipcMain.handle('fl:scriptDir', () => scriptDir(app.getPath('documents')));
+ipcMain.handle('fl:revealScript', () => {
+  const dir = scriptDir(app.getPath('documents'));
+  return shell.openPath(fs.existsSync(dir) ? dir : path.dirname(dir));
+});
+
 app.whenReady().then(() => {
   installDisplayMediaHandler();
+  fl.open();
   createMain();
   app.on('activate', () => { if (!mainWin) createMain(); });
 });
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => { globalShortcut.unregisterAll(); fl.close(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

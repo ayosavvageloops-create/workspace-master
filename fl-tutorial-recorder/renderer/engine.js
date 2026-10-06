@@ -210,10 +210,11 @@
         if (blur > 0.3) ctx.filter = `blur(${blur}px)`;
         cover(img, 0, 0, o.w, o.h, extraScale);
       } else if (!exporting) {
-        ctx.fillStyle = '#d9d9e3'; ctx.fillRect(0, 0, o.w, o.h);
-        ctx.fillStyle = '#8a8aa0'; ctx.font = `500 ${Math.round(o.w / 7)}px system-ui, sans-serif`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('фото', o.w / 2, o.h / 2);
+        ctx.fillStyle = '#e4e3ee'; ctx.fillRect(0, 0, o.w, o.h);
+        ctx.strokeStyle = '#a9a7c4'; ctx.lineWidth = 4; ctx.setLineDash([14, 10]); ctx.strokeRect(2, 2, o.w - 4, o.h - 4); ctx.setLineDash([]);
+        ctx.fillStyle = '#7b78a0'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `600 ${Math.round(o.w / 4)}px system-ui, sans-serif`; ctx.fillText('+', o.w / 2, o.h / 2 - o.w / 9);
+        ctx.font = `500 ${Math.round(o.w / 10)}px system-ui, sans-serif`; ctx.fillText('добавить фото', o.w / 2, o.h / 2 + o.w / 7);
       }
       ctx.restore();
       if (o.border) {
@@ -221,7 +222,7 @@
         ctx.lineWidth = o.border; ctx.strokeStyle = o.borderColor || P.ink; ctx.stroke();
       }
       ctx.restore();
-      hits.push({ ref: o, kind: 'image', role, owner, x: o.x, y: o.y, w: o.w, h: o.h });
+      hits.push({ ref: o, kind: 'image', role, owner, empty: !img, x: o.x, y: o.y, w: o.w, h: o.h });
     }
 
     // Crop is stored as fractions of the recording: {x, y, w}; height follows the band's aspect.
@@ -387,7 +388,7 @@
     const changed = () => listeners.change.forEach(fn => fn());
     function select(h) {
       selected = h ? h.ref : null;
-      listeners.select.forEach(fn => fn(h ? { ref: h.ref, kind: h.kind, role: h.role, owner: h.owner } : null));
+      listeners.select.forEach(fn => fn(h ? { ref: h.ref, kind: h.kind, role: h.role, owner: h.owner, empty: h.empty } : null));
       requestDraw();
     }
     canvas.addEventListener('pointerdown', (e) => {
@@ -456,6 +457,8 @@
       W, H,
       setProject(p) { P = p; T = Math.min(T, timeline().total); requestDraw(); },
       select(ref) { selected = ref; requestDraw(); },
+      hitAtClient(e) { return hitAt(toFrame(e)); },
+      toFrame,
       setRecording,
       timeline, segAt, seek, play, stop, record, requestDraw, ensureAudio,
       get time() { return T; },
