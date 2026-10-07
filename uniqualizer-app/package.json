@@ -1,0 +1,36 @@
+{
+  "name": "uniqualizer",
+  "version": "1.0.0",
+  "description": "Уникализатор видео 9:16 для TikTok и Instagram Reels",
+  "author": "Uniqualizer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/smoke.js",
+    "dist": "electron-builder --mac dmg"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.local.uniqualizer",
+    "productName": "Uniqualizer",
+    "files": ["main.js", "preload.js", "core.js", "renderer/**", "package.json"],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**"
+    ],
+    "afterPack": "build/afterPack.js",
+    "mac": {
+      "category": "public.app-category.video",
+      "target": [{ "target": "dmg" }],
+      "identity": null
+    },
+    "dmg": { "title": "Uniqualizer" }
+  }
+}

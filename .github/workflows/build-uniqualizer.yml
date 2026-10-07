@@ -1,0 +1,41 @@
+name: Build Uniqualizer (macOS DMG)
+
+on:
+  push:
+    branches: [claude/modest-hawking-0gstj0]
+    paths:
+      - 'uniqualizer-app/**'
+      - '.github/workflows/build-uniqualizer.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest      # Apple Silicon (M1/M2/M3/M4)
+            arch: arm64
+          - os: macos-15-intel    # Intel Mac
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: uniqualizer-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Smoke test (bundled ffmpeg)
+        run: npm test
+      - name: Build DMG
+        run: npx electron-builder --mac dmg --${{ matrix.arch }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Uniqualizer-${{ matrix.arch }}
+          path: uniqualizer-app/dist/*.dmg
+          if-no-files-found: error

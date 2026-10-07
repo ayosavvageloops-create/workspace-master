@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+<title>Uniqualizer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1>Uniqualizer</h1><span class="badge">9:16 · 1080×1920</span></header>
+
+<main>
+  <section id="drop" class="drop">
+    <div>Перетащите видео или папку сюда</div>
+    <button id="pick" class="ghost">Выбрать файлы…</button>
+  </section>
+
+  <section id="files" class="files"></section>
+
+  <section class="grid">
+    <fieldset>
+      <legend>Скорость</legend>
+      <div class="row"><label>От <input id="speedMin" type="number" step="0.01" min="0.5" max="2" value="0.97"></label>
+      <label>До <input id="speedMax" type="number" step="0.01" min="0.5" max="2" value="1.03"></label></div>
+      <small>1.00 / 1.00 — не менять. Звук меняется вместе с видео.</small>
+    </fieldset>
+
+    <fieldset>
+      <legend>Цветокоррекция (LUT)</legend>
+      <label class="check"><input id="lutOn" type="checkbox" checked> Применять LUT</label>
+      <div class="row"><label>Сила от <input id="lutMin" type="number" step="0.05" min="0.05" max="1" value="0.5"></label>
+      <label>до <input id="lutMax" type="number" step="0.05" min="0.05" max="1" value="1"></label></div>
+      <div class="row"><button id="genLuts" class="ghost">+12 случайных</button>
+      <button id="openLuts" class="ghost">Папка LUT</button></div>
+      <small id="lutInfo"></small>
+    </fieldset>
+
+    <fieldset>
+      <legend>Формат 9:16</legend>
+      <select id="fit">
+        <option value="crop">Обрезка по центру (без полос)</option>
+        <option value="blur">Целиком + размытые края</option>
+      </select>
+      <label>Копий на ролик <input id="copies" type="number" min="1" max="50" value="1"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Дата файла (дней назад)</legend>
+      <div class="row"><label>От <input id="daysA" type="number" min="0" value="10"></label>
+      <label>До <input id="daysB" type="number" min="0" value="150"></label></div>
+      <small>Дата создания и изменения файла + creation_time внутри видео.</small>
+    </fieldset>
+
+    <fieldset>
+      <legend>Кодирование</legend>
+      <select id="codec">
+        <option value="libx264">Качество (x264, CRF 18) — медленнее</option>
+        <option value="h264_videotoolbox">Быстро (VideoToolbox)</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>Папка результата</legend>
+      <div class="row"><input id="outDir" type="text" readonly>
+      <button id="pickOut" class="ghost">Изменить</button></div>
+    </fieldset>
+  </section>
+
+  <section class="actions">
+    <button id="start" class="primary" disabled>Запустить</button>
+    <button id="cancel" class="danger" hidden>Остановить</button>
+    <button id="openOut" class="ghost">Открыть папку</button>
+    <span id="status"></span>
+  </section>
+
+  <section id="jobs" class="jobs"></section>
+</main>
+<script src="renderer.js"></script>
+</body>
+</html>
