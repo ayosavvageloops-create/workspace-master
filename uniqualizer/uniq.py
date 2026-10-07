@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Уникализатор видео для TikTok / Instagram Reels (macOS / Linux).
+Выход всегда 1080x1920 (9:16).
 
 Что делает с каждым роликом:
   1. Цветокоррекция через LUT (.cube) со случайной силой эффекта.
@@ -220,17 +221,42 @@ def atempo_chain(speed):
     return ",".join(parts)
 
 
-def build_lut_filter(lut_path, strength):
+OUT_W, OUT_H = 1080, 1920  # строго 9:16 (TikTok / Reels)
+
+
+def build_frame_filter(mode):
+    """
+    Приводит кадр к 1080x1920 (9:16). Возвращает [0:v] ... [vframe].
+      crop — масштаб с заполнением кадра и обрезка по центру (без полос);
+      blur — всё видео целиком, а пустые края заполнены размытой копией.
+    Если исходник уже 9:16, обе схемы сводятся к простому масштабированию.
+    """
+    if mode == "blur":
+        return (
+            "[0:v]split[fgsrc][bgsrc];"
+            f"[bgsrc]scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase:"
+            f"flags=lanczos,crop={OUT_W}:{OUT_H},boxblur=30:4[bgb];"
+            f"[fgsrc]scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=decrease:"
+            "flags=lanczos[fgs];"
+            "[bgb][fgs]overlay=(W-w)/2:(H-h)/2[vframe]"
+        )
+    return (
+        f"[0:v]scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase:"
+        f"flags=lanczos,crop={OUT_W}:{OUT_H}[vframe]"
+    )
+
+
+def build_lut_filter(lut_path, strength, src="vframe"):
     """
     LUT с регулируемой силой: strength=1.0 — полный LUT,
     0.5 — смесь 50/50 с оригиналом.
-    Возвращает фрагмент filter_complex: [0:v] ... [vgrade]
+    Возвращает фрагмент filter_complex: [src] ... [vgrade]
     """
     lut = ff_escape_path(lut_path)
     if strength >= 0.999:
-        return f"[0:v]lut3d=file={lut}[vgrade]"
+        return f"[{src}]lut3d=file={lut}[vgrade]"
     return (
-        "[0:v]split[orig][tolut];"
+        f"[{src}]split[orig][tolut];"
         f"[tolut]lut3d=file={lut}[graded];"
         f"[orig][graded]blend=all_expr="
         f"'A*(1-{strength:.4f})+B*{strength:.4f}'[vgrade]"
@@ -251,14 +277,12 @@ def process_video(src, dst, args, luts, used_dates):
     date = random_creation_date(args.days[0], args.days[1], used_dates)
     uid = uuid.uuid4().hex
 
-    graph = []
-    video_in = "0:v"
+    graph = [build_frame_filter(args.fit)]
     if lut:
         graph.append(build_lut_filter(lut, strength))
-        video_in = "vgrade"
-        tail = f"[{video_in}]"
+        tail = "[vgrade]"
     else:
-        tail = "[0:v]"
+        tail = "[vframe]"
 
     graph.append(
         f"{tail}setpts=PTS/{speed:.6f},format=yuv420p,setsar=1[vout]"
@@ -391,8 +415,9 @@ def cmd_run(args):
 
     luts = [] if args.no_lut else load_luts(args.luts)
     if not luts and not args.no_lut:
-        print(f"! В {args.luts} нет .cube файлов — цветокоррекция пропущена. "
-              "Создай их: python3 uniq.py gen-luts")
+        print(f"В {args.luts} нет .cube файлов — генерирую 12 случайных LUT.")
+        cmd_gen_luts(argparse.Namespace(count=12, dir=args.luts))
+        luts = load_luts(args.luts)
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -421,7 +446,7 @@ def cmd_run(args):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Уникализатор видео: LUT + скорость + метаданные + дата файла."
+        description="Уникализатор видео (выход 1080x1920, 9:16): LUT + скорость + метаданные + дата файла."
     )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -451,6 +476,9 @@ def main():
                    metavar=("MAX_AGO", "MIN_AGO"),
                    help="Диапазон даты файла в днях назад (по умолч. 150 10)")
 
+    r.add_argument("--fit", choices=["crop", "blur"], default="crop",
+                   help="Приведение к 9:16 1080x1920: crop — обрезка по центру, "
+                        "blur — целиком + размытые края (по умолч. crop)")
     r.add_argument("--codec", choices=["libx264", "h264_videotoolbox"],
                    default="libx264",
                    help="h264_videotoolbox — аппаратное кодирование на Mac")
