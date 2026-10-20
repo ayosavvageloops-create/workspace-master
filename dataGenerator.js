@@ -2,26 +2,11 @@
 
 const crypto = require('crypto');
 
-// Наборы имён по локалям. Транслитерация русских имён нужна для username на латинице.
+// Наборы английских имён для генерации профиля.
 const NAMES = {
-  en: {
-    male: ['James', 'John', 'Michael', 'David', 'Daniel', 'Matthew', 'Andrew', 'Joseph', 'William', 'Ryan'],
-    female: ['Mary', 'Jennifer', 'Linda', 'Patricia', 'Elizabeth', 'Susan', 'Jessica', 'Sarah', 'Karen', 'Emily'],
-    last: ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis', 'Wilson', 'Taylor', 'Anderson'],
-  },
-  ru: {
-    male: ['Александр', 'Дмитрий', 'Максим', 'Сергей', 'Андрей', 'Алексей', 'Иван', 'Михаил', 'Никита', 'Роман'],
-    female: ['Анна', 'Мария', 'Елена', 'Ольга', 'Наталья', 'Екатерина', 'Татьяна', 'Ирина', 'Юлия', 'Виктория'],
-    last: ['Иванов', 'Смирнов', 'Кузнецов', 'Попов', 'Соколов', 'Лебедев', 'Козлов', 'Новиков', 'Морозов', 'Волков'],
-  },
-};
-
-// Карта транслитерации кириллицы → латиница для генерации username.
-const TRANSLIT = {
-  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
-  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
-  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch',
-  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+  male: ['James', 'John', 'Michael', 'David', 'Daniel', 'Matthew', 'Andrew', 'Joseph', 'William', 'Ryan'],
+  female: ['Mary', 'Jennifer', 'Linda', 'Patricia', 'Elizabeth', 'Susan', 'Jessica', 'Sarah', 'Karen', 'Emily'],
+  last: ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis', 'Wilson', 'Taylor', 'Anderson'],
 };
 
 const PASSWORD_SETS = {
@@ -32,23 +17,12 @@ const PASSWORD_SETS = {
 };
 
 /**
- * Генератор случайных данных для тестирования форм регистрации.
+ * Генератор случайных данных для тестирования форм регистрации (английская локаль).
  *
  * Использует crypto из стандартной библиотеки Node.js для криптографически
  * стойкой случайности, без внешних зависимостей.
  */
 class DataGenerator {
-  /**
-   * @param {object} [options]
-   * @param {'en'|'ru'} [options.locale='en'] — локаль для имён.
-   */
-  constructor({ locale = 'en' } = {}) {
-    if (!NAMES[locale]) {
-      throw new Error(`DataGenerator: неизвестная локаль "${locale}". Доступно: ${Object.keys(NAMES).join(', ')}`);
-    }
-    this.locale = locale;
-  }
-
   /**
    * Генерирует полный профиль для формы регистрации.
    * @returns {{
@@ -61,10 +35,9 @@ class DataGenerator {
    */
   generateProfile() {
     const gender = this._pick(['male', 'female']);
-    const pool = NAMES[this.locale];
 
-    const firstName = this._pick(pool[gender]);
-    const lastName = this._pick(pool.last);
+    const firstName = this._pick(NAMES[gender]);
+    const lastName = this._pick(NAMES.last);
 
     return {
       firstName,
@@ -117,33 +90,14 @@ class DataGenerator {
 
   /**
    * Уникальный username на латинице: firstname.lastname + 2 цифры.
-   * Для русской локали имена транслитерируются.
    * @private
    */
   _generateUsername(firstName, lastName) {
-    const first = this._latinize(firstName).toLowerCase();
-    const last = this._latinize(lastName).toLowerCase();
+    const first = firstName.toLowerCase();
+    const last = lastName.toLowerCase();
     const suffix = String(this._randomInt(10, 99)); // ровно 2 цифры
 
     return `${first}.${last}${suffix}`;
-  }
-
-  /**
-   * Транслитерация кириллицы в латиницу; латинские символы остаются как есть.
-   * @private
-   */
-  _latinize(str) {
-    return str
-      .split('')
-      .map((ch) => {
-        const lower = ch.toLowerCase();
-        const mapped = TRANSLIT[lower];
-        if (mapped === undefined) return ch; // уже латиница или цифра
-        // Сохраняем регистр первой буквы.
-        return ch === lower ? mapped : mapped.charAt(0).toUpperCase() + mapped.slice(1);
-      })
-      .join('')
-      .replace(/[^a-zA-Z0-9]/g, ''); // чистим всё, что не латиница/цифра
   }
 
   /**
