@@ -3,558 +3,1445 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YTFarm</title>
+<title>BrowserFarm</title>
 <style>
 :root {
-  --bg: #0f0f0f;
-  --surface: #1a1a2e;
-  --surface2: #16213e;
-  --accent: #e94560;
-  --accent2: #533483;
-  --text: #eee;
-  --text2: #999;
-  --green: #0f9b58;
-  --red: #e94560;
-  --yellow: #f4b400;
-  --blue: #4285f4;
-  --border: #2a2a4a;
-  --radius: 10px;
+  --bg:       #111113;
+  --surface:  #1c1c1f;
+  --surface2: #252528;
+  --surface3: #2e2e32;
+  --border:   #3a3a3f;
+  --accent:   #6c63ff;
+  --accent-h: #8b83ff;
+  --green:    #30d158;
+  --red:      #ff453a;
+  --yellow:   #ffd60a;
+  --blue:     #0a84ff;
+  --orange:   #ff9f0a;
+  --text:     #f5f5f7;
+  --text2:    #98989f;
+  --text3:    #636366;
+  --radius:   10px;
+  --radius-sm:6px;
+  --sidebar:  220px;
+  --font:     -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
-  background: var(--bg); color: var(--text);
-  min-height: 100vh;
-}
-.app { display: flex; height: 100vh; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; }
+body { font-family:var(--font); background:var(--bg); color:var(--text); font-size:14px; }
 
-/* Sidebar */
+/* ── Layout ── */
+.layout { display:flex; height:100vh; }
 .sidebar {
-  width: 220px; background: var(--surface); padding: 20px 0;
-  display: flex; flex-direction: column; border-right: 1px solid var(--border);
-  flex-shrink: 0;
+  width:var(--sidebar); flex-shrink:0; background:var(--surface);
+  border-right:1px solid var(--border); display:flex; flex-direction:column;
+  padding-top:12px;
 }
-.sidebar .logo {
-  font-size: 22px; font-weight: 700; padding: 0 20px 20px;
-  color: var(--accent); letter-spacing: -0.5px;
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.topbar {
+  height:52px; background:var(--surface); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; padding:0 24px; gap:16px; flex-shrink:0;
 }
-.sidebar .logo span { color: var(--text); }
+.content { flex:1; overflow-y:auto; padding:24px; }
+
+/* ── Sidebar ── */
+.sidebar-logo {
+  display:flex; align-items:center; gap:10px; padding:8px 16px 20px;
+  font-size:16px; font-weight:700; letter-spacing:-0.3px;
+}
+.sidebar-logo .icon { font-size:22px; }
+.sidebar-logo .sub { font-size:11px; font-weight:400; color:var(--text2); margin-top:1px; }
+
+.nav-section { padding:0 8px 4px; }
+.nav-label { font-size:10px; font-weight:600; letter-spacing:0.8px; color:var(--text3); padding:8px 8px 4px; text-transform:uppercase; }
 .nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 20px; cursor: pointer;
-  color: var(--text2); transition: all 0.2s; font-size: 14px;
-  border-left: 3px solid transparent;
+  display:flex; align-items:center; gap:10px; padding:8px 10px;
+  border-radius:var(--radius-sm); cursor:pointer; color:var(--text2);
+  transition:all 0.15s; font-size:13px; font-weight:500;
+  margin-bottom:2px;
 }
-.nav-item:hover { background: var(--surface2); color: var(--text); }
-.nav-item.active {
-  background: var(--surface2); color: var(--accent);
-  border-left-color: var(--accent);
+.nav-item:hover { background:var(--surface2); color:var(--text); }
+.nav-item.active { background:rgba(108,99,255,0.15); color:var(--accent-h); }
+.nav-item .ni { font-size:15px; width:20px; text-align:center; }
+.nav-item .badge-count {
+  margin-left:auto; background:var(--accent); color:#fff;
+  font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px;
+  min-width:18px; text-align:center;
 }
-.nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
-.sidebar-footer { margin-top: auto; padding: 16px 20px; }
-.status-dot {
-  display: inline-block; width: 8px; height: 8px;
-  border-radius: 50%; margin-right: 8px;
-}
-.status-dot.green { background: var(--green); }
-.status-dot.red { background: var(--red); }
-.status-dot.yellow { background: var(--yellow); }
-.status-text { font-size: 12px; color: var(--text2); }
 
-/* Main content */
-.main { flex: 1; overflow-y: auto; padding: 24px 32px; }
-.page { display: none; }
-.page.active { display: block; }
-.page-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; }
+.sidebar-bottom { margin-top:auto; padding:12px 16px; border-top:1px solid var(--border); }
+.status-line { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text2); }
+.dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.dot.green { background:var(--green); box-shadow:0 0 6px var(--green); }
+.dot.red { background:var(--red); }
+.dot.yellow { background:var(--yellow); animation:pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-/* Cards */
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.card {
-  background: var(--surface); border-radius: var(--radius);
-  padding: 16px; border: 1px solid var(--border);
-}
-.card .label { font-size: 12px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-.card .value { font-size: 28px; font-weight: 700; }
-.card .value.green { color: var(--green); }
-.card .value.red { color: var(--red); }
-.card .value.blue { color: var(--blue); }
-.card .value.yellow { color: var(--yellow); }
+/* ── Topbar ── */
+.topbar-title { font-size:15px; font-weight:600; }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.topbar-stat { font-size:12px; color:var(--text2); display:flex; align-items:center; gap:4px; }
+.topbar-stat strong { color:var(--text); font-weight:600; }
 
-/* Tables */
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { text-align: left; padding: 10px 12px; color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-tr:hover td { background: var(--surface2); }
-.badge {
-  display: inline-block; padding: 2px 8px; border-radius: 12px;
-  font-size: 11px; font-weight: 600;
-}
-.badge.free { background: #0f9b5822; color: var(--green); }
-.badge.busy { background: #f4b40022; color: var(--yellow); }
-.badge.pending { background: #4285f422; color: var(--blue); }
-.badge.done { background: #0f9b5822; color: var(--green); }
-.badge.failed, .badge.error { background: #e9456022; color: var(--red); }
-.badge.running { background: #f4b40022; color: var(--yellow); }
-.badge.ok { background: #0f9b5822; color: var(--green); }
-
-/* Buttons */
-.btn-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+/* ── Buttons ── */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 8px; border: none;
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  transition: all 0.2s;
+  display:inline-flex; align-items:center; gap:6px; padding:7px 14px;
+  border-radius:var(--radius-sm); border:none; font-size:13px; font-weight:500;
+  cursor:pointer; transition:all 0.15s; font-family:var(--font);
 }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: #d63851; }
-.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-.btn-secondary:hover { background: var(--border); }
-.btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
-.btn-danger:hover { background: var(--red); color: #fff; }
-.btn-sm { padding: 4px 10px; font-size: 12px; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover:not(:disabled) { background:var(--accent-h); }
+.btn-success { background:var(--green); color:#000; }
+.btn-success:hover:not(:disabled) { filter:brightness(1.1); }
+.btn-danger { background:transparent; color:var(--red); border:1px solid var(--red); }
+.btn-danger:hover:not(:disabled) { background:var(--red); color:#fff; }
+.btn-ghost { background:transparent; color:var(--text2); border:1px solid var(--border); }
+.btn-ghost:hover:not(:disabled) { background:var(--surface2); color:var(--text); }
+.btn-sm { padding:4px 10px; font-size:12px; }
+.btn-icon { padding:6px 8px; }
+.btn-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; align-items:center; }
 
-/* Forms */
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+/* ── Cards ── */
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:24px; }
+.stat-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px;
+}
+.stat-card .slabel { font-size:11px; color:var(--text2); letter-spacing:0.4px; text-transform:uppercase; margin-bottom:6px; }
+.stat-card .sval { font-size:30px; font-weight:700; line-height:1; }
+.sval.green { color:var(--green); }
+.sval.red { color:var(--red); }
+.sval.blue { color:var(--blue); }
+.sval.yellow { color:var(--yellow); }
+.sval.purple { color:var(--accent-h); }
+.sval.orange { color:var(--orange); }
+
+/* ── Section ── */
+.section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:20px; }
+.section-header {
+  display:flex; align-items:center; gap:10px; padding:14px 18px;
+  border-bottom:1px solid var(--border);
+}
+.section-title { font-size:14px; font-weight:600; }
+.section-header .hactions { margin-left:auto; display:flex; gap:8px; }
+.section-body { padding:18px; }
+
+/* ── Tables ── */
+.tbl-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:9px 12px; color:var(--text3); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,0.02); }
+.mono { font-family:'SF Mono','Menlo',monospace; font-size:12px; }
+
+/* ── Badges ── */
+.badge {
+  display:inline-flex; align-items:center; gap:4px; padding:2px 8px;
+  border-radius:20px; font-size:11px; font-weight:600;
+}
+.badge.free   { background:rgba(48,209,88,.12);  color:var(--green); }
+.badge.busy   { background:rgba(255,159,10,.12); color:var(--orange); }
+.badge.pending{ background:rgba(10,132,255,.12); color:var(--blue); }
+.badge.done   { background:rgba(48,209,88,.12);  color:var(--green); }
+.badge.failed,.badge.error{ background:rgba(255,69,58,.12); color:var(--red); }
+.badge.running{ background:rgba(255,214,10,.12); color:var(--yellow); }
+.badge.ok     { background:rgba(48,209,88,.12);  color:var(--green); }
+.badge.general{ background:rgba(108,99,255,.12); color:var(--accent-h); }
+.badge.youtube{ background:rgba(255,69,58,.12);  color:var(--red); }
+
+/* ── Forms ── */
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:11px; font-weight:600; color:var(--text2); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.4px; }
 .form-group input, .form-group select, .form-group textarea {
-  width: 100%; padding: 8px 12px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--bg);
-  color: var(--text); font-size: 14px; font-family: inherit;
+  width:100%; padding:8px 12px; border-radius:var(--radius-sm);
+  border:1px solid var(--border); background:var(--bg);
+  color:var(--text); font-size:13px; font-family:var(--font); outline:none;
+  transition:border-color 0.15s;
 }
-.form-group textarea { min-height: 80px; resize: vertical; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-inline { display: flex; gap: 8px; align-items: end; }
-.form-inline .form-group { margin-bottom: 0; flex: 1; }
-.checkbox-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.checkbox-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; text-transform: none; letter-spacing: 0; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:var(--accent); }
+.form-group textarea { min-height:90px; resize:vertical; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.form-inline { display:flex; gap:8px; align-items:flex-end; }
+.form-inline .form-group { margin-bottom:0; flex:1; }
+.checkbox-group { display:flex; gap:14px; flex-wrap:wrap; }
+.checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer; font-weight:normal; }
+.checkbox-label input[type=checkbox] { width:14px; height:14px; accent-color:var(--accent); }
 
-/* Farm control panel */
+/* ── Log stream ── */
+.log-stream {
+  background:var(--bg); border-radius:var(--radius-sm);
+  font-family:'SF Mono','Menlo',monospace; font-size:12px;
+  height:280px; overflow-y:auto; padding:12px;
+  border:1px solid var(--border);
+}
+.log-entry { display:flex; gap:10px; margin-bottom:4px; line-height:1.5; }
+.log-ts { color:var(--text3); flex-shrink:0; }
+.log-result { flex-shrink:0; font-weight:600; }
+.log-result.ok { color:var(--green); }
+.log-result.error { color:var(--red); }
+.log-body { color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ── Farm control ── */
 .farm-panel {
-  background: var(--surface); border-radius: var(--radius);
-  padding: 20px; border: 1px solid var(--border); margin-bottom: 24px;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:var(--radius); padding:20px; margin-bottom:20px;
 }
-.farm-panel .farm-status {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+.farm-indicator {
+  display:flex; align-items:center; gap:12px; margin-bottom:16px;
 }
-.farm-panel .farm-status .indicator {
-  width: 12px; height: 12px; border-radius: 50%;
-  animation: pulse 2s infinite;
+.farm-indicator .big-dot {
+  width:12px; height:12px; border-radius:50%; flex-shrink:0;
 }
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+.farm-indicator .big-dot.running { background:var(--green); animation:pulse 1.5s infinite; }
+.farm-indicator .big-dot.idle { background:var(--text3); }
+.farm-indicator .fi-text { font-weight:600; font-size:15px; }
+.farm-indicator .fi-sub { font-size:12px; color:var(--text2); margin-top:1px; }
+.farm-settings { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+.farm-settings .form-group { margin-bottom:0; }
 
-/* Toast */
-.toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
-.toast {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;
-  font-size: 13px; min-width: 250px; animation: slideIn 0.3s;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+/* ── Action builder ── */
+.action-list { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.action-item {
+  display:flex; align-items:center; gap:8px; background:var(--surface2);
+  border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px;
 }
-.toast.success { border-left: 3px solid var(--green); }
-.toast.error { border-left: 3px solid var(--red); }
-@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.action-item .ai-type {
+  font-size:11px; font-weight:700; color:var(--accent-h); width:80px; flex-shrink:0; text-transform:uppercase;
+}
+.action-item .ai-params { flex:1; font-size:12px; color:var(--text2); font-family:'SF Mono','Menlo',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.action-item .ai-del { flex-shrink:0; cursor:pointer; color:var(--text3); font-size:16px; line-height:1; }
+.action-item .ai-del:hover { color:var(--red); }
+
+/* ── Fingerprint viewer ── */
+.fp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+.fp-item { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; }
+.fp-item .fp-key { font-size:10px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px; }
+.fp-item .fp-val { font-size:12px; color:var(--text); font-family:'SF Mono','Menlo',monospace; word-break:break-all; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100;
+  display:none; align-items:center; justify-content:center; padding:20px;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  width:100%; max-width:560px; max-height:90vh; display:flex; flex-direction:column;
+}
+.modal-header { display:flex; align-items:center; padding:18px 20px; border-bottom:1px solid var(--border); }
+.modal-title { font-size:15px; font-weight:600; }
+.modal-close { margin-left:auto; cursor:pointer; color:var(--text2); font-size:20px; line-height:1; }
+.modal-close:hover { color:var(--text); }
+.modal-body { padding:20px; overflow-y:auto; flex:1; }
+.modal-footer { padding:16px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+
+/* ── Toast ── */
+.toasts { position:fixed; bottom:24px; right:24px; z-index:200; display:flex; flex-direction:column; gap:8px; }
+.toast {
+  background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:11px 16px; font-size:13px; min-width:240px; max-width:360px;
+  animation:slideUp 0.25s ease; box-shadow:0 4px 24px rgba(0,0,0,0.4);
+  display:flex; align-items:center; gap:10px;
+}
+.toast.success { border-left:3px solid var(--green); }
+.toast.error   { border-left:3px solid var(--red); }
+.toast.info    { border-left:3px solid var(--blue); }
+@keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+/* ── Misc ── */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text3); }
+.empty-state .ei { font-size:36px; margin-bottom:10px; }
+.chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:20px; font-size:11px; background:var(--surface2); border:1px solid var(--border); color:var(--text2); }
+.page { display:none; }
+.page.active { display:block; }
+.scrollable { overflow-y:auto; }
+.truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
+a { color:var(--accent-h); text-decoration:none; }
+a:hover { text-decoration:underline; }
+.tag-green { color:var(--green); font-size:12px; }
+.tag-red   { color:var(--red);   font-size:12px; }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="sidebar">
-    <div class="logo"><span>YT</span>Farm</div>
-    <div class="nav-item active" data-page="dashboard"><span class="icon">&#9632;</span> Dashboard</div>
-    <div class="nav-item" data-page="profiles"><span class="icon">&#9787;</span> Profiles</div>
-    <div class="nav-item" data-page="proxies"><span class="icon">&#9741;</span> Proxies</div>
-    <div class="nav-item" data-page="tasks"><span class="icon">&#9654;</span> Tasks</div>
-    <div class="nav-item" data-page="logs"><span class="icon">&#9776;</span> Logs</div>
-    <div class="nav-item" data-page="farm"><span class="icon">&#9881;</span> Farm Control</div>
-    <div class="sidebar-footer">
-      <span class="status-dot green" id="statusDot"></span>
-      <span class="status-text" id="statusText">Connected</span>
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <span class="icon">🌐</span>
+      <div>
+        <div>BrowserFarm</div>
+        <div class="sub">Automation Studio</div>
+      </div>
     </div>
-  </div>
 
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" data-page="dashboard">
+        <span class="ni">📊</span> Dashboard
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Resources</div>
+      <div class="nav-item" data-page="profiles">
+        <span class="ni">🧑‍💻</span> Profiles
+        <span class="badge-count" id="nav-profiles-count">0</span>
+      </div>
+      <div class="nav-item" data-page="proxies">
+        <span class="ni">🔀</span> Proxies
+        <span class="badge-count" id="nav-proxies-count">0</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Automation</div>
+      <div class="nav-item" data-page="tasks">
+        <span class="ni">📋</span> Tasks
+        <span class="badge-count" id="nav-tasks-count">0</span>
+      </div>
+      <div class="nav-item" data-page="scheduled">
+        <span class="ni">🕐</span> Scheduled
+      </div>
+      <div class="nav-item" data-page="farm">
+        <span class="ni">⚡</span> Farm Control
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Insights</div>
+      <div class="nav-item" data-page="logs">
+        <span class="ni">📜</span> Logs
+      </div>
+      <div class="nav-item" data-page="screenshots">
+        <span class="ni">🖼️</span> Screenshots
+      </div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="status-line">
+        <div class="dot green" id="sidebar-dot"></div>
+        <span id="sidebar-status">Connected</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
   <div class="main">
-    <!-- DASHBOARD -->
-    <div class="page active" id="page-dashboard">
-      <h1 class="page-title">Dashboard</h1>
-      <div class="cards" id="dashCards"></div>
-      <h2 style="font-size:16px;margin-bottom:12px;color:var(--text2)">Recent Activity</h2>
-      <div class="table-wrap"><table id="dashLogs"><thead><tr><th>Time</th><th>Profile</th><th>Task</th><th>Result</th><th>Duration</th></tr></thead><tbody></tbody></table></div>
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-right" id="topbar-stats"></div>
     </div>
 
-    <!-- PROFILES -->
-    <div class="page" id="page-profiles">
-      <h1 class="page-title">Profiles</h1>
-      <div class="btn-row">
-        <div class="form-inline">
-          <div class="form-group"><label>Count</label><input type="number" id="genCount" value="5" min="1" max="100" style="width:80px"></div>
-          <button class="btn btn-primary" onclick="generateProfiles()">+ Generate</button>
-        </div>
-        <button class="btn btn-secondary" onclick="resetProfiles()">Reset Busy</button>
-      </div>
-      <div class="table-wrap"><table id="profilesTable"><thead><tr><th>ID</th><th>Seed</th><th>Status</th><th>Cookies</th><th>Last Used</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
-    </div>
+    <div class="content" id="content">
 
-    <!-- PROXIES -->
-    <div class="page" id="page-proxies">
-      <h1 class="page-title">Proxies</h1>
-      <div class="btn-row">
-        <div class="form-inline">
-          <div class="form-group"><label>Proxy URL</label><input type="text" id="proxyUrl" placeholder="http://user:pass@host:port" style="min-width:300px"></div>
-          <div class="form-group"><label>Type</label>
-            <select id="proxyType" style="width:100px"><option>http</option><option>socks5</option></select>
-          </div>
-          <button class="btn btn-primary" onclick="addProxy()">+ Add</button>
-        </div>
-        <button class="btn btn-secondary" onclick="resetProxies()">Reset Busy</button>
-      </div>
-      <div class="table-wrap"><table id="proxiesTable"><thead><tr><th>ID</th><th>URL</th><th>Type</th><th>Status</th><th>Fails</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
-    </div>
-
-    <!-- TASKS -->
-    <div class="page" id="page-tasks">
-      <h1 class="page-title">Tasks</h1>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:14px;margin-bottom:12px;color:var(--text2)">Add Task</h3>
-          <div class="form-group"><label>Video URL</label><input type="text" id="taskUrl" placeholder="https://youtube.com/watch?v=..."></div>
-          <div class="form-row">
-            <div class="form-group"><label>Watch (sec)</label><input type="number" id="taskWatch" value="30"></div>
-            <div class="form-group"><label>Source</label>
-              <select id="taskSource"><option>search</option><option>direct</option><option>homepage</option></select>
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="stat-grid" id="stat-grid"></div>
+        <div class="section">
+          <div class="section-header">
+            <span>⚡</span>
+            <span class="section-title">Farm Status</span>
+            <div class="hactions">
+              <button class="btn btn-success btn-sm" id="db-start-btn" onclick="quickStart()">▶ Start Farm</button>
+              <button class="btn btn-danger btn-sm" id="db-stop-btn" onclick="quickStop()" style="display:none">■ Stop</button>
             </div>
           </div>
-          <div class="form-group"><label>Search Query</label><input type="text" id="taskQuery" placeholder="optional"></div>
-          <div class="form-group"><label>Actions</label>
-            <div class="checkbox-row">
-              <label><input type="checkbox" id="actLike" checked> Like</label>
-              <label><input type="checkbox" id="actSub"> Subscribe</label>
-              <label><input type="checkbox" id="actComment"> Comment</label>
-            </div>
-          </div>
-          <div class="form-group"><label>Comment Text</label><input type="text" id="taskComment" placeholder="optional"></div>
-          <div class="form-row">
-            <div class="form-group"><label>Repeat</label><input type="number" id="taskRepeat" value="1" min="1"></div>
-            <div><br><button class="btn btn-primary" onclick="addTask()" style="width:100%">+ Add Task</button></div>
-          </div>
-        </div>
-        <div class="card" style="padding:20px">
-          <h3 style="font-size:14px;margin-bottom:12px;color:var(--text2)">Import YAML</h3>
-          <div class="form-group"><label>Paste tasks YAML</label>
-            <textarea id="yamlInput" rows="10" placeholder="- url: https://youtube.com/watch?v=...&#10;  watch_seconds: 30&#10;  source: search&#10;  search_query: my query&#10;  actions: [like, subscribe]&#10;  repeat: 2"></textarea>
-          </div>
-          <button class="btn btn-secondary" onclick="loadYaml()">Import Tasks</button>
-        </div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-secondary" onclick="resetTasks()">Reset Running</button>
-        <button class="btn btn-secondary" onclick="loadTasks()">Refresh</button>
-      </div>
-      <div class="table-wrap"><table id="tasksTable"><thead><tr><th>ID</th><th>Video</th><th>Watch</th><th>Source</th><th>Actions</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
-    </div>
-
-    <!-- LOGS -->
-    <div class="page" id="page-logs">
-      <h1 class="page-title">Logs</h1>
-      <div class="btn-row">
-        <button class="btn btn-secondary" onclick="loadLogs()">Refresh</button>
-      </div>
-      <div class="table-wrap"><table id="logsTable"><thead><tr><th>ID</th><th>Time</th><th>Profile</th><th>Task</th><th>Result</th><th>Duration</th><th>Error</th></tr></thead><tbody></tbody></table></div>
-    </div>
-
-    <!-- FARM CONTROL -->
-    <div class="page" id="page-farm">
-      <h1 class="page-title">Farm Control</h1>
-      <div class="farm-panel">
-        <div class="farm-status">
-          <div class="indicator" id="farmIndicator" style="background:var(--text2)"></div>
-          <span id="farmStatusText" style="font-size:14px">Idle</span>
-        </div>
-        <div class="form-row" style="margin-bottom:16px">
-          <div class="form-group"><label>Workers</label><input type="number" id="farmWorkers" value="3" min="1" max="20"></div>
-          <div class="form-group"><label>Timeout (ms)</label><input type="number" id="farmTimeout" value="15000"></div>
-        </div>
-        <div class="form-row" style="margin-bottom:16px">
-          <div class="form-group"><label>Max Retries</label><input type="number" id="farmRetries" value="3" min="1" max="10"></div>
-          <div class="form-group"><label>Mode</label>
-            <div class="checkbox-row" style="margin-top:8px">
-              <label><input type="checkbox" id="farmHeadless" checked> Headless</label>
+          <div class="section-body">
+            <div class="farm-indicator" id="db-farm-indicator">
+              <div class="big-dot idle" id="db-farm-dot"></div>
+              <div>
+                <div class="fi-text" id="db-farm-text">Idle</div>
+                <div class="fi-sub" id="db-farm-sub">Start the farm to begin processing tasks</div>
+              </div>
             </div>
           </div>
         </div>
+        <div class="section">
+          <div class="section-header">
+            <span>📜</span>
+            <span class="section-title">Live Activity</span>
+            <div class="hactions">
+              <button class="btn btn-ghost btn-sm" onclick="clearLiveLog()">Clear</button>
+            </div>
+          </div>
+          <div class="section-body" style="padding:12px">
+            <div class="log-stream" id="live-log">
+              <div class="log-entry"><span class="log-ts">--:--:--</span><span class="log-body">Waiting for activity...</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILES -->
+      <div class="page" id="page-profiles">
         <div class="btn-row">
-          <button class="btn btn-primary" id="farmStartBtn" onclick="startFarm()">Start Farm</button>
-          <button class="btn btn-danger" id="farmStopBtn" onclick="stopFarm()" disabled>Stop</button>
+          <div class="form-inline" style="flex:none">
+            <div class="form-group" style="width:90px">
+              <label>Count</label>
+              <input type="number" id="gen-count" value="5" min="1" max="200">
+            </div>
+            <div class="form-group" style="width:150px">
+              <label>Tags</label>
+              <input type="text" id="gen-tags" placeholder="tag1,tag2">
+            </div>
+            <button class="btn btn-primary" onclick="generateProfiles()">+ Generate</button>
+          </div>
+          <button class="btn btn-ghost" onclick="showImportModal()">⬆ Import</button>
+          <button class="btn btn-ghost" onclick="exportProfiles()">⬇ Export</button>
+          <button class="btn btn-ghost" onclick="resetProfiles()">↺ Reset Busy</button>
+          <div style="margin-left:auto">
+            <input type="text" placeholder="Filter by tag..." id="profile-tag-filter" oninput="loadProfiles()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;width:160px">
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-header">
+            <span>🧑‍💻</span>
+            <span class="section-title">Browser Profiles</span>
+            <div class="hactions">
+              <span id="profiles-count" style="font-size:12px;color:var(--text2)">0 profiles</span>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr>
+                <th>ID</th><th>Seed</th><th>Status</th><th>Tags</th><th>Cookies</th><th>Last Used</th><th>Created</th><th></th>
+              </tr></thead>
+              <tbody id="profiles-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div class="cards" id="farmCards"></div>
+
+      <!-- PROXIES -->
+      <div class="page" id="page-proxies">
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="openModal('modal-add-proxy')">+ Add Proxy</button>
+          <button class="btn btn-ghost" onclick="openModal('modal-bulk-proxy')">⬆ Bulk Import</button>
+          <button class="btn btn-ghost" onclick="resetProxies()">↺ Reset Busy</button>
+        </div>
+        <div class="section">
+          <div class="section-header">
+            <span>🔀</span>
+            <span class="section-title">Proxies</span>
+            <div class="hactions"><span id="proxies-count" style="font-size:12px;color:var(--text2)">0 proxies</span></div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>URL</th><th>Type</th><th>Status</th><th>Failures</th><th></th></tr></thead>
+              <tbody id="proxies-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TASKS -->
+      <div class="page" id="page-tasks">
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="openModal('modal-add-task')">+ New Task</button>
+          <button class="btn btn-ghost" onclick="openModal('modal-yaml-tasks')">📄 From YAML</button>
+          <button class="btn btn-ghost" onclick="resetTasks()">↺ Reset Running</button>
+          <button class="btn btn-danger btn-sm" onclick="clearTasks('done')">🗑 Clear Done</button>
+          <div style="margin-left:auto; display:flex; gap:8px;">
+            <select id="task-status-filter" onchange="loadTasks()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="running">Running</option>
+              <option value="done">Done</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-header">
+            <span>📋</span>
+            <span class="section-title">Task Queue</span>
+            <div class="hactions"><span id="tasks-count" style="font-size:12px;color:var(--text2)">0 tasks</span></div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>Name</th><th>URL</th><th>Type</th><th>Actions</th><th>Priority</th><th>Status</th><th>Created</th><th></th></tr></thead>
+              <tbody id="tasks-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCHEDULED -->
+      <div class="page" id="page-scheduled">
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="openModal('modal-add-scheduled')">+ New Schedule</button>
+        </div>
+        <div class="section">
+          <div class="section-header"><span>🕐</span><span class="section-title">Scheduled Tasks</span></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>Name</th><th>Cron</th><th>Description</th><th>Enabled</th><th>Last Run</th><th>Next Run</th><th></th></tr></thead>
+              <tbody id="scheduled-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- FARM CONTROL -->
+      <div class="page" id="page-farm">
+        <div class="farm-panel">
+          <div class="farm-indicator">
+            <div class="big-dot idle" id="farm-dot"></div>
+            <div>
+              <div class="fi-text" id="farm-status-text">Idle</div>
+              <div class="fi-sub" id="farm-status-sub">Configure settings and start the farm</div>
+            </div>
+          </div>
+          <div class="farm-settings">
+            <div class="form-group"><label>Workers</label><input type="number" id="farm-workers" value="3" min="1" max="20"></div>
+            <div class="form-group"><label>Timeout (ms)</label><input type="number" id="farm-timeout" value="15000" min="5000"></div>
+            <div class="form-group"><label>Max Retries</label><input type="number" id="farm-retries" value="3" min="0" max="10"></div>
+            <div class="form-group"><label>Mode</label>
+              <select id="farm-headless">
+                <option value="true">Headless</option>
+                <option value="false">Visible</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-bottom:0">
+            <button class="btn btn-success" id="farm-start-btn" onclick="startFarm()">▶ Start Farm</button>
+            <button class="btn btn-danger" id="farm-stop-btn" onclick="stopFarm()" style="display:none">■ Stop Farm</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <span>📜</span><span class="section-title">Live Output</span>
+            <div class="hactions"><button class="btn btn-ghost btn-sm" onclick="clearLiveLog()">Clear</button></div>
+          </div>
+          <div class="section-body" style="padding:12px">
+            <div class="log-stream" id="farm-live-log"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOGS -->
+      <div class="page" id="page-logs">
+        <div class="btn-row">
+          <div class="form-group" style="width:100px;margin-bottom:0">
+            <label>Limit</label>
+            <input type="number" id="logs-limit" value="100" min="10" max="1000">
+          </div>
+          <button class="btn btn-ghost" onclick="loadLogs()">Refresh</button>
+        </div>
+        <div class="section">
+          <div class="section-header"><span>📜</span><span class="section-title">Execution Logs</span>
+            <div class="hactions"><span id="logs-count" style="font-size:12px;color:var(--text2)"></span></div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>Time</th><th>Profile</th><th>Task</th><th>Result</th><th>Duration</th><th>Error</th></tr></thead>
+              <tbody id="logs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREENSHOTS -->
+      <div class="page" id="page-screenshots">
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="loadScreenshots()">Refresh</button>
+        </div>
+        <div id="screenshots-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
+        <div class="empty-state" id="no-screenshots" style="display:none">
+          <div class="ei">🖼️</div>
+          <div>No screenshots yet</div>
+          <div style="font-size:12px;margin-top:6px">Screenshots captured during task runs appear here</div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ── Modals ─────────────────────────────────────────────────────────────── -->
+
+<!-- Add Proxy -->
+<div class="modal-overlay" id="modal-add-proxy">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Add Proxy</span>
+      <span class="modal-close" onclick="closeModal('modal-add-proxy')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Proxy URL</label><input type="text" id="proxy-url" placeholder="http://user:pass@host:port or socks5://..."></div>
+      <div class="form-group"><label>Type</label>
+        <select id="proxy-type"><option>http</option><option>socks5</option><option>https</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-proxy')">Cancel</button>
+      <button class="btn btn-primary" onclick="addProxy()">Add Proxy</button>
     </div>
   </div>
 </div>
 
-<div class="toast-container" id="toasts"></div>
+<!-- Bulk Proxies -->
+<div class="modal-overlay" id="modal-bulk-proxy">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Bulk Import Proxies</span>
+      <span class="modal-close" onclick="closeModal('modal-bulk-proxy')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>One proxy per line</label>
+        <textarea id="bulk-proxies" placeholder="http://user:pass@host:port&#10;socks5://user:pass@host:port&#10;..." style="min-height:200px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-bulk-proxy')">Cancel</button>
+      <button class="btn btn-primary" onclick="bulkAddProxies()">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Task -->
+<div class="modal-overlay" id="modal-add-task">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span class="modal-title">New Task</span>
+      <span class="modal-close" onclick="closeModal('modal-add-task')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Task Name (optional)</label><input type="text" id="task-name" placeholder="My task"></div>
+        <div class="form-group"><label>Task Type</label>
+          <select id="task-type" onchange="onTaskTypeChange()">
+            <option value="general">General</option>
+            <option value="youtube">YouTube</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Target URL</label><input type="text" id="task-url" placeholder="https://example.com"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Priority (1=highest)</label><input type="number" id="task-priority" value="5" min="1" max="10"></div>
+        <div class="form-group"><label>Repeat</label><input type="number" id="task-repeat" value="1" min="1" max="1000"></div>
+      </div>
+
+      <!-- General actions -->
+      <div id="general-actions-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Action Sequence</label>
+          <button class="btn btn-ghost btn-sm" onclick="openModal('modal-action-picker')">+ Add Action</button>
+        </div>
+        <div class="action-list" id="action-list"></div>
+        <div id="no-actions" style="font-size:12px;color:var(--text3);padding:8px 0">No actions yet — click "Add Action" to build a sequence</div>
+      </div>
+
+      <!-- YouTube legacy -->
+      <div id="yt-actions-section" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label>Source</label>
+            <select id="task-source"><option value="direct">Direct</option><option value="search">Search</option><option value="homepage">Homepage</option></select>
+          </div>
+          <div class="form-group"><label>Watch Seconds</label><input type="number" id="task-watch" value="45" min="5"></div>
+        </div>
+        <div class="form-group"><label>Search Query</label><input type="text" id="task-search" placeholder="(required for search source)"></div>
+        <div class="form-group"><label>Comment Text</label><input type="text" id="task-comment" placeholder="(optional)"></div>
+        <div class="form-group">
+          <label>Actions</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label"><input type="checkbox" id="yt-like"> Like</label>
+            <label class="checkbox-label"><input type="checkbox" id="yt-subscribe"> Subscribe</label>
+            <label class="checkbox-label"><input type="checkbox" id="yt-comment"> Comment</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-task')">Cancel</button>
+      <button class="btn btn-primary" onclick="addTask()">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Action Picker -->
+<div class="modal-overlay" id="modal-action-picker">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <span class="modal-title">Add Action</span>
+      <span class="modal-close" onclick="closeModal('modal-action-picker')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Action Type</label>
+        <select id="ap-type" onchange="onActionTypeChange()">
+          <option value="navigate">navigate — go to URL</option>
+          <option value="click">click — click selector</option>
+          <option value="type">type — type text into selector</option>
+          <option value="wait">wait — pause for N ms</option>
+          <option value="wait_for">wait_for — wait for selector</option>
+          <option value="screenshot">screenshot — capture page</option>
+          <option value="scroll">scroll — scroll page</option>
+          <option value="evaluate">evaluate — run JS</option>
+          <option value="extract">extract — get element text/attr</option>
+          <option value="hover">hover — hover over selector</option>
+          <option value="press">press — press keyboard key</option>
+          <option value="assert_text">assert_text — check text</option>
+          <option value="assert_url">assert_url — check URL</option>
+        </select>
+      </div>
+      <div id="ap-fields"></div>
+      <div class="form-group">
+        <label class="checkbox-label"><input type="checkbox" id="ap-required" checked> Required (stop sequence on failure)</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-action-picker')">Cancel</button>
+      <button class="btn btn-primary" onclick="addActionToList()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAML Tasks -->
+<div class="modal-overlay" id="modal-yaml-tasks">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <span class="modal-title">Load Tasks from YAML</span>
+      <span class="modal-close" onclick="closeModal('modal-yaml-tasks')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>YAML (list of tasks or {tasks: [...]})</label>
+        <textarea id="yaml-input" style="min-height:260px;font-family:monospace;font-size:12px" placeholder="- url: https://example.com
+  name: My Task
+  task_type: general
+  actions:
+    - type: navigate
+      url: https://example.com
+    - type: screenshot
+      name: after_load
+  priority: 3
+  repeat: 1"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-yaml-tasks')">Cancel</button>
+      <button class="btn btn-primary" onclick="loadYamlTasks()">Load Tasks</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Import -->
+<div class="modal-overlay" id="modal-import-profiles">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Import Profiles</span>
+      <span class="modal-close" onclick="closeModal('modal-import-profiles')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>JSON Data (array of profiles)</label>
+        <textarea id="import-json" style="min-height:220px;font-family:monospace;font-size:12px" placeholder='[{"seed":"...","fingerprint_json":"..."}]'></textarea>
+      </div>
+      <p style="font-size:12px;color:var(--text2)">Or drag & drop a .json export file here.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-import-profiles')">Cancel</button>
+      <button class="btn btn-primary" onclick="importProfiles()">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Fingerprint -->
+<div class="modal-overlay" id="modal-fingerprint">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span class="modal-title">Profile Fingerprint</span>
+      <span class="modal-close" onclick="closeModal('modal-fingerprint')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="fp-grid" id="fp-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-fingerprint')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Scheduled Task -->
+<div class="modal-overlay" id="modal-add-scheduled">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">New Scheduled Task</span>
+      <span class="modal-close" onclick="closeModal('modal-add-scheduled')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="st-name" placeholder="Daily warmup"></div>
+      <div class="form-group"><label>Description</label><input type="text" id="st-desc" placeholder="(optional)"></div>
+      <div class="form-group">
+        <label>Cron Expression <span style="color:var(--text3);font-weight:normal">(UTC)</span></label>
+        <input type="text" id="st-cron" placeholder="0 */6 * * *">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Examples: <code>0 */6 * * *</code> = every 6h &nbsp; <code>0 9 * * 1-5</code> = weekdays 9am &nbsp; <code>*/30 * * * *</code> = every 30m</div>
+      </div>
+      <div class="form-group"><label>Target URL</label><input type="text" id="st-url" placeholder="https://example.com"></div>
+      <div class="form-group"><label>Task Type</label>
+        <select id="st-type"><option value="general">General</option><option value="youtube">YouTube</option></select>
+      </div>
+      <div class="form-group"><label>Actions JSON</label>
+        <textarea id="st-actions" placeholder='[{"type":"navigate","url":"https://example.com"},{"type":"screenshot"}]' style="min-height:80px;font-family:monospace;font-size:12px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-scheduled')">Cancel</button>
+      <button class="btn btn-primary" onclick="addScheduledTask()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toasts" id="toasts"></div>
 
 <script>
-const API = '';
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  farmRunning: false,
+  currentActions: [],
+  ws: null,
+};
 
-function toast(msg, type = 'success') {
-  const c = document.getElementById('toasts');
-  const t = document.createElement('div');
-  t.className = `toast ${type}`;
-  t.textContent = msg;
-  c.appendChild(t);
-  setTimeout(() => t.remove(), 4000);
-}
-
-async function api(path, opts = {}) {
-  try {
-    const r = await fetch(API + path, {
-      headers: {'Content-Type': 'application/json'},
-      ...opts,
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || 'Request failed');
-    return data;
-  } catch(e) {
-    toast(e.message, 'error');
-    throw e;
-  }
-}
-
-function badge(status) {
-  return `<span class="badge ${status}">${status}</span>`;
-}
-
-function shortUrl(url) {
-  if (!url) return '';
-  if (url.length > 50) return url.substring(0, 50) + '...';
-  return url;
-}
-
-// --- Navigation ---
-document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+// ── Navigation ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    const page = el.dataset.page;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    item.classList.add('active');
-    document.getElementById('page-' + item.dataset.page).classList.add('active');
-    const loaders = {
-      dashboard: loadDashboard,
-      profiles: loadProfiles,
-      proxies: loadProxies,
-      tasks: loadTasks,
-      logs: loadLogs,
-      farm: loadFarmStatus,
-    };
-    if (loaders[item.dataset.page]) loaders[item.dataset.page]();
+    document.getElementById('page-' + page).classList.add('active');
+    document.getElementById('topbar-title').textContent = el.textContent.trim();
+    loadPageData(page);
   });
 });
 
-// --- Dashboard ---
-async function loadDashboard() {
-  const [stats, logs] = await Promise.all([api('/api/stats'), api('/api/logs?limit=10')]);
-  document.getElementById('dashCards').innerHTML = `
-    <div class="card"><div class="label">Profiles</div><div class="value blue">${stats.profiles_total}</div></div>
-    <div class="card"><div class="label">Profiles Busy</div><div class="value yellow">${stats.profiles_busy}</div></div>
-    <div class="card"><div class="label">Proxies</div><div class="value blue">${stats.proxies_total}</div></div>
-    <div class="card"><div class="label">Proxies Healthy</div><div class="value green">${stats.proxies_healthy}</div></div>
-    <div class="card"><div class="label">Tasks Pending</div><div class="value yellow">${stats.tasks_pending}</div></div>
-    <div class="card"><div class="label">Tasks Done</div><div class="value green">${stats.tasks_done}</div></div>
-    <div class="card"><div class="label">Tasks Failed</div><div class="value red">${stats.tasks_failed}</div></div>
-    <div class="card"><div class="label">Success Rate</div><div class="value green">${stats.logs_total > 0 ? Math.round(stats.logs_success / stats.logs_total * 100) : 0}%</div></div>
-  `;
-  const tbody = document.querySelector('#dashLogs tbody');
-  tbody.innerHTML = logs.map(l => `<tr>
-    <td>${l.ts || '-'}</td><td>${l.profile_id}</td><td>${l.task_id}</td>
-    <td>${badge(l.result)}</td><td>${l.duration_sec ? l.duration_sec.toFixed(1) + 's' : '-'}</td>
-  </tr>`).join('');
+function loadPageData(page) {
+  if (page === 'dashboard') { loadStats(); loadLogs(10); }
+  else if (page === 'profiles') loadProfiles();
+  else if (page === 'proxies') loadProxies();
+  else if (page === 'tasks') loadTasks();
+  else if (page === 'scheduled') loadScheduled();
+  else if (page === 'logs') loadLogs();
+  else if (page === 'screenshots') loadScreenshots();
+  else if (page === 'farm') { loadFarmStatus(); }
 }
 
-// --- Profiles ---
+// ── WebSocket ──────────────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  state.ws = new WebSocket(`${proto}://${location.host}/ws/logs`);
+
+  state.ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'log') appendLiveLog(msg);
+    else if (msg.type === 'status') onStatusUpdate(msg);
+    else if (msg.type === 'profiles_changed' || msg.type === 'tasks_changed') loadStats();
+  };
+
+  state.ws.onopen = () => {
+    setSidebarStatus('Connected', 'green');
+  };
+
+  state.ws.onclose = () => {
+    setSidebarStatus('Reconnecting...', 'yellow');
+    setTimeout(connectWS, 3000);
+  };
+
+  state.ws.onerror = () => {
+    setSidebarStatus('Disconnected', 'red');
+  };
+}
+
+function setSidebarStatus(text, color) {
+  document.getElementById('sidebar-status').textContent = text;
+  const dot = document.getElementById('sidebar-dot');
+  dot.className = `dot ${color}`;
+}
+
+function onStatusUpdate(msg) {
+  state.farmRunning = msg.running;
+  updateFarmUI(msg.running, msg.message);
+  loadStats();
+}
+
+// ── Live Log ───────────────────────────────────────────────────────────────
+function appendLiveLog(entry) {
+  const streams = ['live-log', 'farm-live-log'];
+  const ts = entry.ts ? entry.ts.split('T')[1]?.slice(0,8) : '--:--:--';
+  const result = entry.result || '';
+  const ok = result === 'ok';
+  const html = `<div class="log-entry">
+    <span class="log-ts">${ts}</span>
+    <span class="log-result ${ok ? 'ok' : 'error'}">${ok ? '✓' : '✗'}</span>
+    <span class="log-body">Profile ${entry.profile_id} → Task ${entry.task_id} [${result}] ${entry.duration_sec ? entry.duration_sec+'s' : ''} ${entry.error ? '— '+entry.error : ''}</span>
+  </div>`;
+  streams.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.insertAdjacentHTML('afterbegin', html);
+      if (el.children.length > 200) el.removeChild(el.lastChild);
+    }
+  });
+}
+
+function clearLiveLog() {
+  ['live-log','farm-live-log'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const data = await api('/api/stats');
+  if (!data) return;
+  const grid = document.getElementById('stat-grid');
+  const items = [
+    {label:'Profiles', val:data.profiles_total, color:'purple'},
+    {label:'Busy Profiles', val:data.profiles_busy, color:'orange'},
+    {label:'Proxies', val:data.proxies_total, color:'blue'},
+    {label:'Healthy Proxies', val:data.proxies_healthy, color:'green'},
+    {label:'Total Tasks', val:data.tasks_total, color:'purple'},
+    {label:'Pending', val:data.tasks_pending, color:'yellow'},
+    {label:'Done', val:data.tasks_done, color:'green'},
+    {label:'Failed', val:data.tasks_failed, color:'red'},
+  ];
+  grid.innerHTML = items.map(i =>
+    `<div class="stat-card"><div class="slabel">${i.label}</div><div class="sval ${i.color}">${i.val}</div></div>`
+  ).join('');
+
+  const topStats = document.getElementById('topbar-stats');
+  topStats.innerHTML = `
+    <span class="topbar-stat">Profiles: <strong>${data.profiles_total}</strong></span>
+    <span class="topbar-stat">Pending: <strong>${data.tasks_pending}</strong></span>
+    <span class="topbar-stat">Done: <strong>${data.tasks_done}</strong></span>
+  `;
+
+  document.getElementById('nav-profiles-count').textContent = data.profiles_total;
+  document.getElementById('nav-proxies-count').textContent = data.proxies_total;
+  document.getElementById('nav-tasks-count').textContent = data.tasks_pending;
+}
+
+// ── Farm Status ────────────────────────────────────────────────────────────
+async function loadFarmStatus() {
+  const data = await api('/api/farm/status');
+  if (!data) return;
+  state.farmRunning = data.running;
+  updateFarmUI(data.running, data.message);
+}
+
+function updateFarmUI(running, message) {
+  ['farm-dot','db-farm-dot'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = `big-dot ${running ? 'running' : 'idle'}`;
+  });
+  const farmText = document.getElementById('farm-status-text');
+  const farmSub = document.getElementById('farm-status-sub');
+  const dbText = document.getElementById('db-farm-text');
+  const dbSub = document.getElementById('db-farm-sub');
+  if (farmText) farmText.textContent = running ? 'Running' : 'Idle';
+  if (farmSub) farmSub.textContent = message;
+  if (dbText) dbText.textContent = running ? 'Running' : 'Idle';
+  if (dbSub) dbSub.textContent = message;
+
+  const startBtn = document.getElementById('farm-start-btn');
+  const stopBtn = document.getElementById('farm-stop-btn');
+  const dbStart = document.getElementById('db-start-btn');
+  const dbStop = document.getElementById('db-stop-btn');
+  if (startBtn) { startBtn.style.display = running ? 'none' : ''; stopBtn.style.display = running ? '' : 'none'; }
+  if (dbStart) { dbStart.style.display = running ? 'none' : ''; dbStop.style.display = running ? '' : 'none'; }
+}
+
+// ── Profiles ───────────────────────────────────────────────────────────────
 async function loadProfiles() {
-  const data = await api('/api/profiles');
-  const tbody = document.querySelector('#profilesTable tbody');
-  tbody.innerHTML = data.map(p => `<tr>
-    <td>${p.id}</td><td style="font-family:monospace;font-size:12px">${p.seed}</td>
-    <td>${badge(p.status)}</td><td>${p.has_cookies ? '&#10003;' : '-'}</td>
-    <td style="font-size:12px;color:var(--text2)">${p.last_used || 'never'}</td>
-    <td><button class="btn btn-danger btn-sm" onclick="deleteProfile(${p.id})">Del</button></td>
-  </tr>`).join('');
+  const tag = document.getElementById('profile-tag-filter')?.value || '';
+  const url = tag ? `/api/profiles?tag=${encodeURIComponent(tag)}` : '/api/profiles';
+  const data = await api(url);
+  if (!data) return;
+  document.getElementById('profiles-count').textContent = `${data.length} profiles`;
+  const tbody = document.getElementById('profiles-tbody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="ei">🧑‍💻</div><div>No profiles yet</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(p => `
+    <tr>
+      <td><span class="mono">${p.id}</span></td>
+      <td><span class="mono" title="${p.seed}">${p.seed}</span></td>
+      <td><span class="badge ${p.status}">${p.status}</span></td>
+      <td>${p.tags ? p.tags.split(',').map(t => `<span class="chip">${t.trim()}</span>`).join(' ') : '<span class="mono" style="color:var(--text3)">—</span>'}</td>
+      <td>${p.has_cookies ? '<span class="tag-green">✓</span>' : '<span class="tag-red">✗</span>'}</td>
+      <td class="mono" style="color:var(--text2)">${p.last_used || '—'}</td>
+      <td class="mono" style="color:var(--text2)">${p.created_at || '—'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm btn-icon" title="Fingerprint" onclick="showFingerprint(${p.id})">🔍</button>
+        <button class="btn btn-danger btn-sm btn-icon" title="Delete" onclick="deleteProfile(${p.id})">🗑</button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 async function generateProfiles() {
-  const count = parseInt(document.getElementById('genCount').value) || 5;
-  const data = await api('/api/profiles/generate', { method: 'POST', body: JSON.stringify({count}) });
-  toast(`Generated ${data.created} profiles`);
-  loadProfiles();
+  const count = parseInt(document.getElementById('gen-count').value) || 5;
+  const tags = document.getElementById('gen-tags').value || '';
+  const data = await api('/api/profiles/generate', 'POST', {count, tags});
+  if (data) { toast(`Created ${data.created} profiles`, 'success'); loadProfiles(); loadStats(); }
 }
 
 async function resetProfiles() {
-  const data = await api('/api/profiles/reset', { method: 'POST' });
-  toast(`Reset ${data.reset} profiles`);
-  loadProfiles();
+  const data = await api('/api/profiles/reset', 'POST');
+  if (data) { toast(`Reset ${data.reset} busy profiles`, 'info'); loadProfiles(); }
 }
 
 async function deleteProfile(id) {
-  await api(`/api/profiles/${id}`, { method: 'DELETE' });
-  loadProfiles();
+  if (!confirm(`Delete profile #${id}?`)) return;
+  const data = await api(`/api/profiles/${id}`, 'DELETE');
+  if (data) { toast('Profile deleted', 'success'); loadProfiles(); loadStats(); }
 }
 
-// --- Proxies ---
+async function showFingerprint(id) {
+  const data = await api(`/api/profiles/${id}/fingerprint`);
+  if (!data) return;
+  const fp = data.fingerprint;
+  const grid = document.getElementById('fp-grid');
+  const skip = ['fonts'];
+  grid.innerHTML = Object.entries(fp).filter(([k]) => !skip.includes(k)).map(([k, v]) =>
+    `<div class="fp-item"><div class="fp-key">${k}</div><div class="fp-val">${v}</div></div>`
+  ).join('') + `<div class="fp-item" style="grid-column:1/-1"><div class="fp-key">fonts (${fp.fonts?.length || 0})</div><div class="fp-val">${(fp.fonts || []).join(', ')}</div></div>`;
+  openModal('modal-fingerprint');
+}
+
+async function exportProfiles() {
+  window.open('/api/profiles/export', '_blank');
+}
+
+function showImportModal() {
+  openModal('modal-import-profiles');
+}
+
+async function importProfiles() {
+  const raw = document.getElementById('import-json').value.trim();
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { toast('Invalid JSON', 'error'); return; }
+  const data = await api('/api/profiles/import', 'POST', {profiles: Array.isArray(parsed) ? parsed : [parsed]});
+  if (data) {
+    toast(`Imported ${data.imported} profiles`, 'success');
+    closeModal('modal-import-profiles');
+    loadProfiles();
+    loadStats();
+  }
+}
+
+// ── Proxies ────────────────────────────────────────────────────────────────
 async function loadProxies() {
   const data = await api('/api/proxies');
-  const tbody = document.querySelector('#proxiesTable tbody');
-  tbody.innerHTML = data.map(px => `<tr>
-    <td>${px.id}</td><td style="font-family:monospace;font-size:12px">${shortUrl(px.url)}</td>
-    <td>${px.proxy_type}</td><td>${badge(px.status)}</td><td>${px.fail_count}</td>
-    <td>
-      <button class="btn btn-secondary btn-sm" onclick="checkProxy(${px.id})">Check</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteProxy(${px.id})">Del</button>
-    </td>
-  </tr>`).join('');
+  if (!data) return;
+  document.getElementById('proxies-count').textContent = `${data.length} proxies`;
+  const tbody = document.getElementById('proxies-tbody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="ei">🔀</div><div>No proxies added</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(px => `
+    <tr>
+      <td class="mono">${px.id}</td>
+      <td class="truncate mono"><a href="${px.url}" target="_blank">${px.url}</a></td>
+      <td><span class="chip">${px.proxy_type}</span></td>
+      <td><span class="badge ${px.status}">${px.status}</span></td>
+      <td>${px.fail_count > 0 ? `<span style="color:var(--red)">${px.fail_count}</span>` : `<span style="color:var(--green)">0</span>`}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="checkProxy(${px.id})">Check</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteProxy(${px.id})">🗑</button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 async function addProxy() {
-  const url = document.getElementById('proxyUrl').value.trim();
-  const proxy_type = document.getElementById('proxyType').value;
-  if (!url) return toast('Enter proxy URL', 'error');
-  await api('/api/proxies/add', { method: 'POST', body: JSON.stringify({url, proxy_type}) });
-  document.getElementById('proxyUrl').value = '';
-  toast('Proxy added');
-  loadProxies();
+  const url = document.getElementById('proxy-url').value.trim();
+  const proxy_type = document.getElementById('proxy-type').value;
+  if (!url) { toast('Enter a proxy URL', 'error'); return; }
+  const data = await api('/api/proxies/add', 'POST', {url, proxy_type});
+  if (data) { toast('Proxy added', 'success'); closeModal('modal-add-proxy'); loadProxies(); loadStats(); }
+}
+
+async function bulkAddProxies() {
+  const lines = document.getElementById('bulk-proxies').value;
+  const data = await api('/api/proxies/bulk', 'POST', {lines});
+  if (data) { toast(`Added ${data.added} proxies`, 'success'); closeModal('modal-bulk-proxy'); loadProxies(); loadStats(); }
 }
 
 async function checkProxy(id) {
-  toast('Checking proxy...');
-  const data = await api('/api/proxies/check', { method: 'POST', body: JSON.stringify({proxy_id: id}) });
-  toast(data.alive ? 'Proxy is alive' : 'Proxy is dead', data.alive ? 'success' : 'error');
-  loadProxies();
+  toast('Checking...', 'info');
+  const data = await api('/api/proxies/check', 'POST', {proxy_id: id});
+  if (data) { toast(data.alive ? `Proxy #${id} ✓ alive` : `Proxy #${id} ✗ dead`, data.alive ? 'success' : 'error'); loadProxies(); }
 }
 
 async function deleteProxy(id) {
-  await api(`/api/proxies/${id}`, { method: 'DELETE' });
-  loadProxies();
+  if (!confirm(`Delete proxy #${id}?`)) return;
+  const data = await api(`/api/proxies/${id}`, 'DELETE');
+  if (data) { toast('Proxy deleted', 'success'); loadProxies(); loadStats(); }
 }
 
 async function resetProxies() {
-  const data = await api('/api/proxies/reset', { method: 'POST' });
-  toast(`Reset ${data.reset} proxies`);
-  loadProxies();
+  const data = await api('/api/proxies/reset', 'POST');
+  if (data) { toast(`Reset ${data.reset} proxies`, 'info'); loadProxies(); }
 }
 
-// --- Tasks ---
+// ── Tasks ──────────────────────────────────────────────────────────────────
 async function loadTasks() {
-  const data = await api('/api/tasks');
-  const tbody = document.querySelector('#tasksTable tbody');
-  tbody.innerHTML = data.map(t => `<tr>
-    <td>${t.id}</td><td style="font-size:12px">${shortUrl(t.video_url)}</td>
-    <td>${t.watch_seconds}s</td><td>${t.source}</td>
-    <td style="font-size:12px">${t.actions.join(', ')}</td>
-    <td>${badge(t.status)}</td>
-    <td><button class="btn btn-danger btn-sm" onclick="deleteTask(${t.id})">Del</button></td>
-  </tr>`).join('');
+  const status = document.getElementById('task-status-filter')?.value || '';
+  const url = status ? `/api/tasks?status=${status}` : '/api/tasks';
+  const data = await api(url);
+  if (!data) return;
+  document.getElementById('tasks-count').textContent = `${data.length} tasks`;
+  const tbody = document.getElementById('tasks-tbody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="ei">📋</div><div>No tasks queued</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(t => {
+    const actCount = Array.isArray(t.actions) ? t.actions.length : 0;
+    return `
+    <tr>
+      <td class="mono">${t.id}</td>
+      <td>${t.name ? `<span style="color:var(--text)">${t.name}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+      <td class="truncate"><a href="${t.target_url}" target="_blank" title="${t.target_url}">${t.target_url}</a></td>
+      <td><span class="badge ${t.task_type}">${t.task_type}</span></td>
+      <td><span class="chip">${actCount} action${actCount !== 1 ? 's' : ''}</span></td>
+      <td><span class="mono">${t.priority}</span></td>
+      <td><span class="badge ${t.status}">${t.status}</span></td>
+      <td class="mono" style="color:var(--text2)">${t.created_at || '—'}</td>
+      <td><button class="btn btn-danger btn-sm btn-icon" onclick="deleteTask(${t.id})">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function onTaskTypeChange() {
+  const type = document.getElementById('task-type').value;
+  document.getElementById('general-actions-section').style.display = type === 'general' ? '' : 'none';
+  document.getElementById('yt-actions-section').style.display = type === 'youtube' ? '' : 'none';
 }
 
 async function addTask() {
-  const video_url = document.getElementById('taskUrl').value.trim();
-  if (!video_url) return toast('Enter video URL', 'error');
-  const actions = [];
-  if (document.getElementById('actLike').checked) actions.push('like');
-  if (document.getElementById('actSub').checked) actions.push('subscribe');
-  if (document.getElementById('actComment').checked) actions.push('comment');
+  const type = document.getElementById('task-type').value;
   const body = {
-    video_url,
-    watch_seconds: parseInt(document.getElementById('taskWatch').value) || 30,
-    source: document.getElementById('taskSource').value,
-    search_query: document.getElementById('taskQuery').value || null,
-    actions,
-    comment_text: document.getElementById('taskComment').value || null,
-    repeat: parseInt(document.getElementById('taskRepeat').value) || 1,
+    target_url: document.getElementById('task-url').value.trim(),
+    name: document.getElementById('task-name').value.trim() || null,
+    task_type: type,
+    priority: parseInt(document.getElementById('task-priority').value) || 5,
+    repeat: parseInt(document.getElementById('task-repeat').value) || 1,
+    actions: [],
   };
-  const data = await api('/api/tasks/add', { method: 'POST', body: JSON.stringify(body) });
-  toast(`Created ${data.created} task(s)`);
-  document.getElementById('taskUrl').value = '';
-  loadTasks();
-}
-
-async function loadYaml() {
-  const yaml_text = document.getElementById('yamlInput').value.trim();
-  if (!yaml_text) return toast('Paste YAML first', 'error');
-  const data = await api('/api/tasks/load-yaml', { method: 'POST', body: JSON.stringify({yaml_text}) });
-  toast(`Imported ${data.loaded} tasks`);
-  document.getElementById('yamlInput').value = '';
-  loadTasks();
+  if (!body.target_url) { toast('Enter a target URL', 'error'); return; }
+  if (type === 'general') {
+    body.actions = state.currentActions;
+  } else {
+    const actions = [];
+    if (document.getElementById('yt-like').checked) actions.push('like');
+    if (document.getElementById('yt-subscribe').checked) actions.push('subscribe');
+    if (document.getElementById('yt-comment').checked) actions.push('comment');
+    body.actions = actions;
+    body.source = document.getElementById('task-source').value;
+    body.watch_seconds = parseInt(document.getElementById('task-watch').value) || 45;
+    body.search_query = document.getElementById('task-search').value.trim() || null;
+    body.comment_text = document.getElementById('task-comment').value.trim() || null;
+  }
+  const data = await api('/api/tasks/add', 'POST', body);
+  if (data) {
+    toast(`Added ${data.created} task(s)`, 'success');
+    closeModal('modal-add-task');
+    state.currentActions = [];
+    renderActionList();
+    loadTasks();
+    loadStats();
+  }
 }
 
 async function deleteTask(id) {
-  await api(`/api/tasks/${id}`, { method: 'DELETE' });
-  loadTasks();
+  const data = await api(`/api/tasks/${id}`, 'DELETE');
+  if (data) { toast('Task deleted', 'success'); loadTasks(); loadStats(); }
 }
 
 async function resetTasks() {
-  const data = await api('/api/tasks/reset', { method: 'POST' });
-  toast(`Reset ${data.reset} tasks`);
-  loadTasks();
+  const data = await api('/api/tasks/reset', 'POST');
+  if (data) { toast(`Reset ${data.reset} running tasks`, 'info'); loadTasks(); }
 }
 
-// --- Logs ---
-async function loadLogs() {
-  const data = await api('/api/logs?limit=100');
-  const tbody = document.querySelector('#logsTable tbody');
-  tbody.innerHTML = data.map(l => `<tr>
-    <td>${l.id}</td><td style="font-size:12px">${l.ts || '-'}</td>
-    <td>${l.profile_id}</td><td>${l.task_id}</td>
-    <td>${badge(l.result)}</td>
-    <td>${l.duration_sec ? l.duration_sec.toFixed(1) + 's' : '-'}</td>
-    <td style="font-size:12px;color:var(--red);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.error_message || ''}</td>
-  </tr>`).join('');
+async function clearTasks(status) {
+  if (!confirm(`Delete all ${status} tasks?`)) return;
+  const data = await api(`/api/tasks?status=${status}`, 'DELETE');
+  if (data) { toast(`Deleted ${data.deleted} tasks`, 'success'); loadTasks(); loadStats(); }
 }
 
-// --- Farm Control ---
-async function loadFarmStatus() {
-  const [status, stats] = await Promise.all([api('/api/farm/status'), api('/api/stats')]);
-  const ind = document.getElementById('farmIndicator');
-  const txt = document.getElementById('farmStatusText');
-  txt.textContent = status.message;
-  ind.style.background = status.running ? 'var(--green)' : 'var(--text2)';
-  document.getElementById('farmStartBtn').disabled = status.running;
-  document.getElementById('farmStopBtn').disabled = !status.running;
-  document.getElementById('farmCards').innerHTML = `
-    <div class="card"><div class="label">Pending</div><div class="value yellow">${stats.tasks_pending}</div></div>
-    <div class="card"><div class="label">Done</div><div class="value green">${stats.tasks_done}</div></div>
-    <div class="card"><div class="label">Failed</div><div class="value red">${stats.tasks_failed}</div></div>
-    <div class="card"><div class="label">Active Profiles</div><div class="value blue">${stats.profiles_busy}</div></div>
-  `;
+async function loadYamlTasks() {
+  const yaml_text = document.getElementById('yaml-input').value;
+  const data = await api('/api/tasks/load-yaml', 'POST', {yaml_text});
+  if (data) { toast(`Loaded ${data.loaded} tasks`, 'success'); closeModal('modal-yaml-tasks'); loadTasks(); loadStats(); }
 }
 
+// ── Action Builder ─────────────────────────────────────────────────────────
+const ACTION_FIELDS = {
+  navigate: [{id:'url', label:'URL', placeholder:'https://example.com'}, {id:'wait_until', label:'Wait Until', type:'select', options:['domcontentloaded','load','networkidle']}],
+  click: [{id:'selector', label:'CSS Selector', placeholder:'.btn-submit'}],
+  type: [{id:'selector', label:'CSS Selector', placeholder:'input[name="q"]'}, {id:'text', label:'Text to type', placeholder:'Hello world'}],
+  wait: [{id:'ms', label:'Milliseconds', type:'number', placeholder:'1000'}],
+  wait_for: [{id:'selector', label:'CSS Selector'}, {id:'state', label:'State', type:'select', options:['visible','hidden','attached','detached']}],
+  screenshot: [{id:'name', label:'Name (optional)', placeholder:'after_login'}, {id:'full_page', label:'Full page', type:'checkbox'}],
+  scroll: [{id:'direction', label:'Direction', type:'select', options:['down','up']}, {id:'distance', label:'Distance px', type:'number', placeholder:'300'}],
+  evaluate: [{id:'script', label:'JavaScript', placeholder:'() => document.title', type:'textarea'}],
+  extract: [{id:'selector', label:'Selector', placeholder:'h1'}, {id:'attribute', label:'Attribute', placeholder:'innerText'}],
+  hover: [{id:'selector', label:'CSS Selector'}],
+  press: [{id:'key', label:'Key', placeholder:'Enter'}],
+  assert_text: [{id:'selector', label:'Selector', placeholder:'body'}, {id:'text', label:'Expected text'}],
+  assert_url: [{id:'url', label:'Expected URL fragment'}],
+};
+
+function onActionTypeChange() {
+  const type = document.getElementById('ap-type').value;
+  const fields = ACTION_FIELDS[type] || [];
+  document.getElementById('ap-fields').innerHTML = fields.map(f => {
+    if (f.type === 'select') return `<div class="form-group"><label>${f.label}</label><select id="ap-${f.id}">${f.options.map(o=>`<option>${o}</option>`).join('')}</select></div>`;
+    if (f.type === 'checkbox') return `<div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ap-${f.id}"> ${f.label}</label></div>`;
+    if (f.type === 'textarea') return `<div class="form-group"><label>${f.label}</label><textarea id="ap-${f.id}" placeholder="${f.placeholder||''}" style="min-height:70px;font-family:monospace;font-size:12px"></textarea></div>`;
+    if (f.type === 'number') return `<div class="form-group"><label>${f.label}</label><input type="number" id="ap-${f.id}" placeholder="${f.placeholder||''}"></div>`;
+    return `<div class="form-group"><label>${f.label}</label><input type="text" id="ap-${f.id}" placeholder="${f.placeholder||''}"></div>`;
+  }).join('');
+}
+
+function addActionToList() {
+  const type = document.getElementById('ap-type').value;
+  const fields = ACTION_FIELDS[type] || [];
+  const action = {type, required: document.getElementById('ap-required').checked};
+  fields.forEach(f => {
+    const el = document.getElementById(`ap-${f.id}`);
+    if (!el) return;
+    if (f.type === 'checkbox') action[f.id] = el.checked;
+    else if (f.type === 'number') action[f.id] = el.value ? parseInt(el.value) : undefined;
+    else action[f.id] = el.value || undefined;
+  });
+  Object.keys(action).forEach(k => action[k] === undefined && delete action[k]);
+  state.currentActions.push(action);
+  renderActionList();
+  closeModal('modal-action-picker');
+}
+
+function renderActionList() {
+  const list = document.getElementById('action-list');
+  const noActions = document.getElementById('no-actions');
+  if (!state.currentActions.length) {
+    list.innerHTML = '';
+    if (noActions) noActions.style.display = '';
+    return;
+  }
+  if (noActions) noActions.style.display = 'none';
+  list.innerHTML = state.currentActions.map((a, i) => {
+    const params = Object.entries(a).filter(([k]) => k !== 'type' && k !== 'required').map(([k,v]) => `${k}:${JSON.stringify(v)}`).join('  ');
+    return `<div class="action-item">
+      <span class="ai-type">${a.type}</span>
+      <span class="ai-params">${params || '—'}</span>
+      <span class="ai-del" onclick="removeAction(${i})">×</span>
+    </div>`;
+  }).join('');
+}
+
+function removeAction(i) {
+  state.currentActions.splice(i, 1);
+  renderActionList();
+}
+
+// ── Scheduled Tasks ────────────────────────────────────────────────────────
+async function loadScheduled() {
+  const data = await api('/api/scheduled-tasks');
+  if (!data) return;
+  const tbody = document.getElementById('scheduled-tbody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="ei">🕐</div><div>No scheduled tasks</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(st => `
+    <tr>
+      <td class="mono">${st.id}</td>
+      <td><strong>${st.name}</strong></td>
+      <td><code style="font-size:12px;color:var(--accent-h)">${st.cron_expr}</code></td>
+      <td style="color:var(--text2)">${st.description || '—'}</td>
+      <td>${st.enabled ? '<span class="badge done">✓ On</span>' : '<span class="badge failed">✗ Off</span>'}</td>
+      <td class="mono" style="color:var(--text2)">${st.last_run || '—'}</td>
+      <td class="mono" style="color:var(--text2)">${st.next_run || '—'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="runScheduledNow(${st.id})">▶ Now</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleScheduled(${st.id}, ${!st.enabled})">${st.enabled ? 'Disable' : 'Enable'}</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteScheduled(${st.id})">🗑</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function addScheduledTask() {
+  const name = document.getElementById('st-name').value.trim();
+  const cron_expr = document.getElementById('st-cron').value.trim();
+  const target_url = document.getElementById('st-url').value.trim();
+  const task_type = document.getElementById('st-type').value;
+  const actionsRaw = document.getElementById('st-actions').value.trim();
+  if (!name || !cron_expr || !target_url) { toast('Fill required fields', 'error'); return; }
+  let actions = [];
+  if (actionsRaw) { try { actions = JSON.parse(actionsRaw); } catch { toast('Invalid actions JSON', 'error'); return; } }
+  const task_template = {target_url, task_type, actions};
+  const data = await api('/api/scheduled-tasks', 'POST', {
+    name, description: document.getElementById('st-desc').value.trim(),
+    cron_expr, task_template
+  });
+  if (data) { toast('Scheduled task created', 'success'); closeModal('modal-add-scheduled'); loadScheduled(); }
+}
+
+async function runScheduledNow(id) {
+  const data = await api(`/api/scheduled-tasks/${id}/run-now`, 'POST');
+  if (data) { toast('Task queued', 'success'); loadTasks(); loadStats(); }
+}
+
+async function toggleScheduled(id, enabled) {
+  await api(`/api/scheduled-tasks/${id}`, 'PATCH', {enabled});
+  loadScheduled();
+}
+
+async function deleteScheduled(id) {
+  if (!confirm('Delete scheduled task?')) return;
+  const data = await api(`/api/scheduled-tasks/${id}`, 'DELETE');
+  if (data) { toast('Deleted', 'success'); loadScheduled(); }
+}
+
+// ── Logs ───────────────────────────────────────────────────────────────────
+async function loadLogs(limit) {
+  limit = limit || parseInt(document.getElementById('logs-limit')?.value) || 100;
+  const data = await api(`/api/logs?limit=${limit}`);
+  if (!data) return;
+  const el = document.getElementById('logs-count');
+  if (el) el.textContent = `${data.length} entries`;
+
+  // Update live-log on dashboard with historical entries if empty
+  const liveLog = document.getElementById('live-log');
+  if (liveLog && liveLog.children.length <= 1) {
+    liveLog.innerHTML = data.slice(0, 30).map(log => {
+      const ok = log.result === 'ok';
+      return `<div class="log-entry">
+        <span class="log-ts">${(log.ts || '').slice(11,19)}</span>
+        <span class="log-result ${ok ? 'ok' : 'error'}">${ok ? '✓' : '✗'}</span>
+        <span class="log-body">Profile ${log.profile_id} → Task ${log.task_id} [${log.result}] ${log.duration_sec ? log.duration_sec+'s' : ''} ${log.error_message ? '— '+log.error_message : ''}</span>
+      </div>`;
+    }).join('');
+  }
+
+  const tbody = document.getElementById('logs-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = data.map(log => {
+    const ok = log.result === 'ok';
+    return `<tr>
+      <td class="mono">${log.id}</td>
+      <td class="mono" style="color:var(--text2)">${log.ts || '—'}</td>
+      <td class="mono">${log.profile_id}</td>
+      <td class="mono">${log.task_id}</td>
+      <td><span class="badge ${ok ? 'ok' : 'error'}">${log.result}</span></td>
+      <td class="mono">${log.duration_sec != null ? log.duration_sec + 's' : '—'}</td>
+      <td style="color:var(--red);font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${log.error_message || ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Screenshots ────────────────────────────────────────────────────────────
+async function loadScreenshots() {
+  const data = await api('/api/screenshots');
+  if (!data) return;
+  const grid = document.getElementById('screenshots-grid');
+  const empty = document.getElementById('no-screenshots');
+  if (!data.length) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  grid.innerHTML = data.map(s => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      ${s.has_data ? `<img src="/api/screenshots/${s.id}/data" style="width:100%;height:140px;object-fit:cover" loading="lazy">` :
+        `<div style="height:140px;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--text3)">No preview</div>`}
+      <div style="padding:10px">
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.filename}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${s.created_at || ''}</div>
+        <div style="font-size:11px;color:var(--text3)">Profile ${s.profile_id || '—'} · Task ${s.task_id || '—'}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Farm Control ───────────────────────────────────────────────────────────
 async function startFarm() {
   const body = {
-    max_workers: parseInt(document.getElementById('farmWorkers').value) || 3,
-    headless: document.getElementById('farmHeadless').checked,
-    timeout: parseInt(document.getElementById('farmTimeout').value) || 15000,
-    max_retries: parseInt(document.getElementById('farmRetries').value) || 3,
+    max_workers: parseInt(document.getElementById('farm-workers').value) || 3,
+    timeout: parseInt(document.getElementById('farm-timeout').value) || 15000,
+    max_retries: parseInt(document.getElementById('farm-retries').value) || 3,
+    headless: document.getElementById('farm-headless').value === 'true',
   };
-  await api('/api/farm/start', { method: 'POST', body: JSON.stringify(body) });
-  toast('Farm started!');
-  loadFarmStatus();
+  const data = await api('/api/farm/start', 'POST', body);
+  if (data) { toast(`Farm started — ${data.pending_tasks} tasks`, 'success'); loadFarmStatus(); }
+}
+
+async function quickStart() {
+  const data = await api('/api/farm/start', 'POST', {max_workers:3, headless:true, timeout:15000, max_retries:3});
+  if (data) { toast(`Farm started — ${data.pending_tasks} tasks`, 'success'); loadFarmStatus(); }
 }
 
 async function stopFarm() {
-  await api('/api/farm/stop', { method: 'POST' });
-  toast('Farm stopped');
-  loadFarmStatus();
+  const data = await api('/api/farm/stop', 'POST');
+  if (data?.stopped) { toast('Farm stopped', 'info'); loadFarmStatus(); }
 }
 
-// --- Auto-refresh ---
-loadDashboard();
+async function quickStop() {
+  return stopFarm();
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+async function api(url, method = 'GET', body = null) {
+  try {
+    const opts = {method, headers:{'Content-Type':'application/json'}};
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(url, opts);
+    const json = await r.json();
+    if (!r.ok) { toast(json.detail || 'Request failed', 'error'); return null; }
+    return json;
+  } catch (e) { toast('Network error: ' + e.message, 'error'); return null; }
+}
+
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+onActionTypeChange();
+connectWS();
+loadStats();
+loadFarmStatus();
+loadLogs(30);
+
 setInterval(() => {
-  const active = document.querySelector('.page.active')?.id;
-  if (active === 'page-dashboard') loadDashboard();
-  if (active === 'page-farm') loadFarmStatus();
-}, 3000);
+  if (state.farmRunning) { loadStats(); loadFarmStatus(); }
+}, 5000);
 </script>
 </body>
 </html>

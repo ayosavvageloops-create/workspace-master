@@ -1,7 +1,6 @@
-"""Task queue: load tasks from YAML config into DB and serve them to workers."""
+"""Task queue backed by ProfileStore."""
 
-import json
-from typing import Any, Optional
+from typing import Optional
 
 from core.profile_store import ProfileStore, Task
 
@@ -9,33 +8,6 @@ from core.profile_store import ProfileStore, Task
 class TaskQueue:
     def __init__(self, store: ProfileStore):
         self.store = store
-
-    def load_from_config(self, tasks_config: list[dict[str, Any]]) -> int:
-        count = 0
-        for item in tasks_config:
-            video_url = item.get("url", "")
-            if not video_url:
-                continue
-
-            watch_seconds = item.get("watch_seconds", 30)
-            source = item.get("source", "search")
-            actions = item.get("actions", [])
-            search_query = item.get("search_query")
-            comment_text = item.get("comment_text")
-
-            repeat = item.get("repeat", 1)
-            for _ in range(repeat):
-                self.store.add_task(
-                    video_url=video_url,
-                    watch_seconds=watch_seconds,
-                    source=source,
-                    actions=actions,
-                    search_query=search_query,
-                    comment_text=comment_text,
-                )
-                count += 1
-
-        return count
 
     def next_task(self) -> Optional[Task]:
         return self.store.acquire_task()
@@ -46,3 +18,26 @@ class TaskQueue:
     def pending_count(self) -> int:
         with self.store.session() as s:
             return s.query(Task).filter(Task.status == "pending").count()
+
+    def load_from_config(self, tasks_list: list[dict]) -> int:
+        loaded = 0
+        for item in tasks_list:
+            url = item.get("url") or item.get("target_url") or item.get("video_url", "")
+            if not url:
+                continue
+            actions_raw = item.get("actions", [])
+            repeat = item.get("repeat", 1)
+            for _ in range(max(1, repeat)):
+                self.store.add_task(
+                    target_url=url,
+                    name=item.get("name"),
+                    task_type=item.get("task_type", "general") if isinstance(actions_raw[0] if actions_raw else None, dict) else "youtube",
+                    actions=actions_raw,
+                    watch_seconds=item.get("watch_seconds", 30),
+                    source=item.get("source", "direct"),
+                    search_query=item.get("search_query"),
+                    comment_text=item.get("comment_text"),
+                    priority=item.get("priority", 5),
+                )
+                loaded += 1
+        return loaded

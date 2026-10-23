@@ -2,14 +2,15 @@
 
 import asyncio
 import signal
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable, Optional
 
 from rich.console import Console
 from rich.table import Table
 
 from core.profile_store import ProfileStore
 from engine.queue import TaskQueue
-from engine.worker import Worker
+from engine.worker import Worker, LogCallback
 
 console = Console()
 
@@ -23,6 +24,9 @@ class Scheduler:
         headless: bool = True,
         timeout: int = 15000,
         max_retries: int = 3,
+        screenshots_dir: Optional[Path] = None,
+        on_log: Optional[LogCallback] = None,
+        on_status: Optional[Callable[[str], None]] = None,
     ):
         self.store = store
         self.task_queue = task_queue
@@ -30,8 +34,17 @@ class Scheduler:
         self.headless = headless
         self.timeout = timeout
         self.max_retries = max_retries
+        self.screenshots_dir = screenshots_dir
+        self.on_log = on_log
+        self.on_status = on_status
         self._shutdown = False
-        self._active_workers: list[asyncio.Task] = []
+
+    def _emit_status(self, msg: str) -> None:
+        if self.on_status:
+            try:
+                self.on_status(msg)
+            except Exception:
+                pass
 
     async def run(self) -> None:
         self.store.reset_busy_profiles()
@@ -45,10 +58,9 @@ class Scheduler:
             except NotImplementedError:
                 pass
 
-        console.log(
-            f"[green]Scheduler started: {self.max_workers} workers, "
-            f"{self.task_queue.pending_count()} tasks pending[/green]"
-        )
+        pending = self.task_queue.pending_count()
+        self._emit_status(f"Running {pending} tasks with {self.max_workers} workers")
+        console.log(f"[green]Scheduler: {self.max_workers} workers, {pending} tasks[/green]")
 
         sem = asyncio.Semaphore(self.max_workers)
         tasks_launched: list[asyncio.Task] = []
@@ -67,16 +79,15 @@ class Scheduler:
                 self.task_queue.complete(task.id, "pending")
                 break
 
-            coro = self._worker_wrapper(sem, task)
-            t = asyncio.create_task(coro)
+            t = asyncio.create_task(self._worker_wrapper(sem, task))
             tasks_launched.append(t)
-            self._active_workers.append(t)
 
         if tasks_launched:
             await asyncio.gather(*tasks_launched, return_exceptions=True)
 
         self.store.reset_busy_profiles()
         self.store.reset_busy_proxies()
+        self._emit_status("Finished")
         console.log("[green]Scheduler finished[/green]")
         self._print_summary()
 
@@ -87,6 +98,8 @@ class Scheduler:
                 store=self.store,
                 headless=self.headless,
                 timeout=self.timeout,
+                screenshots_dir=self.screenshots_dir,
+                on_log=self.on_log,
             )
             retries = 0
             result = "error"
@@ -97,30 +110,23 @@ class Scheduler:
                     break
                 retries += 1
                 if retries < self.max_retries:
-                    backoff = 2**retries
-                    console.log(
-                        f"[yellow]Task {task.id} retry {retries}/{self.max_retries} "
-                        f"in {backoff}s[/yellow]"
-                    )
+                    backoff = 2 ** retries
+                    console.log(f"[yellow]Task {task.id} retry {retries}/{self.max_retries} in {backoff}s[/yellow]")
                     await asyncio.sleep(backoff)
 
-            status = "done" if result == "ok" else "failed"
-            self.task_queue.complete(task.id, status)
+            self.task_queue.complete(task.id, "done" if result == "ok" else "failed")
 
         except Exception as exc:
-            console.log(
-                f"[red]Worker wrapper error for task {task.id}: {exc}[/red]"
-            )
+            console.log(f"[red]Worker error for task {task.id}: {exc}[/red]")
             self.task_queue.complete(task.id, "failed")
         finally:
             sem.release()
 
     def _signal_handler(self) -> None:
         if not self._shutdown:
-            console.log(
-                "[yellow]Shutdown signal received, finishing active tasks...[/yellow]"
-            )
+            console.log("[yellow]Shutdown signal received...[/yellow]")
             self._shutdown = True
+            self._emit_status("Stopping...")
 
     def _print_summary(self) -> None:
         stats = self.store.get_stats()

@@ -1,9 +1,10 @@
-"""Worker: takes a profile + proxy + task, runs a full browser session."""
+"""Worker: acquires a profile + proxy, runs a full browser session for one task."""
 
 import asyncio
 import json
 import time
-from typing import Optional
+from pathlib import Path
+from typing import Callable, Optional
 
 from playwright.async_api import async_playwright
 from rich.console import Console
@@ -12,6 +13,7 @@ from core.browser import create_browser_context, save_context_state
 from core.fingerprint import Fingerprint
 from core.profile_store import ProfileStore, Profile, Proxy, Task
 from core.proxy import check_proxy
+from core.task_runner import run_actions
 from actions.search import search_and_open_video
 from actions.watch import watch_video
 from actions.like import like_video
@@ -21,6 +23,9 @@ from behavior.human import random_delay
 
 console = Console()
 
+# Callback type: (profile_id, task_id, result, error, duration_sec) -> None
+LogCallback = Callable[[int, int, str, Optional[str], float], None]
+
 
 class Worker:
     def __init__(
@@ -29,11 +34,15 @@ class Worker:
         store: ProfileStore,
         headless: bool = True,
         timeout: int = 15000,
+        screenshots_dir: Optional[Path] = None,
+        on_log: Optional[LogCallback] = None,
     ):
         self.worker_id = worker_id
         self.store = store
         self.headless = headless
         self.timeout = timeout
+        self.screenshots_dir = screenshots_dir
+        self.on_log = on_log
         self.profile: Optional[Profile] = None
         self.proxy: Optional[Proxy] = None
         self._tag = f"[W{worker_id}]"
@@ -49,14 +58,10 @@ class Worker:
             return "no_profile"
 
         self.proxy = self.store.acquire_proxy()
-
         proxy_url: Optional[str] = None
         if self.proxy:
             proxy_ok = await check_proxy(self.proxy.url)
             if not proxy_ok:
-                console.log(
-                    f"{self._tag} Proxy {self.proxy.url} failed, trying another"
-                )
                 self.store.mark_proxy_failed(self.proxy.id)
                 self.proxy = self.store.acquire_proxy()
                 if self.proxy:
@@ -64,19 +69,19 @@ class Worker:
                     if not proxy_ok:
                         self.store.mark_proxy_failed(self.proxy.id)
                         self.proxy = None
-
             if self.proxy:
                 proxy_url = self.proxy.url
 
         fingerprint = Fingerprint.from_json(self.profile.fingerprint_json)
-        actions_list: list[str] = (
-            json.loads(task.actions_json) if task.actions_json else []
+        actions_raw = json.loads(task.actions_json) if task.actions_json else []
+        is_general = task.task_type == "general" or (
+            actions_raw and isinstance(actions_raw[0], dict)
         )
 
         console.log(
             f"{self._tag} Profile={self.profile.id} "
             f"Proxy={'yes' if proxy_url else 'none'} "
-            f"Task={task.id} Video={task.video_url[:50]}"
+            f"Task={task.id} [{task.task_type}] {task.target_url[:50]}"
         )
 
         pw = None
@@ -96,32 +101,51 @@ class Worker:
 
             page = await context.new_page()
 
-            opened = await self._navigate_to_video(page, task)
-            if not opened:
-                raise RuntimeError("Failed to open video page")
-
-            console.log(f"{self._tag} Watching for {task.watch_seconds}s ...")
-            await watch_video(page, task.watch_seconds, timeout=self.timeout)
-            console.log(f"{self._tag} Watch complete")
-
-            if "like" in actions_list:
-                ok = await like_video(page, timeout=self.timeout)
-                console.log(f"{self._tag} Like: {'ok' if ok else 'failed'}")
-
-            if "subscribe" in actions_list:
-                ok = await subscribe_to_channel(page, timeout=self.timeout)
-                console.log(f"{self._tag} Subscribe: {'ok' if ok else 'failed'}")
-
-            if "comment" in actions_list and task.comment_text:
-                ok = await leave_comment(
-                    page, task.comment_text, timeout=self.timeout
+            if is_general:
+                # General action sequence
+                shots_dir = None
+                if self.screenshots_dir:
+                    shots_dir = self.screenshots_dir / f"task_{task.id}"
+                report = await run_actions(
+                    page,
+                    actions_raw,
+                    timeout=self.timeout,
+                    screenshots_dir=shots_dir,
                 )
-                console.log(f"{self._tag} Comment: {'ok' if ok else 'failed'}")
+                if not report.success:
+                    raise RuntimeError(report.error or "Action sequence failed")
+                # Save any screenshots to DB
+                for path in report.screenshots:
+                    self.store.save_screenshot(
+                        filename=Path(path).name,
+                        filepath=path,
+                        profile_id=self.profile.id,
+                        task_id=task.id,
+                    )
+            else:
+                # Legacy YouTube flow
+                legacy_actions: list[str] = [a for a in actions_raw if isinstance(a, str)]
+                opened = await self._navigate_to_video(page, task)
+                if not opened:
+                    raise RuntimeError("Failed to open video page")
+
+                console.log(f"{self._tag} Watching for {task.watch_seconds}s ...")
+                await watch_video(page, task.watch_seconds, timeout=self.timeout)
+
+                if "like" in legacy_actions:
+                    ok = await like_video(page, timeout=self.timeout)
+                    console.log(f"{self._tag} Like: {'ok' if ok else 'failed'}")
+
+                if "subscribe" in legacy_actions:
+                    ok = await subscribe_to_channel(page, timeout=self.timeout)
+                    console.log(f"{self._tag} Subscribe: {'ok' if ok else 'failed'}")
+
+                if "comment" in legacy_actions and task.comment_text:
+                    ok = await leave_comment(page, task.comment_text, timeout=self.timeout)
+                    console.log(f"{self._tag} Comment: {'ok' if ok else 'failed'}")
 
             cookies_json, storage_json = await save_context_state(context)
-            self.store.save_profile_state(
-                self.profile.id, cookies_json, storage_json
-            )
+            self.store.save_profile_state(self.profile.id, cookies_json, storage_json)
 
         except Exception as exc:
             result = "error"
@@ -129,21 +153,12 @@ class Worker:
             console.log(f"{self._tag} [red]Error: {error_msg}[/red]")
 
         finally:
-            if context:
-                try:
-                    await context.close()
-                except Exception:
-                    pass
-            if browser:
-                try:
-                    await browser.close()
-                except Exception:
-                    pass
-            if pw:
-                try:
-                    await pw.stop()
-                except Exception:
-                    pass
+            for obj, method in [(context, "close"), (browser, "close"), (pw, "stop")]:
+                if obj:
+                    try:
+                        await getattr(obj, method)()
+                    except Exception:
+                        pass
 
             if self.profile:
                 self.store.release_profile(self.profile.id)
@@ -151,16 +166,23 @@ class Worker:
                 self.store.release_proxy(self.proxy.id)
 
         duration = time.monotonic() - start
-        self.store.log_result(
-            profile_id=self.profile.id if self.profile else 0,
+        profile_id = self.profile.id if self.profile else 0
+
+        log = self.store.log_result(
+            profile_id=profile_id,
             task_id=task.id,
             result=result,
             error_message=error_msg,
             duration_sec=round(duration, 2),
         )
-        console.log(
-            f"{self._tag} Task {task.id} finished: {result} ({duration:.1f}s)"
-        )
+
+        if self.on_log:
+            try:
+                self.on_log(profile_id, task.id, result, error_msg, round(duration, 2))
+            except Exception:
+                pass
+
+        console.log(f"{self._tag} Task {task.id} finished: {result} ({duration:.1f}s)")
         return result
 
     async def _navigate_to_video(self, page, task: Task) -> bool:
@@ -168,28 +190,16 @@ class Worker:
             return await search_and_open_video(
                 page,
                 task.search_query,
-                target_video_url=task.video_url,
+                target_video_url=task.target_url,
                 timeout=self.timeout,
             )
         elif task.source == "homepage":
-            await page.goto(
-                "https://www.youtube.com",
-                wait_until="domcontentloaded",
-                timeout=self.timeout,
-            )
+            await page.goto("https://www.youtube.com", wait_until="domcontentloaded", timeout=self.timeout)
             await random_delay(2000, 5000)
-            await page.goto(
-                task.video_url,
-                wait_until="domcontentloaded",
-                timeout=self.timeout,
-            )
+            await page.goto(task.target_url, wait_until="domcontentloaded", timeout=self.timeout)
             await random_delay(1000, 3000)
             return True
         else:
-            await page.goto(
-                task.video_url,
-                wait_until="domcontentloaded",
-                timeout=self.timeout,
-            )
+            await page.goto(task.target_url, wait_until="domcontentloaded", timeout=self.timeout)
             await random_delay(2000, 4000)
             return True
