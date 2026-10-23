@@ -1,5 +1,6 @@
 """Browser session management with fingerprint injection via Playwright."""
 
+import glob
 import json
 import asyncio
 from pathlib import Path
@@ -74,6 +75,14 @@ STEALTH_JS = """
 """
 
 
+def _find_chromium() -> Optional[str]:
+    candidates = sorted(glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome"), reverse=True)
+    for c in candidates:
+        if Path(c).is_file():
+            return c
+    return None
+
+
 async def create_browser_context(
     pw,
     fingerprint: Fingerprint,
@@ -93,11 +102,15 @@ async def create_browser_context(
         f"--font-family={','.join(fingerprint.fonts[:5])}",
     ]
 
+    chrome_path = _find_chromium()
+
     launch_kwargs: dict = {
         "headless": headless,
         "args": launch_args,
         "chromium_sandbox": False,
     }
+    if chrome_path:
+        launch_kwargs["executable_path"] = chrome_path
 
     if proxy_url:
         parts = proxy_url.replace("http://", "").replace("https://", "").replace("socks5://", "")
