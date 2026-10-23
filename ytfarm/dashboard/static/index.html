@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YTFarm</title>
+<style>
+:root {
+  --bg: #0f0f0f;
+  --surface: #1a1a2e;
+  --surface2: #16213e;
+  --accent: #e94560;
+  --accent2: #533483;
+  --text: #eee;
+  --text2: #999;
+  --green: #0f9b58;
+  --red: #e94560;
+  --yellow: #f4b400;
+  --blue: #4285f4;
+  --border: #2a2a4a;
+  --radius: 10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh;
+}
+.app { display: flex; height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 220px; background: var(--surface); padding: 20px 0;
+  display: flex; flex-direction: column; border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sidebar .logo {
+  font-size: 22px; font-weight: 700; padding: 0 20px 20px;
+  color: var(--accent); letter-spacing: -0.5px;
+}
+.sidebar .logo span { color: var(--text); }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 20px; cursor: pointer;
+  color: var(--text2); transition: all 0.2s; font-size: 14px;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active {
+  background: var(--surface2); color: var(--accent);
+  border-left-color: var(--accent);
+}
+.nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+.sidebar-footer { margin-top: auto; padding: 16px 20px; }
+.status-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; margin-right: 8px;
+}
+.status-dot.green { background: var(--green); }
+.status-dot.red { background: var(--red); }
+.status-dot.yellow { background: var(--yellow); }
+.status-text { font-size: 12px; color: var(--text2); }
+
+/* Main content */
+.main { flex: 1; overflow-y: auto; padding: 24px 32px; }
+.page { display: none; }
+.page.active { display: block; }
+.page-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; }
+
+/* Cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 16px; border: 1px solid var(--border);
+}
+.card .label { font-size: 12px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.green { color: var(--green); }
+.card .value.red { color: var(--red); }
+.card .value.blue { color: var(--blue); }
+.card .value.yellow { color: var(--yellow); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+tr:hover td { background: var(--surface2); }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.badge.free { background: #0f9b5822; color: var(--green); }
+.badge.busy { background: #f4b40022; color: var(--yellow); }
+.badge.pending { background: #4285f422; color: var(--blue); }
+.badge.done { background: #0f9b5822; color: var(--green); }
+.badge.failed, .badge.error { background: #e9456022; color: var(--red); }
+.badge.running { background: #f4b40022; color: var(--yellow); }
+.badge.ok { background: #0f9b5822; color: var(--green); }
+
+/* Buttons */
+.btn-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px; border: none;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #d63851; }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
+.btn-danger:hover { background: var(--red); color: #fff; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Forms */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--text); font-size: 14px; font-family: inherit;
+}
+.form-group textarea { min-height: 80px; resize: vertical; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-inline { display: flex; gap: 8px; align-items: end; }
+.form-inline .form-group { margin-bottom: 0; flex: 1; }
+.checkbox-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.checkbox-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; text-transform: none; letter-spacing: 0; }
+
+/* Farm control panel */
+.farm-panel {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 20px; border: 1px solid var(--border); margin-bottom: 24px;
+}
+.farm-panel .farm-status {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.farm-panel .farm-status .indicator {
+  width: 12px; height: 12px; border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Toast */
+.toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+.toast {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;
+  font-size: 13px; min-width: 250px; animation: slideIn 0.3s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.toast.success { border-left: 3px solid var(--green); }
+.toast.error { border-left: 3px solid var(--red); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="logo"><span>YT</span>Farm</div>
+    <div class="nav-item active" data-page="dashboard"><span class="icon">&#9632;</span> Dashboard</div>
+    <div class="nav-item" data-page="profiles"><span class="icon">&#9787;</span> Profiles</div>
+    <div class="nav-item" data-page="proxies"><span class="icon">&#9741;</span> Proxies</div>
+    <div class="nav-item" data-page="tasks"><span class="icon">&#9654;</span> Tasks</div>
+    <div class="nav-item" data-page="logs"><span class="icon">&#9776;</span> Logs</div>
+    <div class="nav-item" data-page="farm"><span class="icon">&#9881;</span> Farm Control</div>
+    <div class="sidebar-footer">
+      <span class="status-dot green" id="statusDot"></span>
+      <span class="status-text" id="statusText">Connected</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="cards" id="dashCards"></div>
+      <h2 style="font-size:16px;margin-bottom:12px;color:var(--text2)">Recent Activity</h2>
+      <div class="table-wrap"><table id="dashLogs"><thead><tr><th>Time</th><th>Profile</th><th>Task</th><th>Result</th><th>Duration</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- PROFILES -->
+    <div class="page" id="page-profiles">
+      <h1 class="page-title">Profiles</h1>
+      <div class="btn-row">
+        <div class="form-inline">
+          <div class="form-group"><label>Count</label><input type="number" id="genCount" value="5" min="1" max="100" style="width:80px"></div>
+          <button class="btn btn-primary" onclick="generateProfiles()">+ Generate</button>
+        </div>
+        <button class="btn btn-secondary" onclick="resetProfiles()">Reset Busy</button>
+      </div>
+      <div class="table-wrap"><table id="profilesTable"><thead><tr><th>ID</th><th>Seed</th><th>Status</th><th>Cookies</th><th>Last Used</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- PROXIES -->
+    <div class="page" id="page-proxies">
+      <h1 class="page-title">Proxies</h1>
+      <div class="btn-row">
+        <div class="form-inline">
+          <div class="form-group"><label>Proxy URL</label><input type="text" id="proxyUrl" placeholder="http://user:pass@host:port" style="min-width:300px"></div>
+          <div class="form-group"><label>Type</label>
+            <select id="proxyType" style="width:100px"><option>http</option><option>socks5</option></select>
+          </div>
+          <button class="btn btn-primary" onclick="addProxy()">+ Add</button>
+        </div>
+        <button class="btn btn-secondary" onclick="resetProxies()">Reset Busy</button>
+      </div>
+      <div class="table-wrap"><table id="proxiesTable"><thead><tr><th>ID</th><th>URL</th><th>Type</th><th>Status</th><th>Fails</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- TASKS -->
+    <div class="page" id="page-tasks">
+      <h1 class="page-title">Tasks</h1>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:14px;margin-bottom:12px;color:var(--text2)">Add Task</h3>
+          <div class="form-group"><label>Video URL</label><input type="text" id="taskUrl" placeholder="https://youtube.com/watch?v=..."></div>
+          <div class="form-row">
+            <div class="form-group"><label>Watch (sec)</label><input type="number" id="taskWatch" value="30"></div>
+            <div class="form-group"><label>Source</label>
+              <select id="taskSource"><option>search</option><option>direct</option><option>homepage</option></select>
+            </div>
+          </div>
+          <div class="form-group"><label>Search Query</label><input type="text" id="taskQuery" placeholder="optional"></div>
+          <div class="form-group"><label>Actions</label>
+            <div class="checkbox-row">
+              <label><input type="checkbox" id="actLike" checked> Like</label>
+              <label><input type="checkbox" id="actSub"> Subscribe</label>
+              <label><input type="checkbox" id="actComment"> Comment</label>
+            </div>
+          </div>
+          <div class="form-group"><label>Comment Text</label><input type="text" id="taskComment" placeholder="optional"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Repeat</label><input type="number" id="taskRepeat" value="1" min="1"></div>
+            <div><br><button class="btn btn-primary" onclick="addTask()" style="width:100%">+ Add Task</button></div>
+          </div>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:14px;margin-bottom:12px;color:var(--text2)">Import YAML</h3>
+          <div class="form-group"><label>Paste tasks YAML</label>
+            <textarea id="yamlInput" rows="10" placeholder="- url: https://youtube.com/watch?v=...&#10;  watch_seconds: 30&#10;  source: search&#10;  search_query: my query&#10;  actions: [like, subscribe]&#10;  repeat: 2"></textarea>
+          </div>
+          <button class="btn btn-secondary" onclick="loadYaml()">Import Tasks</button>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="resetTasks()">Reset Running</button>
+        <button class="btn btn-secondary" onclick="loadTasks()">Refresh</button>
+      </div>
+      <div class="table-wrap"><table id="tasksTable"><thead><tr><th>ID</th><th>Video</th><th>Watch</th><th>Source</th><th>Actions</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="page" id="page-logs">
+      <h1 class="page-title">Logs</h1>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="loadLogs()">Refresh</button>
+      </div>
+      <div class="table-wrap"><table id="logsTable"><thead><tr><th>ID</th><th>Time</th><th>Profile</th><th>Task</th><th>Result</th><th>Duration</th><th>Error</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- FARM CONTROL -->
+    <div class="page" id="page-farm">
+      <h1 class="page-title">Farm Control</h1>
+      <div class="farm-panel">
+        <div class="farm-status">
+          <div class="indicator" id="farmIndicator" style="background:var(--text2)"></div>
+          <span id="farmStatusText" style="font-size:14px">Idle</span>
+        </div>
+        <div class="form-row" style="margin-bottom:16px">
+          <div class="form-group"><label>Workers</label><input type="number" id="farmWorkers" value="3" min="1" max="20"></div>
+          <div class="form-group"><label>Timeout (ms)</label><input type="number" id="farmTimeout" value="15000"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:16px">
+          <div class="form-group"><label>Max Retries</label><input type="number" id="farmRetries" value="3" min="1" max="10"></div>
+          <div class="form-group"><label>Mode</label>
+            <div class="checkbox-row" style="margin-top:8px">
+              <label><input type="checkbox" id="farmHeadless" checked> Headless</label>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="farmStartBtn" onclick="startFarm()">Start Farm</button>
+          <button class="btn btn-danger" id="farmStopBtn" onclick="stopFarm()" disabled>Stop</button>
+        </div>
+      </div>
+      <div class="cards" id="farmCards"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = '';
+
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+async function api(path, opts = {}) {
+  try {
+    const r = await fetch(API + path, {
+      headers: {'Content-Type': 'application/json'},
+      ...opts,
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Request failed');
+    return data;
+  } catch(e) {
+    toast(e.message, 'error');
+    throw e;
+  }
+}
+
+function badge(status) {
+  return `<span class="badge ${status}">${status}</span>`;
+}
+
+function shortUrl(url) {
+  if (!url) return '';
+  if (url.length > 50) return url.substring(0, 50) + '...';
+  return url;
+}
+
+// --- Navigation ---
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-' + item.dataset.page).classList.add('active');
+    const loaders = {
+      dashboard: loadDashboard,
+      profiles: loadProfiles,
+      proxies: loadProxies,
+      tasks: loadTasks,
+      logs: loadLogs,
+      farm: loadFarmStatus,
+    };
+    if (loaders[item.dataset.page]) loaders[item.dataset.page]();
+  });
+});
+
+// --- Dashboard ---
+async function loadDashboard() {
+  const [stats, logs] = await Promise.all([api('/api/stats'), api('/api/logs?limit=10')]);
+  document.getElementById('dashCards').innerHTML = `
+    <div class="card"><div class="label">Profiles</div><div class="value blue">${stats.profiles_total}</div></div>
+    <div class="card"><div class="label">Profiles Busy</div><div class="value yellow">${stats.profiles_busy}</div></div>
+    <div class="card"><div class="label">Proxies</div><div class="value blue">${stats.proxies_total}</div></div>
+    <div class="card"><div class="label">Proxies Healthy</div><div class="value green">${stats.proxies_healthy}</div></div>
+    <div class="card"><div class="label">Tasks Pending</div><div class="value yellow">${stats.tasks_pending}</div></div>
+    <div class="card"><div class="label">Tasks Done</div><div class="value green">${stats.tasks_done}</div></div>
+    <div class="card"><div class="label">Tasks Failed</div><div class="value red">${stats.tasks_failed}</div></div>
+    <div class="card"><div class="label">Success Rate</div><div class="value green">${stats.logs_total > 0 ? Math.round(stats.logs_success / stats.logs_total * 100) : 0}%</div></div>
+  `;
+  const tbody = document.querySelector('#dashLogs tbody');
+  tbody.innerHTML = logs.map(l => `<tr>
+    <td>${l.ts || '-'}</td><td>${l.profile_id}</td><td>${l.task_id}</td>
+    <td>${badge(l.result)}</td><td>${l.duration_sec ? l.duration_sec.toFixed(1) + 's' : '-'}</td>
+  </tr>`).join('');
+}
+
+// --- Profiles ---
+async function loadProfiles() {
+  const data = await api('/api/profiles');
+  const tbody = document.querySelector('#profilesTable tbody');
+  tbody.innerHTML = data.map(p => `<tr>
+    <td>${p.id}</td><td style="font-family:monospace;font-size:12px">${p.seed}</td>
+    <td>${badge(p.status)}</td><td>${p.has_cookies ? '&#10003;' : '-'}</td>
+    <td style="font-size:12px;color:var(--text2)">${p.last_used || 'never'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteProfile(${p.id})">Del</button></td>
+  </tr>`).join('');
+}
+
+async function generateProfiles() {
+  const count = parseInt(document.getElementById('genCount').value) || 5;
+  const data = await api('/api/profiles/generate', { method: 'POST', body: JSON.stringify({count}) });
+  toast(`Generated ${data.created} profiles`);
+  loadProfiles();
+}
+
+async function resetProfiles() {
+  const data = await api('/api/profiles/reset', { method: 'POST' });
+  toast(`Reset ${data.reset} profiles`);
+  loadProfiles();
+}
+
+async function deleteProfile(id) {
+  await api(`/api/profiles/${id}`, { method: 'DELETE' });
+  loadProfiles();
+}
+
+// --- Proxies ---
+async function loadProxies() {
+  const data = await api('/api/proxies');
+  const tbody = document.querySelector('#proxiesTable tbody');
+  tbody.innerHTML = data.map(px => `<tr>
+    <td>${px.id}</td><td style="font-family:monospace;font-size:12px">${shortUrl(px.url)}</td>
+    <td>${px.proxy_type}</td><td>${badge(px.status)}</td><td>${px.fail_count}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick="checkProxy(${px.id})">Check</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteProxy(${px.id})">Del</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function addProxy() {
+  const url = document.getElementById('proxyUrl').value.trim();
+  const proxy_type = document.getElementById('proxyType').value;
+  if (!url) return toast('Enter proxy URL', 'error');
+  await api('/api/proxies/add', { method: 'POST', body: JSON.stringify({url, proxy_type}) });
+  document.getElementById('proxyUrl').value = '';
+  toast('Proxy added');
+  loadProxies();
+}
+
+async function checkProxy(id) {
+  toast('Checking proxy...');
+  const data = await api('/api/proxies/check', { method: 'POST', body: JSON.stringify({proxy_id: id}) });
+  toast(data.alive ? 'Proxy is alive' : 'Proxy is dead', data.alive ? 'success' : 'error');
+  loadProxies();
+}
+
+async function deleteProxy(id) {
+  await api(`/api/proxies/${id}`, { method: 'DELETE' });
+  loadProxies();
+}
+
+async function resetProxies() {
+  const data = await api('/api/proxies/reset', { method: 'POST' });
+  toast(`Reset ${data.reset} proxies`);
+  loadProxies();
+}
+
+// --- Tasks ---
+async function loadTasks() {
+  const data = await api('/api/tasks');
+  const tbody = document.querySelector('#tasksTable tbody');
+  tbody.innerHTML = data.map(t => `<tr>
+    <td>${t.id}</td><td style="font-size:12px">${shortUrl(t.video_url)}</td>
+    <td>${t.watch_seconds}s</td><td>${t.source}</td>
+    <td style="font-size:12px">${t.actions.join(', ')}</td>
+    <td>${badge(t.status)}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteTask(${t.id})">Del</button></td>
+  </tr>`).join('');
+}
+
+async function addTask() {
+  const video_url = document.getElementById('taskUrl').value.trim();
+  if (!video_url) return toast('Enter video URL', 'error');
+  const actions = [];
+  if (document.getElementById('actLike').checked) actions.push('like');
+  if (document.getElementById('actSub').checked) actions.push('subscribe');
+  if (document.getElementById('actComment').checked) actions.push('comment');
+  const body = {
+    video_url,
+    watch_seconds: parseInt(document.getElementById('taskWatch').value) || 30,
+    source: document.getElementById('taskSource').value,
+    search_query: document.getElementById('taskQuery').value || null,
+    actions,
+    comment_text: document.getElementById('taskComment').value || null,
+    repeat: parseInt(document.getElementById('taskRepeat').value) || 1,
+  };
+  const data = await api('/api/tasks/add', { method: 'POST', body: JSON.stringify(body) });
+  toast(`Created ${data.created} task(s)`);
+  document.getElementById('taskUrl').value = '';
+  loadTasks();
+}
+
+async function loadYaml() {
+  const yaml_text = document.getElementById('yamlInput').value.trim();
+  if (!yaml_text) return toast('Paste YAML first', 'error');
+  const data = await api('/api/tasks/load-yaml', { method: 'POST', body: JSON.stringify({yaml_text}) });
+  toast(`Imported ${data.loaded} tasks`);
+  document.getElementById('yamlInput').value = '';
+  loadTasks();
+}
+
+async function deleteTask(id) {
+  await api(`/api/tasks/${id}`, { method: 'DELETE' });
+  loadTasks();
+}
+
+async function resetTasks() {
+  const data = await api('/api/tasks/reset', { method: 'POST' });
+  toast(`Reset ${data.reset} tasks`);
+  loadTasks();
+}
+
+// --- Logs ---
+async function loadLogs() {
+  const data = await api('/api/logs?limit=100');
+  const tbody = document.querySelector('#logsTable tbody');
+  tbody.innerHTML = data.map(l => `<tr>
+    <td>${l.id}</td><td style="font-size:12px">${l.ts || '-'}</td>
+    <td>${l.profile_id}</td><td>${l.task_id}</td>
+    <td>${badge(l.result)}</td>
+    <td>${l.duration_sec ? l.duration_sec.toFixed(1) + 's' : '-'}</td>
+    <td style="font-size:12px;color:var(--red);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.error_message || ''}</td>
+  </tr>`).join('');
+}
+
+// --- Farm Control ---
+async function loadFarmStatus() {
+  const [status, stats] = await Promise.all([api('/api/farm/status'), api('/api/stats')]);
+  const ind = document.getElementById('farmIndicator');
+  const txt = document.getElementById('farmStatusText');
+  txt.textContent = status.message;
+  ind.style.background = status.running ? 'var(--green)' : 'var(--text2)';
+  document.getElementById('farmStartBtn').disabled = status.running;
+  document.getElementById('farmStopBtn').disabled = !status.running;
+  document.getElementById('farmCards').innerHTML = `
+    <div class="card"><div class="label">Pending</div><div class="value yellow">${stats.tasks_pending}</div></div>
+    <div class="card"><div class="label">Done</div><div class="value green">${stats.tasks_done}</div></div>
+    <div class="card"><div class="label">Failed</div><div class="value red">${stats.tasks_failed}</div></div>
+    <div class="card"><div class="label">Active Profiles</div><div class="value blue">${stats.profiles_busy}</div></div>
+  `;
+}
+
+async function startFarm() {
+  const body = {
+    max_workers: parseInt(document.getElementById('farmWorkers').value) || 3,
+    headless: document.getElementById('farmHeadless').checked,
+    timeout: parseInt(document.getElementById('farmTimeout').value) || 15000,
+    max_retries: parseInt(document.getElementById('farmRetries').value) || 3,
+  };
+  await api('/api/farm/start', { method: 'POST', body: JSON.stringify(body) });
+  toast('Farm started!');
+  loadFarmStatus();
+}
+
+async function stopFarm() {
+  await api('/api/farm/stop', { method: 'POST' });
+  toast('Farm stopped');
+  loadFarmStatus();
+}
+
+// --- Auto-refresh ---
+loadDashboard();
+setInterval(() => {
+  const active = document.querySelector('.page.active')?.id;
+  if (active === 'page-dashboard') loadDashboard();
+  if (active === 'page-farm') loadFarmStatus();
+}, 3000);
+</script>
+</body>
+</html>
